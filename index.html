@@ -3,63 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#10150f">
-<title>Desert Falcons — Command OS</title>
+<meta name="theme-color" content="#0b0f0c">
+<title>Desert Falcons — Player Terminal</title>
 <link rel="stylesheet" href="style.css">
 <link rel="stylesheet" href="ui.css">
 </head>
 <body>
-<header class="topbar">
-<div class="brand"><span class="brand-mark">DF</span><div><strong>DESERT FALCONS</strong><small>COMMAND OS</small></div></div>
-<div class="top-meta"><b id="headerRole">JOGADOR</b><span id="headerMatch">AGUARDANDO</span></div>
-</header>
+<header class="topbar"><div class="brand"><span class="brand-mark">DF</span><div><strong>DESERT FALCONS</strong><small>PLAYER TERMINAL</small></div></div><div class="top-meta"><b id="headerRole">JOGADOR</b><span id="headerMatch">PREPARAÇÃO</span></div></header>
 <main>
 <section id="screen-home" class="screen active">
-<div class="hero card"><div><span class="eyebrow">BASE DE OPERAÇÕES</span><h1 id="matchName">Operação Red Sand</h1><p>Centro de gerenciamento e acompanhamento da partida.</p></div><span id="homeStatus" class="pill warning">AGUARDANDO</span></div>
-<div class="instructions-strip"><span class="info-mark">i</span><div><b>COMO TESTAR</b><br>Entre em Preparação, inicie pelo Comando e abra o Painel Tático para testar os módulos.</div></div>
-<div class="quick-grid">
-<button class="quick primary" data-action="command"><span>◈</span><b>COMANDO</b><small>Controle da partida</small></button>
-<button class="quick" data-action="prepare"><span>◉</span><b>PREPARAÇÃO</b><small>Identidade e briefing</small></button>
-<button class="quick" data-action="tactical"><span>▣</span><b>PAINEL TÁTICO</b><small>Experiência do jogador</small></button>
-<button class="quick" data-action="dev"><span>⌘</span><b>DEV TEST</b><small>Testar módulos</small></button>
-</div>
-<div class="card overview"><div class="card-head"><span class="eyebrow">CENTRAL DE TESTES</span><span class="live-dot">● ONLINE</span></div><div class="module-row"><button data-action="briefing">BRIEFING</button><button data-action="map">MAPA</button><button data-action="camera">CÂMERA</button><button data-action="radioTest">RÁDIO</button></div></div>
+<div class="card hero"><span class="eyebrow">IDENTIDADE</span><h1 id="homePlayerName">DANI</h1><p id="homeIdentity">DF-001 · AZUL · ASSALTO</p><div class="identity-ready">IDENTIDADE PREENCHIDA</div></div>
+<div class="prep-tabs"><button class="prep-tab active" data-prep="inicio">INÍCIO</button><button class="prep-tab" data-prep="briefing">BRIEFING</button><button class="prep-tab" data-prep="perfil">PERFIL</button></div>
+<div id="prep-inicio" class="prep-pane active"><div class="card"><span class="eyebrow">PREPARAÇÃO</span><h2>Confirme sua participação</h2><p class="muted">Leia o briefing configurado pelo organizador, registre sua presença e aguarde a liberação da partida.</p><div class="flow-list"><div><b>01</b><span>Briefing e regras</span></div><div><b>02</b><span>Selfie de presença</span></div><div><b>03</b><span>Confirmação de participação</span></div><div><b>04</b><span>Sala de espera</span></div></div><button class="wide primary" data-prep="briefing">ABRIR BRIEFING</button></div></div>
+<div id="prep-briefing" class="prep-pane"><div class="card"><span class="eyebrow">BRIEFING DO ORGANIZADOR</span><h2 id="briefingTitle">Operação Red Sand</h2><div id="briefingBody" class="briefing-body"><p>O briefing desta partida é configurado previamente pelo organizador e apresenta as regras e condições válidas para esta sessão.</p><div class="rule-card"><b>Regras da partida</b><p>Respeite as regras publicadas pelo organizador e utilize os recursos digitais somente dentro da partida.</p></div><div class="rule-card"><b>Recursos digitais</b><p>Mapa, localização, comunicação e estados do jogador funcionam conforme a configuração da partida.</p></div></div><label class="ack-row"><input id="briefingAck" type="checkbox"><span>Recebi e estou ciente das regras do briefing.</span></label><p class="responsibility-text">Ao confirmar, declaro que li o briefing apresentado, compreendi as regras configuradas pelo organizador e assumo a responsabilidade por cumprir as condições informadas durante a partida.</p><button id="selfieButton" class="wide secondary" data-action="selfie">CAPTURAR SELFIE DE PRESENÇA</button><div id="selfiePreview" class="selfie-preview hidden"></div><button id="confirmParticipation" class="wide success" data-action="confirmParticipation" disabled>CONFIRMAR PARTICIPAÇÃO</button></div></div>
+<div id="prep-perfil" class="prep-pane"><div class="card profile-card"><span class="eyebrow">PERFIL</span><div class="identity"><div class="avatar">D</div><div><h2 id="profileName">DANI</h2><p id="profileMeta">DF-001 · AZUL</p></div></div><div class="profile-grid"><span>CLASSE<b id="profileClass">ASSALTO</b></span><span>STATUS<b id="profileStatus">AGUARDANDO</b></span><span>RÁDIO<b id="profileRadio">CH 01</b></span></div></div></div>
 </section>
-<section id="screen-prepare" class="screen">
-<div class="section-head"><div><span class="eyebrow">JOGADOR</span><h2>Central de preparação</h2></div><button class="ghost" data-action="home">INÍCIO</button></div>
-<div class="grid-two">
-<article class="card identity-card"><span class="eyebrow">IDENTIDADE</span><div class="identity"><div class="avatar">D</div><div><h2 id="playerName">DANI</h2><p>Equipe <b id="playerTeam">AZUL</b> · <span id="playerId">DF-001</span></p></div></div><label>Classe<select id="playerClass"><option>Assalto</option><option>Médico</option><option>Recon</option><option>Suporte</option></select></label><button class="wide secondary" data-action="radioTest">◉ TESTAR RÁDIO</button></article>
-<article class="card"><span class="eyebrow">BRIEFING</span><h3>Capturar e manter Alfa e Bravo.</h3><p class="muted">Partida demonstrativa para testar fluxo, comunicação, mapa, estados e eventos.</p><div class="test-instructions"><div class="test-step"><i>1</i><span>Confira sua identidade e classe.</span></div><div class="test-step"><i>2</i><span>Inicie a partida no painel de Comando.</span></div><div class="test-step"><i>3</i><span>Entre no painel e teste os módulos.</span></div></div><button class="wide" data-action="briefing">VER BRIEFING</button></article>
-</div>
-<div class="ready card"><div><span class="eyebrow">DEPLOY</span><h2 id="readyState">Aguardando partida</h2><p class="muted">Inicie a partida pelo Comando para liberar o painel.</p></div><button id="readyButton" class="success big" data-action="ready">ESTOU PRONTO</button></div>
-</section>
+<section id="screen-waiting" class="screen"><div class="waiting-screen"><div class="waiting-mark">DF</div><span class="eyebrow">PARTICIPAÇÃO CONFIRMADA</span><h1>AGUARDANDO INÍCIO</h1><p id="waitingText">Sua presença foi registrada. O painel tático será liberado quando o organizador iniciar a partida.</p><div class="waiting-status"><span class="live-dot">●</span><b id="waitingMatchStatus">AGUARDANDO ORGANIZADOR</b></div></div></section>
 <section id="screen-tactical" class="screen tactical-screen">
-<div id="touchGuard" class="touch-guard"><div class="lock-mark">▣</div><b>PAINEL PROTEGIDO</b><small>Segure por 1,2 s para liberar os comandos</small><div class="unlock-track"><span></span></div></div>
-<div class="tactical-head"><div><span class="eyebrow">PAINEL TÁTICO</span><h2 id="tacticalMatch">OPERAÇÃO RED SAND</h2><span id="gameClock" class="clock">00:00:00</span></div><div class="head-right"><span id="radioBadge" class="radio-badge">● RÁDIO CH 01</span><span id="tacticalStatus" class="pill success">ATIVO</span></div></div>
-<div class="quick-radio" data-action="radioTest"><div class="radio-box">◉</div><div><b>RÁDIO</b><small>Teste de voz local · canal 01</small></div><div class="radio-level"><span></span></div></div>
-<div class="tactical-grid">
-<article class="status-card"><div id="playerStateIcon" class="state-icon">✓</div><div><span class="eyebrow">SEU ESTADO</span><h1 id="playerStateTitle">ATIVO</h1><p id="playerStateDesc">Sistema operacional.</p></div></article>
-<article class="mission-card"><span class="eyebrow">OBJETIVO ATUAL</span><h2>ALFA / BRAVO</h2><div class="mini-progress"><span id="missionProgress"></span></div><small id="missionText">0 de 2 setores registrados</small></article>
-</div>
-<div class="card"><div class="card-head"><span class="eyebrow">LOCALIZAÇÃO</span><span class="live-dot">● LOCAL</span></div><div class="venue-map"><div class="venue-road main"></div><div class="venue-road cross"></div><div class="venue-road side-a"></div><div class="venue-road side-b"></div><div class="venue-building hangar"></div><div class="venue-building admin"></div><div class="venue-building obstacle obs1"></div><div class="venue-building obstacle obs2"></div><div class="venue-building obstacle obs3"></div><span class="venue-label gate">Entrada</span><span class="venue-label loading">Pátio</span><span class="venue-label yard">Área central</span><span class="venue-label hangar">Galpão A</span><div class="venue-location">VOCÊ</div></div><div class="gps-readout"><span class="live">● GPS DISPONÍVEL</span><span>MAPA FICTÍCIO</span><span>POSIÇÃO LOCAL</span></div><div class="venue-legend"><span><i class="road"></i>Via interna</span><span><i class="building"></i>Edificação</span><span><i class="obstacle"></i>Obstáculo</span><span><i class="you"></i>Você</span></div></div>
-<div class="action-deck">
-<button id="hitButton" class="action critical" data-action="hit"><span>!</span><b>REGISTRAR HIT</b><small>Toque para simular</small></button>
-<button class="action" data-action="map"><span>⌖</span><b>MAPA</b><small>Visualização</small></button>
-<button class="action" data-action="camera"><span>◌</span><b>CÂMERA</b><small>Teste visual</small></button>
-<button class="action" data-action="briefing"><span>≡</span><b>INSTRUÇÕES</b><small>Consultar</small></button>
-</div>
-<div class="unlock-hint">Tela protegida contra toques acidentais · segure o centro para liberar</div>
-</section>
-<section id="screen-command" class="screen">
-<div class="section-head"><div><span class="eyebrow">COMANDO</span><h2>Centro de controle</h2></div><button class="ghost" data-action="home">INÍCIO</button></div>
-<div class="command-banner card"><div><span class="eyebrow">MOTOR DA PARTIDA</span><h2 id="commandStatus">AGUARDANDO</h2></div><div class="command-actions"><button id="startMatch" class="primary" data-action="start">INICIAR</button><button id="pauseMatch" class="warning hidden" data-action="pause">PAUSAR</button><button id="resumeMatch" class="success hidden" data-action="resume">RETOMAR</button><button id="endMatch" class="danger hidden" data-action="end">ENCERRAR</button></div></div>
-<div class="stats-grid"><div class="stat blue"><small>AZUL ATIVOS</small><b id="blueCount">12</b></div><div class="stat red"><small>VERMELHO ATIVOS</small><b id="redCount">12</b></div><div class="stat"><small>OBJETIVOS</small><b id="objectiveCount">0/2</b></div><div class="stat"><small>EVENTOS</small><b id="eventCount">0</b></div></div>
-<div class="grid-two"><article class="card"><div class="card-head"><span class="eyebrow">MAPA OPERACIONAL</span><button class="small" data-action="map">ABRIR</button></div><div id="commandMap" class="map-mini"></div></article><article class="card"><div class="card-head"><span class="eyebrow">EVENTOS AO VIVO</span><button class="small" data-action="clearLogs">LIMPAR</button></div><div id="logs" class="logs"></div></article></div>
-<article class="card"><div class="card-head"><span class="eyebrow">OBJETIVOS</span><button class="small" data-action="objectiveDemo">SIMULAR EVENTO</button></div><div id="objectives" class="objectives"></div></article>
-<div class="command-tools"><button data-action="playerView">VISÃO JOGADOR</button><button data-action="radioTest">TESTAR RÁDIO</button><button data-action="dev">DEV TEST</button></div>
+<div id="touchGuard" class="touch-guard visible"><div class="lock-mark">▣</div><b>PAINEL PROTEGIDO</b><small>Segure por 1,2 s para liberar comandos</small><div class="unlock-track"><span></span></div></div>
+<div class="tactical-head"><div><span class="eyebrow">PAINEL TÁTICO</span><h2 id="tacticalMatch">OPERAÇÃO RED SAND</h2><span id="gameClock" class="clock">00:00:00</span></div><div class="head-right"><span id="tacticalState" class="pill success">ATIVO</span></div></div>
+<div class="radio-panel card"><div class="radio-panel-head"><div><span class="eyebrow">RÁDIO</span><h3 id="radioStatus">LIGADO · CH 01</h3></div><span id="radioTx" class="tx-indicator">PRONTO</span></div><div class="radio-controls"><label>FREQUÊNCIA<select id="radioChannel"><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option></select></label><button id="radioPower" class="radio-control">LIGAR</button><label>VOLUME<input id="radioVolume" type="range" min="0" max="100" value="70"></label></div><button id="radioPtt" class="ptt-button">SEGURE PARA FALAR</button><small class="radio-note">A comunicação segue a frequência selecionada. O botão de volume ajusta o áudio do aplicativo; o rádio pode permanecer ligado e mudo.</small></div>
+<div class="tactical-grid"><article class="status-card"><div id="playerStateIcon" class="state-icon">✓</div><div><span class="eyebrow">SEU ESTADO</span><h1 id="playerStateTitle">ATIVO</h1><p id="playerStateDesc">Partida em andamento.</p></div></article><article class="mission-card"><span class="eyebrow">OBJETIVO ATUAL</span><h2 id="missionTitle">ALFA / BRAVO</h2><div class="mini-progress"><span id="missionProgress"></span></div><small id="missionText">Aguardando atualização.</small></article></div>
+<div class="card map-card"><div class="card-head"><span class="eyebrow">LOCALIZAÇÃO ATUAL</span><span id="gpsStatus" class="live-dot">● GPS</span></div><div id="googleMap" class="google-map"><div class="map-loading">Inicializando mapa e localização…</div></div><div class="gps-readout"><span id="gpsCoords">LOCALIZAÇÃO AGUARDANDO</span><span id="gpsAccuracy">PRECISÃO —</span></div></div>
+<div class="tactical-actions"><button id="hitButton" class="action critical" data-action="hit"><b>REGISTRAR HIT</b><small>Simulação de estado</small></button><button class="action" data-action="instructions"><b>INSTRUÇÕES</b><small>Regras do briefing</small></button></div>
+<div class="unlock-hint">Painel único durante a partida · navegação bloqueada</div>
 </section>
 </main>
-<nav class="bottom-nav"><button data-nav="home" class="active">⌂<span>Início</span></button><button data-nav="prepare">◉<span>Preparação</span></button><button data-nav="tactical">▣<span>Tático</span></button><button data-nav="command">◆<span>Comando</span></button></nav>
 <div id="modalRoot"></div>
 <script src="app.js" defer></script>
 </body>
