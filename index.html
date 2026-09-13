@@ -1,137 +1,265 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Desert Falcons — Airsoft Squad</title>
-<style>
-:root{
-  --desert-sand:#E3C598;
-  --tactical-olive:#4B5320;
-  --matte-black:#121212;
-  --dark-gray:#1E1E1E;
-  --text-light:#E0E0E0;
-  --muted:#8A8A8A;
-  --alert-red:#8B0000;
-  --line:#303030;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;font-family:'Courier New',Courier,monospace;background:var(--matte-black);color:var(--text-light)}
-body{display:flex;flex-direction:column;overflow:hidden}
-header{height:72px;flex:0 0 72px;background:var(--dark-gray);display:flex;align-items:center;padding:12px 18px;border-bottom:2px solid var(--tactical-olive);box-shadow:0 4px 12px #0008}
-.logo-img{width:44px;height:44px;object-fit:cover;border-radius:50%;margin-right:14px;border:2px solid var(--desert-sand);background:#222}
-header h1{font-size:1.05rem;letter-spacing:2px;color:var(--desert-sand);text-transform:uppercase}
-header small{display:block;color:var(--muted);font-size:.68rem;margin-top:3px;letter-spacing:1px}
-main{flex:1;overflow-y:auto;padding:20px 16px 96px}
-.screen{display:none;animation:fade .22s ease}
-.screen.active{display:block}
-@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-h2{font-size:1rem;color:var(--desert-sand);letter-spacing:1.6px;text-transform:uppercase;padding-bottom:7px;margin-bottom:14px;border-bottom:1px solid var(--tactical-olive)}
-.grid{display:grid;gap:12px}
-.card{background:var(--dark-gray);border:1px solid var(--line);border-left:4px solid var(--desert-sand);padding:14px;border-radius:6px;margin-bottom:12px;box-shadow:0 6px 14px #0004}
-.card.alert{border-left-color:var(--alert-red)}
-.card h3{font-size:.9rem;margin-bottom:8px;color:#fff}
-.card p{font-size:.82rem;line-height:1.5;color:#cfcfcf;margin:3px 0}
-.meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
-.meta div{background:#171717;border:1px solid var(--line);padding:9px;border-radius:4px}
-.meta span{display:block;color:var(--muted);font-size:.64rem;text-transform:uppercase;margin-bottom:3px}
-button.action-btn{width:100%;border:0;border-radius:5px;padding:12px;margin-top:10px;background:var(--tactical-olive);color:#fff;font:700 .78rem 'Courier New',monospace;text-transform:uppercase;letter-spacing:.6px;cursor:pointer}
-button.action-btn:active{background:var(--desert-sand);color:#111}
-button.secondary{background:#2a2a2a;border:1px solid #444}
-.status{display:inline-block;margin-top:5px;padding:4px 7px;border-radius:4px;background:#29300f;color:var(--desert-sand);font-size:.65rem;text-transform:uppercase}
-.list{list-style:none;display:grid;gap:8px;margin-top:10px}
-.list li{padding:9px 10px;background:#171717;border:1px solid var(--line);border-radius:4px;font-size:.78rem}
-.hero{display:flex;align-items:center;gap:14px;margin-bottom:16px}
-.hero .big-logo{width:64px;height:64px;border-radius:50%;border:2px solid var(--desert-sand);object-fit:cover}
-.hero strong{display:block;color:#fff;font-size:1rem}.hero span{color:var(--muted);font-size:.72rem}
-nav{position:fixed;left:0;right:0;bottom:0;height:76px;background:#191919ee;backdrop-filter:blur(8px);border-top:1px solid var(--tactical-olive);display:flex;z-index:20}
-.nav-item{flex:1;color:#777;text-align:center;font-size:.65rem;text-transform:uppercase;padding:9px 3px 0;cursor:pointer}
-.nav-item.active{color:var(--desert-sand)}
-.nav-icon{display:block;font-size:1.35rem;line-height:1.2;margin-bottom:4px}
-.toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(12px);opacity:0;pointer-events:none;background:#2a2a2a;border:1px solid var(--desert-sand);color:#fff;padding:10px 14px;border-radius:5px;font-size:.75rem;transition:.2s;z-index:30;max-width:88%;text-align:center}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-@media(min-width:720px){main{max-width:760px;width:100%;margin:0 auto}.grid.two{grid-template-columns:1fr 1fr}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Desert Falcons - Airsoft Squad</title>
+    <style>
+        :root {
+            /* Cores extraídas do padrão tático discutido */
+            --desert-sand: #E3C598;
+            --tactical-olive: #4B5320;
+            --matte-black: #121212;
+            --dark-gray: #1E1E1E;
+            --text-light: #E0E0E0;
+            --alert-red: #8B0000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace; /* Vibe terminal/militar */
+        }
+
+        body {
+            background-color: var(--matte-black);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header Tático */
+        header {
+            background-color: var(--dark-gray);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid var(--tactical-olive);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+
+        .logo-img {
+            width: 40px;
+            height: 40px;
+            margin-right: 15px;
+            border-radius: 50%;
+            border: 2px solid var(--desert-sand);
+        }
+
+        header h1 {
+            color: var(--desert-sand);
+            font-size: 1.2rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* Área de Conteúdo (Telas) */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            position: relative;
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            color: var(--tactical-olive);
+            border-bottom: 1px solid var(--tactical-olive);
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        /* Componentes Genéricos */
+        .card {
+            background-color: var(--dark-gray);
+            border-left: 4px solid var(--desert-sand);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        button.action-btn {
+            background-color: var(--tactical-olive);
+            color: var(--text-light);
+            border: none;
+            padding: 12px;
+            width: 100%;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        
+        button.action-btn:active {
+            background-color: var(--desert-sand);
+            color: var(--matte-black);
+        }
+
+        /* Navegação Inferior */
+        nav {
+            background-color: var(--dark-gray);
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            border-top: 1px solid var(--tactical-olive);
+        }
+
+        .nav-item {
+            color: #777;
+            text-align: center;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            padding: 5px;
+            flex: 1;
+        }
+
+        .nav-item.active {
+            color: var(--desert-sand);
+            font-weight: bold;
+        }
+
+        .nav-icon {
+            display: block;
+            font-size: 1.5rem;
+            margin-bottom: 3px;
+        }
+    </style>
 </head>
 <body>
-<header>
-  <img src="assets/IMG-20260912-WA0015(1).png" alt="Logo Desert Falcons" class="logo-img">
-  <div><h1>Desert Falcons</h1><small>Airsoft Squad · Gestão da equipe</small></div>
-</header>
 
-<main>
-  <section id="tela-inicio" class="screen active">
-    <h2>Base de Operações</h2>
-    <div class="card">
-      <div class="hero">
-        <img src="assets/IMG-20260912-WA0015(1).png" class="big-logo" alt="Desert Falcons">
-        <div><strong>Próximo evento</strong><span>25/09/2026 · Fábrica Abandonada</span></div>
-      </div>
-      <p><strong>Equipe:</strong> 14 membros confirmados</p>
-      <p><strong>Status:</strong> <span class="status" id="homeStatus">Aguardando check-in</span></p>
-      <button class="action-btn" onclick="checkIn()">Fazer Check-in</button>
-    </div>
-    <div class="card alert">
-      <h3>Comunicado da organização</h3>
-      <p>Confira o horário, as regras do evento e as orientações publicadas antes da partida.</p>
-    </div>
-    <div class="grid two">
-      <div class="card"><h3>Próxima partida</h3><p>Operação Nightfall</p><p>25/09/2026</p></div>
-      <div class="card"><h3>Histórico</h3><p>12 partidas registradas</p><p>8 resultados positivos</p></div>
-    </div>
-  </section>
+    <header>
+        <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/main/assets/IMG-20260912-WA0015(1).png" alt="Logo" class="logo-img">
+        <h1>Desert Falcons</h1>
+    </header>
 
-  <section id="tela-equipe" class="screen">
-    <h2>Equipe</h2>
-    <div class="card"><h3>Liderança</h3><ul class="list"><li>Comandante Alfa</li><li>Sargento Bravo</li></ul></div>
-    <div class="card"><h3>Membros ativos</h3><p>14 de 20 vagas preenchidas</p><button class="action-btn" onclick="toast('Convite preparado para compartilhamento.')">Convidar membro</button></div>
-    <div class="card"><h3>Organização</h3><p>Eventos, presença, comunicação e resultados centralizados em um só lugar.</p><button class="action-btn secondary" onclick="ir('tela-eventos',document.querySelectorAll('.nav-item')[2])">Ver eventos</button></div>
-  </section>
+    <main>
+        <!-- TELA INÍCIO -->
+        <section id="tela-inicio" class="screen active">
+            <h2>Base de Operações</h2>
+            <div class="card">
+                <h3>Próxima Missão</h3>
+                <p><strong>Data:</strong> 25/09/2026</p>
+                <p><strong>Local:</strong> Fábrica Abandonada</p>
+                <button class="action-btn" onclick="navegarPara('tela-eventos')">Fazer Check-in</button>
+            </div>
+            <div class="card" style="border-left-color: var(--alert-red);">
+                <h3>Comunicado do Comando</h3>
+                <p>Uso de cronógrafo obrigatório antes do briefing. Limite de 400 FPS cravado.</p>
+            </div>
+        </section>
 
-  <section id="tela-eventos" class="screen">
-    <h2>Eventos e partidas</h2>
-    <div class="card">
-      <h3>Operação Nightfall</h3><p><strong>Data:</strong> 25/09/2026</p><p><strong>Local:</strong> Fábrica Abandonada</p><p><strong>Status:</strong> <span class="status" id="eventStatus">Aguardando check-in</span></p>
-      <button class="action-btn" onclick="checkIn()">Confirmar presença</button>
-    </div>
-    <div class="card"><h3>Partida anterior</h3><p><strong>Operação Carga Pesada</strong></p><p>Resultado: <strong>VITÓRIA</strong></p><button class="action-btn secondary" onclick="toast('Detalhes do resultado disponíveis na próxima versão.')">Ver detalhes</button></div>
-  </section>
+        <!-- TELA PERFIL -->
+        <section id="tela-perfil" class="screen">
+            <h2>Meu Perfil</h2>
+            <div class="card">
+                <h3>Operador: Dani</h3>
+                <p><strong>Função:</strong> Assalto / Batedor</p>
+                <p><strong>Status:</strong> Ativo</p>
+                <p><strong>Identidade Única:</strong> #DF-998</p>
+            </div>
+            <div class="card">
+                <h3>Histórico</h3>
+                <p>Partidas Jogadas: 12</p>
+                <p>Vitórias do Esquadrão: 8</p>
+            </div>
+            <button class="action-btn">Editar Loadout</button>
+        </section>
 
-  <section id="tela-perfil" class="screen">
-    <h2>Meu Perfil</h2>
-    <div class="card"><h3>Dani</h3><p><strong>Função na equipe:</strong> Jogador</p><p><strong>Status:</strong> Ativo</p><p><strong>Identidade:</strong> #DF-998</p></div>
-    <div class="card"><h3>Histórico esportivo</h3><div class="meta"><div><span>Partidas</span><strong>12</strong></div><div><span>Resultados</span><strong>8</strong></div></div></div>
-    <button class="action-btn secondary" onclick="toast('Edição de perfil será conectada à persistência na próxima etapa.')">Editar perfil</button>
-  </section>
-</main>
+        <!-- TELA EQUIPE -->
+        <section id="tela-equipe" class="screen">
+            <h2>Esquadrão</h2>
+            <div class="card">
+                <h3>Líderes</h3>
+                <p>- Comandante Alfa</p>
+                <p>- Sargento Bravo</p>
+            </div>
+            <div class="card">
+                <h3>Membros Ativos (14/20)</h3>
+                <p>Visualizar lista completa de operadores...</p>
+                <button class="action-btn" style="margin-top: 10px;">Convidar Recruta</button>
+            </div>
+        </section>
 
-<nav>
-  <div class="nav-item active" onclick="ir('tela-inicio',this)"><span class="nav-icon">⌂</span>Início</div>
-  <div class="nav-item" onclick="ir('tela-equipe',this)"><span class="nav-icon">⛨</span>Equipe</div>
-  <div class="nav-item" onclick="ir('tela-eventos',this)"><span class="nav-icon">🎯</span>Eventos</div>
-  <div class="nav-item" onclick="ir('tela-perfil',this)"><span class="nav-icon">⚙</span>Perfil</div>
-</nav>
-<div id="toast" class="toast"></div>
+        <!-- TELA EVENTOS -->
+        <section id="tela-eventos" class="screen">
+            <h2>Lista de Presença</h2>
+            <div class="card">
+                <h3>Operação Nightfall</h3>
+                <p><strong>Status:</strong> Aguardando Check-in</p>
+                <button class="action-btn" style="background-color: var(--alert-red);" onclick="this.innerText='CONFIRMADO'; this.style.backgroundColor='var(--tactical-olive)';">Confirmar Presença</button>
+            </div>
+            <div class="card">
+                <h3>Placar Anterior</h3>
+                <p>Operação Carga Pesada: <strong>VITÓRIA</strong></p>
+                <button class="action-btn">Ver Detalhes</button>
+            </div>
+        </section>
+    </main>
 
-<script>
-const KEY='desert-falcons-checkin';
-function ir(id,el){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  if(el) el.classList.add('active');
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-function checkIn(){
-  localStorage.setItem(KEY,'confirmed');
-  document.querySelectorAll('#homeStatus,#eventStatus').forEach(e=>{e.textContent='Presença confirmada';e.style.background='#394b10';});
-  toast('Presença confirmada com sucesso.');
-}
-function toast(msg){
-  const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show');
-  clearTimeout(window.__toast); window.__toast=setTimeout(()=>el.classList.remove('show'),2200);
-}
-(function restore(){if(localStorage.getItem(KEY)==='confirmed'){document.querySelectorAll('#homeStatus,#eventStatus').forEach(e=>{e.textContent='Presença confirmada';e.style.background='#394b10';});}})();
-</script>
+    <!-- MENU INFERIOR -->
+    <nav>
+        <div class="nav-item active" onclick="navegarPara('tela-inicio', this)">
+            <span class="nav-icon">⌂</span>
+            Início
+        </div>
+        <div class="nav-item" onclick="navegarPara('tela-equipe', this)">
+            <span class="nav-icon">⛨</span>
+            Equipe
+        </div>
+        <div class="nav-item" onclick="navegarPara('tela-eventos', this)">
+            <span class="nav-icon">🎯</span>
+            Eventos
+        </div>
+        <div class="nav-item" onclick="navegarPara('tela-perfil', this)">
+            <span class="nav-icon">⚙</span>
+            Perfil
+        </div>
+    </nav>
+
+    <script>
+        // Lógica simples de navegação entre telas via DOM
+        function navegarPara(idTela, elementoClicado) {
+            // Esconde todas as telas
+            document.querySelectorAll('.screen').forEach(tela => {
+                tela.classList.remove('active');
+            });
+            
+            // Mostra a tela alvo
+            document.getElementById(idTela).classList.add('active');
+
+            // Atualiza o menu inferior (se o clique veio do menu)
+            if(elementoClicado) {
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                elementoClicado.classList.add('active');
+            } else {
+                // Se navegou por um botão interno, força o menu a sincronizar
+                document.querySelectorAll('.nav-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (item.innerText.toLowerCase().includes(idTela.split('-')[1])) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+        }
+    </script>
 </body>
 </html>
