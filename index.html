@@ -1,73 +1,66 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0b0d">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#10150f">
   <title>Desert Falcons — Command OS</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="app-header">
-    <div class="brand"><span class="brand-mark">DF</span><div><strong>DESERT FALCONS</strong><small>COMMAND OS</small></div></div>
-    <div class="header-status"><span id="headerRole">JOGADOR</span><span id="headerMatch">AGUARDANDO</span></div>
-  </header>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">DF</span><div><strong>DESERT FALCONS</strong><small>COMMAND OS</small></div></div>
+  <div class="top-meta"><b id="headerRole">JOGADOR</b><span id="headerMatch">AGUARDANDO</span></div>
+</header>
+<main>
+<section id="screen-home" class="screen active">
+  <div class="hero card"><div><span class="eyebrow">BASE DE OPERAÇÕES</span><h1 id="matchName">Operação Red Sand</h1><p>Centro de gerenciamento e acompanhamento da partida.</p></div><span id="homeStatus" class="pill warning">AGUARDANDO</span></div>
+  <div class="quick-grid">
+    <button class="quick primary" data-action="command"><span>◈</span><b>COMANDO</b><small>Controle da partida</small></button>
+    <button class="quick" data-action="prepare"><span>◉</span><b>PREPARAÇÃO</b><small>Identidade e briefing</small></button>
+    <button class="quick" data-action="tactical"><span>▣</span><b>PAINEL TÁTICO</b><small>Experiência do jogador</small></button>
+    <button class="quick" data-action="dev"><span>⌘</span><b>DEV TEST</b><small>Testar módulos</small></button>
+  </div>
+  <div class="card overview"><div class="card-head"><span class="eyebrow">CENTRAL DE TESTES</span><span class="live-dot">● ONLINE</span></div><div class="module-row"><button data-action="briefing">BRIEFING</button><button data-action="map">MAPA</button><button data-action="camera">CÂMERA</button><button data-action="radioTest">RÁDIO</button></div></div>
+</section>
 
-  <main id="app" class="app-shell">
-    <section id="screen-home" class="screen active">
-      <div class="hero card">
-        <div><span class="eyebrow">BASE DE OPERAÇÕES</span><h1 id="matchName">Operação Red Sand</h1><p id="matchSummary">Sistema de gerenciamento de partida e equipe.</p></div>
-        <span id="homeStatus" class="status-pill warning">AGUARDANDO</span>
-      </div>
-      <div class="grid two">
-        <article class="card"><span class="eyebrow">PARTIDA</span><h2>Central de comando</h2><p class="muted">Controle o estado da partida, efetivo e objetivos.</p><button class="primary" data-action="command">ABRIR COMANDO</button></article>
-        <article class="card"><span class="eyebrow">JOGADOR</span><h2>Central de preparação</h2><p class="muted">Identidade, briefing e entrada na partida.</p><button class="primary" data-action="prepare">ENTRAR NA OPERAÇÃO</button></article>
-      </div>
-      <div class="grid four">
-        <button class="tool" data-action="briefing">📋<b>BRIEFING</b><small>Objetivo e regras</small></button>
-        <button class="tool" data-action="map">🗺️<b>MAPA</b><small>Área da partida</small></button>
-        <button class="tool" data-action="camera">📷<b>CÂMERA</b><small>Teste de interface</small></button>
-        <button class="tool accent" data-action="dev">🧪<b>DEV TEST</b><small>Trocar experiência</small></button>
-      </div>
-    </section>
+<section id="screen-prepare" class="screen">
+  <div class="section-head"><div><span class="eyebrow">JOGADOR</span><h2>Central de preparação</h2></div><button class="ghost" data-action="home">INÍCIO</button></div>
+  <div class="grid-two">
+    <article class="card identity-card"><span class="eyebrow">IDENTIDADE</span><div class="identity"><div class="avatar">D</div><div><h2 id="playerName">DANI</h2><p>Equipe <b id="playerTeam">AZUL</b> · <span id="playerId">DF-001</span></p></div></div><label>Classe<select id="playerClass"><option>Assalto</option><option>Médico</option><option>Recon</option><option>Suporte</option></select></label><button class="wide secondary" data-action="radioTest">◉ TESTAR RÁDIO</button></article>
+    <article class="card"><span class="eyebrow">BRIEFING</span><h3>Capturar e manter Alfa e Bravo.</h3><p class="muted">Partida demonstrativa para testar fluxo, comunicação, mapa, estados e eventos.</p><div class="checklist"><span>✓ Estado do jogador</span><span>✓ Objetivos e eventos</span><span>✓ Comunicação por voz</span><span>✓ Mapa simulado</span></div><button class="wide" data-action="briefing">VER BRIEFING</button></article>
+  </div>
+  <div class="ready card"><div><span class="eyebrow">DEPLOY</span><h2 id="readyState">Aguardando partida</h2><p class="muted">Inicie a partida pelo Comando para liberar o painel.</p></div><button id="readyButton" class="success big" data-action="ready">ESTOU PRONTO</button></div>
+</section>
 
-    <section id="screen-prepare" class="screen">
-      <div class="section-head"><div><span class="eyebrow">JOGADOR</span><h2>Central de Preparação</h2></div><button class="ghost" data-action="home">← INÍCIO</button></div>
-      <div class="grid two">
-        <article class="card"><span class="eyebrow">IDENTIDADE</span><div class="identity"><div class="avatar">D</div><div><h2 id="playerName">DANI</h2><p>Equipe <b id="playerTeam">AZUL</b> · ID <span id="playerId">DF-001</span></p></div></div>
-          <label>Classe<select id="playerClass"><option>Assalto</option><option>Médico</option><option>Recon</option><option>Suporte</option></select></label>
-          <button class="secondary" data-action="radio">📡 RÁDIO <span id="radioState">ONLINE · CH 01</span></button>
-        </article>
-        <article class="card"><span class="eyebrow">BRIEFING</span><h3 id="briefingObjective">Capturar e manter Alfa e Bravo.</h3><p class="muted" id="briefingContext">Partida de demonstração do sistema de gerenciamento.</p><div class="rule-list"><span>✓ Estado do jogador</span><span>✓ Objetivos em tempo real</span><span>✓ Eventos e comunicação</span><span>✓ Mapa e recursos demonstrativos</span></div><button class="secondary" data-action="briefing">VER BRIEFING COMPLETO</button></article>
-      </div>
-      <article class="card ready-card"><div><span class="eyebrow">DEPLOY</span><h2 id="readyState">Aguardando partida</h2><p class="muted">O comando precisa iniciar a partida antes do deploy.</p></div><button id="readyButton" class="success big" data-action="ready">ESTOU PRONTO</button></article>
-    </section>
+<section id="screen-tactical" class="screen tactical-screen">
+  <div id="touchGuard" class="touch-guard"><div class="lock-mark">▣</div><b>PAINEL PROTEGIDO</b><small>Segure por 1,2 s para liberar os comandos</small><div class="unlock-track"><span></span></div></div>
+  <div class="tactical-head"><div><span class="eyebrow">PAINEL TÁTICO</span><h2 id="tacticalMatch">OPERAÇÃO RED SAND</h2><span id="gameClock" class="clock">00:00:00</span></div><div class="head-right"><span id="radioBadge" class="radio-badge">● RÁDIO CH 01</span><span id="tacticalStatus" class="pill success">ATIVO</span></div></div>
+  <div class="tactical-grid">
+    <article class="status-card"><div id="playerStateIcon" class="state-icon">✓</div><div><span class="eyebrow">SEU ESTADO</span><h1 id="playerStateTitle">ATIVO</h1><p id="playerStateDesc">Sistema operacional.</p></div></article>
+    <article class="mission-card"><span class="eyebrow">OBJETIVO ATUAL</span><h2>ALFA / BRAVO</h2><div class="mini-progress"><span id="missionProgress"></span></div><small id="missionText">0 de 2 setores registrados</small></article>
+  </div>
+  <div class="action-deck">
+    <button id="hitButton" class="action critical" data-action="hit"><span>!</span><b>REGISTRAR HIT</b><small>Toque para simular</small></button>
+    <button class="action" data-action="radioTest"><span>◉</span><b>RÁDIO</b><small>Pressione para transmitir</small></button>
+    <button class="action" data-action="map"><span>⌖</span><b>MAPA</b><small>Posições simuladas</small></button>
+    <button class="action" data-action="camera"><span>◌</span><b>CÂMERA</b><small>Teste visual</small></button>
+    <button class="action" data-action="briefing"><span>≡</span><b>BRIEFING</b><small>Consultar missão</small></button>
+  </div>
+  <div class="unlock-hint">Tela protegida contra toques acidentais · segure o centro para liberar</div>
+</section>
 
-    <section id="screen-tactical" class="screen tactical">
-      <div class="tactical-top"><div><span class="eyebrow">PAINEL TÁTICO</span><h2 id="tacticalMatch">OPERAÇÃO RED SAND</h2><span id="gameClock" class="clock">00:00:00</span></div><span id="tacticalStatus" class="status-pill success">ATIVO</span></div>
-      <div class="tactical-center"><div id="playerStateIcon" class="state-icon">✓</div><h1 id="playerStateTitle">ATIVO</h1><p id="playerStateDesc">Sistema operacional. Aguardando atualização.</p></div>
-      <div class="command-grid">
-        <button id="hitButton" class="critical" data-action="hit">REGISTRAR HIT</button>
-        <button class="module" data-action="objectives">🎯<b>OBJETIVOS</b><small>Estado dos setores</small></button>
-        <button class="module" data-action="radio">📡<b>RÁDIO</b><small id="tacticalRadio">CH 01 · ONLINE</small></button>
-        <button class="module" data-action="map">🗺️<b>MAPA</b><small>Visualizar área</small></button>
-        <button class="module" data-action="camera">📷<b>CÂMERA</b><small>Simulação</small></button>
-        <button class="module" data-action="briefing">📋<b>BRIEFING</b><small>Consultar missão</small></button>
-      </div>
-    </section>
-
-    <section id="screen-command" class="screen">
-      <div class="section-head"><div><span class="eyebrow">COMANDO</span><h2>Dashboard da Partida</h2></div><button class="ghost" data-action="home">← INÍCIO</button></div>
-      <div class="card command-control"><div><span class="eyebrow">MOTOR DA PARTIDA</span><h2 id="commandStatus">AGUARDANDO</h2><p class="muted">Controle central do estado da partida.</p></div><div class="action-row"><button id="startMatch" class="primary" data-action="start">INICIAR OPERAÇÃO</button><button id="pauseMatch" class="warning hidden" data-action="pause">PAUSAR</button><button id="resumeMatch" class="success hidden" data-action="resume">RETOMAR</button><button id="endMatch" class="danger hidden" data-action="end">ENCERRAR</button></div></div>
-      <div class="grid four stats"><div class="stat blue"><small>AZUL ATIVOS</small><strong id="blueCount">12</strong></div><div class="stat red"><small>VERMELHO ATIVOS</small><strong id="redCount">12</strong></div><div class="stat"><small>OBJETIVOS</small><strong id="objectiveCount">0/2</strong></div><div class="stat"><small>EVENTOS</small><strong id="eventCount">0</strong></div></div>
-      <div class="grid two"><article class="card"><div class="card-head"><h3>OBJETIVOS EM CAMPO</h3><button class="small" data-action="objectiveDemo">SIMULAR</button></div><div id="objectives" class="objectives"></div></article><article class="card"><div class="card-head"><h3>EVENTOS EM TEMPO REAL</h3><button class="small" data-action="clearLogs">LIMPAR</button></div><div id="logs" class="logs"></div></article></div>
-      <div class="card"><div class="card-head"><h3>FERRAMENTAS DE COMANDO</h3><span class="muted">DEV TEST</span></div><div class="grid four"><button class="tool" data-action="playerView">👤<b>VISÃO JOGADOR</b></button><button class="tool" data-action="briefing">📋<b>BRIEFING</b></button><button class="tool" data-action="map">🗺️<b>MAPA</b></button><button class="tool" data-action="dev">🧪<b>DEV TEST</b></button></div></div>
-    </section>
-  </main>
-
-  <nav class="bottom-nav"><button data-nav="home" class="active">⌂<span>Início</span></button><button data-nav="prepare">◉<span>Preparação</span></button><button data-nav="tactical">▣<span>Tático</span></button><button data-nav="command">⚑<span>Comando</span></button></nav>
-
-  <div id="modalRoot"></div>
-  <script src="app.js" defer></script>
+<section id="screen-command" class="screen">
+  <div class="section-head"><div><span class="eyebrow">COMANDO</span><h2>Centro de controle</h2></div><button class="ghost" data-action="home">INÍCIO</button></div>
+  <div class="command-banner card"><div><span class="eyebrow">MOTOR DA PARTIDA</span><h2 id="commandStatus">AGUARDANDO</h2></div><div class="command-actions"><button id="startMatch" class="primary" data-action="start">INICIAR</button><button id="pauseMatch" class="warning hidden" data-action="pause">PAUSAR</button><button id="resumeMatch" class="success hidden" data-action="resume">RETOMAR</button><button id="endMatch" class="danger hidden" data-action="end">ENCERRAR</button></div></div>
+  <div class="stats-grid"><div class="stat blue"><small>AZUL ATIVOS</small><b id="blueCount">12</b></div><div class="stat red"><small>VERMELHO ATIVOS</small><b id="redCount">12</b></div><div class="stat"><small>OBJETIVOS</small><b id="objectiveCount">0/2</b></div><div class="stat"><small>EVENTOS</small><b id="eventCount">0</b></div></div>
+  <div class="grid-two"><article class="card"><div class="card-head"><span class="eyebrow">MAPA OPERACIONAL</span><button class="small" data-action="map">ABRIR</button></div><div id="commandMap" class="map-mini"></div></article><article class="card"><div class="card-head"><span class="eyebrow">EVENTOS AO VIVO</span><button class="small" data-action="clearLogs">LIMPAR</button></div><div id="logs" class="logs"></div></article></div>
+  <article class="card"><div class="card-head"><span class="eyebrow">OBJETIVOS</span><button class="small" data-action="objectiveDemo">SIMULAR EVENTO</button></div><div id="objectives" class="objectives"></div></article>
+  <div class="command-tools"><button data-action="playerView">VISÃO JOGADOR</button><button data-action="radioTest">TESTAR RÁDIO</button><button data-action="dev">DEV TEST</button></div>
+</section>
+</main>
+<nav class="bottom-nav"><button data-nav="home" class="active">⌂<span>Início</span></button><button data-nav="prepare">◉<span>Preparação</span></button><button data-nav="tactical">▣<span>Tático</span></button><button data-nav="command">◆<span>Comando</span></button></nav>
+<div id="modalRoot"></div>
+<script src="app.js" defer></script>
 </body>
 </html>
