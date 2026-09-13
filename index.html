@@ -3,27 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Desert Falcons - Tactical OS</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Desert Falcons - Tactical OS Complete</title>
+    <style>
+        :root {
+            --bg-base: #060608;
+            --bg-surface: #121214;
+            --bg-card: #1C1C20;
+            --df-bronze: #A67C52;
+            --df-bronze-dark: #7a5836;
+            --text-main: #EBEBEB;
+            --text-muted: #8c8c94;
+            --border-color: #2a2a2e;
+            --tactical-green: #2F4F3A;
+            --tactical-green-light: #4A7C59;
+            --tactical-red: #7A2020;
+            --tactical-red-light: #A32A2A;
+            --tactical-blue: #23405E;
+            --tactical-blue-light: #35608C;
+            --tactical-yellow: #B8860B;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Roboto', sans-serif; }
+        body { background-color: var(--bg-base); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; -webkit-tap-highlight-color: transparent; }
+
+        h1, h2, h3 { text-transform: uppercase; letter-spacing: 1px; }
+        .bronze-text { color: var(--df-bronze); }
+        .text-muted { color: var(--text-muted); font-size: 0.9rem; }
+        .mt-2 { margin-top: 10px; } .mt-3 { margin-top: 15px; } .mt-4 { margin-top: 20px; }
+        .mb-2 { margin-bottom: 10px; }
+        .p-0 { padding: 0 !important; } .p-3 { padding: 15px; }
+        .text-center { text-align: center; }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .content-area { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: 80px; }
+
+        .view-layer { display: none; flex-direction: column; height: 100%; width: 100%; position: absolute; top: 0; left: 0; background-color: var(--bg-base); }
+        .view-layer.active { display: flex; z-index: 10; }
+
+        .top-bar { background-color: var(--bg-surface); border-bottom: 1px solid var(--df-bronze); padding: 15px; display: flex; align-items: center; justify-content: space-between; }
+        .top-bar.border-red { border-bottom-color: var(--tactical-red-light); }
+        .top-bar h1 { font-size: 1.1rem; color: var(--text-main); }
+        .logo-mini { background-color: var(--df-bronze); color: #000; font-weight: 900; padding: 5px 8px; border-radius: 4px; font-size: 1rem; margin-right: 10px; }
+
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; }
+        .card h3 { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; }
+        .tactical-card { border-left: 4px solid var(--df-bronze); }
+        .alert-card { border-left: 4px solid var(--tactical-yellow); }
+
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; margin-bottom: 8px; }
+        .badge.warning { background-color: var(--tactical-yellow); color: #000; }
+        .tactical-select { width: 100%; background-color: var(--bg-surface); color: var(--text-main); border: 1px solid var(--df-bronze); padding: 10px; border-radius: 4px; font-weight: bold; outline: none; }
+
+        button { border: none; border-radius: 6px; font-weight: bold; text-transform: uppercase; cursor: pointer; transition: 0.2s; padding: 14px; width: 100%; }
+        button:active { filter: brightness(0.8); }
+        .btn-primary { background-color: var(--df-bronze); color: #000; }
+        .btn-success { background-color: var(--tactical-green-light); color: #fff; }
+        .btn-danger { background-color: var(--tactical-red-light); color: #fff; }
+        .btn-warning { background-color: var(--tactical-yellow); color: #000; }
+        .btn-large { padding: 18px; font-size: 1.1rem; }
+        .btn-icon { background: none; color: var(--text-main); width: auto; padding: 5px 10px; font-size: 1.2rem; }
+
+        .mechanics-list { list-style: none; color: var(--text-main); font-size: 0.9rem; }
+        .mechanics-list li { margin-bottom: 6px; display: flex; align-items: center; }
+        .mechanics-list li::before { content: "✓"; color: var(--df-bronze); margin-right: 8px; font-weight: bold; }
+        .mechanics-list li.disabled::before { content: "✗"; color: var(--tactical-red-light); }
+
+        /* COMBAT HUD */
+        .combat-hud { background-color: #000; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .hud-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        .hud-title { display: block; font-size: 1rem; color: var(--df-bronze); font-weight: bold; }
+        .hud-time { font-family: monospace; font-size: 1.5rem; color: var(--text-main); }
+        .status-indicator { padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; border: 1px solid; }
+        .status-indicator.active { background-color: rgba(74, 124, 89, 0.2); color: var(--tactical-green-light); border-color: var(--tactical-green-light); }
+        .status-indicator.hit { background-color: rgba(163, 42, 42, 0.2); color: var(--tactical-red-light); border-color: var(--tactical-red-light); }
+
+        .hud-center { flex: 1; display: flex; align-items: center; justify-content: center; }
+        .state-display { text-align: center; }
+        .state-display h2 { font-size: 2.2rem; color: var(--tactical-green-light); margin-bottom: 10px; }
+        .state-display p { font-size: 1.1rem; color: var(--text-muted); }
+
+        .hud-bottom { padding-bottom: 20px; }
+        .critical-zone button { height: 90px; font-size: 1.8rem; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 15px; }
+        .modules-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .modules-grid button { height: 70px; background-color: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.95rem; }
+        .modules-grid button.module-active { border-color: var(--df-bronze); color: var(--df-bronze); }
+
+        /* DASHBOARD COMANDO */
+        .team-stats { display: flex; gap: 10px; }
+        .team-stats div { flex: 1; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold; }
+        .team-blue { background-color: rgba(53, 96, 140, 0.2); border: 1px solid var(--tactical-blue-light); color: var(--tactical-blue-light); }
+        .team-red { background-color: rgba(163, 42, 42, 0.2); border: 1px solid var(--tactical-red-light); color: var(--tactical-red-light); }
+        .team-stats h2 { font-size: 1.8rem; margin-top: 5px; }
+
+        .objectives-grid { display: grid; gap: 10px; }
+        .obj-item { display: flex; justify-content: space-between; padding: 10px; background-color: var(--bg-surface); border-radius: 4px; font-weight: bold; }
+        .obj-neutro { border-left: 4px solid var(--text-muted); }
+        .obj-azul { border-left: 4px solid var(--tactical-blue-light); }
+        .obj-verm { border-left: 4px solid var(--tactical-red-light); }
+
+        .terminal-logs { background-color: #000; height: 180px; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 0.8rem; }
+        .log-line { margin-bottom: 5px; border-bottom: 1px solid #1a1a1a; padding-bottom: 3px; }
+        .log-time { color: var(--tactical-yellow); margin-right: 8px; }
+        .log-actor { color: var(--df-bronze); margin-right: 8px; }
+
+        .bottom-nav { background-color: var(--bg-surface); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 5px 25px 5px; position: fixed; bottom: 0; width: 100%; z-index: 100; }
+        .nav-btn { background: none; border: none; color: var(--text-muted); padding: 10px; width: auto; font-size: 0.8rem; }
+        .nav-btn.active { color: var(--df-bronze); border-bottom: 2px solid var(--df-bronze); border-radius: 0; }
+    </style>
 </head>
 <body>
 
-    <!-- A. ENTRADA -->
-    <section id="view-splash" class="view-layer active fullscreen-center">
-        <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/main/assets/IMG-20260912-WA0015(1).png" alt="Desert Falcons" class="splash-logo">
-        <div class="loader">Carregando Motor Tático...</div>
-    </section>
-
-    <section id="view-inicio" class="view-layer with-nav">
+    <!-- A. TELA INÍCIO / HOME -->
+    <section id="view-inicio" class="view-layer active with-nav">
         <header class="top-bar">
             <div class="logo-mini">DF</div>
             <h1>Base de Operações</h1>
         </header>
         <div class="content-area">
-            <div id="no-match-alert" class="card alert-card" style="display: none;">
-                <h3>Nenhuma Operação Ativa</h3>
-                <p>Aguarde o Comando iniciar o briefing.</p>
-            </div>
             <div id="available-match-card" class="card tactical-card">
                 <span class="badge warning">OPERAÇÃO DISPONÍVEL</span>
                 <h2 id="home-op-name" style="margin-top: 10px;">Operação Red Sand</h2>
@@ -57,17 +153,9 @@
                 </div>
                 <div class="card">
                     <h3>Briefing da Missão</h3>
-                    <p id="pre-briefing-text" class="text-muted">Capturar e manter os setores Alfa e Bravo. Regras de engajamento restritas.</p>
+                    <p id="pre-briefing-text" class="text-muted">Capturar e manter os setores Alfa e Bravo.</p>
                     <h4 class="mt-2 bronze-text">Mecânicas Ativas</h4>
-                    <ul class="mechanics-list" id="pre-mechanics-list">
-                        <!-- Preenchido via JS -->
-                    </ul>
-                </div>
-            </div>
-            <div class="card mt-2">
-                <h3>Equipe (Roster)</h3>
-                <div id="pre-team-list" class="team-list">
-                    <!-- Preenchido via JS -->
+                    <ul class="mechanics-list" id="pre-mechanics-list"></ul>
                 </div>
             </div>
             <button class="btn-success mt-3 btn-large" onclick="confirmReady()">ESTOU PRONTO (DEPLOY)</button>
@@ -78,27 +166,20 @@
     <section id="view-tatico" class="view-layer combat-hud">
         <div class="hud-top">
             <div>
-                <span id="hud-op-name" class="hud-title">OPERAÇÃO X</span>
-                <span id="hud-clock" class="hud-time">12:42:00</span>
+                <span id="hud-op-name" class="hud-title">OPERAÇÃO RED SAND</span>
+                <span id="hud-clock" class="hud-time">00:00:00</span>
             </div>
             <div id="hud-status-indicator" class="status-indicator active">ATIVO</div>
         </div>
-
         <div class="hud-center">
-            <!-- UI reage ao estado do jogador -->
             <div id="hud-state-display" class="state-display">
                 <h2 id="hud-state-title">SETOR SEGURO</h2>
                 <p id="hud-state-desc">Aguardando contato visual.</p>
             </div>
         </div>
-
         <div class="hud-bottom">
-            <div id="hud-critical-action" class="critical-zone">
-                <!-- Botão HIT ou Médico injetado aqui dinamicamente -->
-            </div>
-            <div id="hud-modules-grid" class="modules-grid">
-                <!-- Granadas, UAV, Objetivos injetados aqui -->
-            </div>
+            <div id="hud-critical-action" class="critical-zone"></div>
+            <div id="hud-modules-grid" class="modules-grid"></div>
         </div>
     </section>
 
@@ -119,56 +200,284 @@
                 <div class="card">
                     <h3>Controle de Efetivo</h3>
                     <div class="team-stats">
-                        <div class="team-blue">
-                            <span>AZUL</span>
-                            <h2 id="cmd-blue-count">0</h2>
-                        </div>
-                        <div class="team-red">
-                            <span>VERM</span>
-                            <h2 id="cmd-red-count">0</h2>
-                        </div>
+                        <div class="team-blue"><span>AZUL</span><h2 id="cmd-blue-count">12</h2></div>
+                        <div class="team-red"><span>VERM</span><h2 id="cmd-red-count">12</h2></div>
                     </div>
                 </div>
             </div>
-
             <div class="card mt-2">
                 <h3>Objetivos em Campo</h3>
-                <div class="objectives-grid" id="cmd-objectives-list">
-                    <!-- Injetado via JS -->
-                </div>
+                <div class="objectives-grid" id="cmd-objectives-list"></div>
             </div>
-
             <div class="card mt-2 p-0">
                 <h3 class="p-3 pb-0 border-bottom-0">Eventos em Tempo Real</h3>
-                <div id="cmd-live-logs" class="terminal-logs">
-                    <!-- Injetado via JS -->
-                </div>
+                <div id="cmd-live-logs" class="terminal-logs"></div>
             </div>
         </div>
     </section>
 
-    <!-- D. PERFIL & E. CONHECIMENTO -->
+    <!-- D. PERFIL -->
     <section id="view-perfil" class="view-layer with-nav">
         <header class="top-bar"><h1>Seu Perfil</h1></header>
         <div class="content-area text-center">
-            <div class="avatar-large">D</div>
             <h2 class="mt-2 bronze-text">DANI</h2>
             <p class="text-muted">#DF-001</p>
-            <div class="grid-2 mt-3">
-                <div class="card"><h3>Hits</h3><h2>42</h2></div>
-                <div class="card"><h3>Curados</h3><h2>15</h2></div>
-            </div>
             <button class="btn-danger mt-4" onclick="logout()">DESCONECTAR</button>
         </div>
     </section>
 
-    <!-- NAVEGAÇÃO GLOBAL (Fora de Combate) -->
+    <!-- NAVEGAÇÃO GLOBAL -->
     <nav id="global-nav" class="bottom-nav">
         <button class="nav-btn active" onclick="switchView('inicio', this)">Início</button>
         <button class="nav-btn" onclick="switchView('comando', this)">Comando</button>
         <button class="nav-btn" onclick="switchView('perfil', this)">Perfil</button>
     </nav>
 
-    <script src="app.js"></script>
+    <script>
+        const state = {
+            app: { currentView: 'inicio' },
+            partida: {
+                ativa: true,
+                status: 'aguardando',
+                nome: 'Operação Red Sand',
+                tempo: 0,
+                mecanicas: { medico: true, bleedoutTime: 60, granada: true, uav: true }
+            },
+            objetivos: {
+                alfa: { nome: 'Setor Alfa', controle: 'neutro' },
+                bravo: { nome: 'Setor Bravo', controle: 'neutro' }
+            },
+            equipes: {
+                azul: { vivos: 12, total: 12 },
+                vermelho: { vivos: 12, total: 12 }
+            },
+            jogador: {
+                id: 'DF-001',
+                nome: 'Dani',
+                equipe: 'azul',
+                classe: 'Assalto',
+                situacao: 'aguardando',
+                timerBleedout: 0,
+                recursos: { granadas: 2, uavAtivo: false }
+            }
+        };
+
+        let clockInterval = null;
+        let bleedoutInterval = null;
+
+        function switchView(targetView, navElement = null) {
+            state.app.currentView = targetView;
+            document.querySelectorAll('.view-layer').forEach(el => el.classList.remove('active'));
+            const targetElement = document.getElementById(`view-${targetView}`);
+            if(targetElement) targetElement.classList.add('active');
+
+            if(navElement) {
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                navElement.classList.add('active');
+            }
+
+            const globalNav = document.getElementById('global-nav');
+            if(globalNav) {
+                globalNav.style.display = (targetView === 'tatico' || targetView === 'prejogo') ? 'none' : 'flex';
+            }
+            renderUI();
+        }
+
+        function requestEntry() { switchView('prejogo'); }
+        function confirmReady() { 
+            if(state.partida.status === 'andamento') state.jogador.situacao = 'ativo';
+            switchView('tatico'); 
+        }
+        function logout() { switchView('inicio'); }
+
+        function dispatch(evento, payload = null) {
+            const timeLog = new Date().toTimeString().substring(0, 8);
+            const origin = payload?.origin || 'SISTEMA';
+            logEvent(timeLog, evento, origin);
+
+            switch(evento) {
+                case 'MATCH_START':
+                    state.partida.status = 'andamento';
+                    state.equipes.azul.vivos = state.equipes.azul.total;
+                    state.equipes.vermelho.vivos = state.equipes.vermelho.total;
+                    if(state.app.currentView === 'tatico' || state.app.currentView === 'prejogo') {
+                        state.jogador.situacao = 'ativo';
+                    }
+                    startClock();
+                    break;
+                case 'MATCH_PAUSE':
+                    state.partida.status = 'pausada';
+                    stopClock();
+                    break;
+                case 'MATCH_END':
+                    state.partida.status = 'encerrada';
+                    state.jogador.situacao = 'aguardando';
+                    stopClock();
+                    clearInterval(bleedoutInterval);
+                    break;
+                case 'CLASS_CHANGE':
+                    state.jogador.classe = payload.classe;
+                    break;
+                case 'PLAYER_HIT':
+                    if(state.jogador.situacao === 'ativo') {
+                        state.jogador.situacao = 'atingido';
+                        state.equipes[state.jogador.equipe].vivos--;
+                        if(state.partida.mecanicas.medico) startBleedout(state.partida.mecanicas.bleedoutTime);
+                        else state.jogador.situacao = 'morto';
+                    }
+                    break;
+                case 'MEDIC_HEAL':
+                    if(state.jogador.situacao === 'atingido' || state.jogador.situacao === 'bleedout') {
+                        state.jogador.situacao = 'ativo';
+                        state.equipes[state.jogador.equipe].vivos++;
+                        clearInterval(bleedoutInterval);
+                    }
+                    break;
+                case 'BLEEDOUT_END':
+                    state.jogador.situacao = 'morto';
+                    break;
+                case 'USE_GRENADE':
+                    if(state.jogador.recursos.granadas > 0 && state.jogador.situacao === 'ativo') {
+                        state.jogador.recursos.granadas--;
+                    }
+                    break;
+                case 'CAPTURE_OBJ':
+                    if(state.jogador.situacao === 'ativo') {
+                        state.objetivos[payload.target].controle = state.jogador.equipe;
+                    }
+                    break;
+            }
+            renderUI();
+        }
+
+        function logEvent(time, event, actor) {
+            const logsContainer = document.getElementById('cmd-live-logs');
+            if(!logsContainer) return;
+            logsContainer.innerHTML = `<div class="log-line"><span class="log-time">[${time}]</span><span class="log-actor">${actor}:</span> ${event}</div>` + logsContainer.innerHTML;
+        }
+
+        function startClock() {
+            clearInterval(clockInterval);
+            clockInterval = setInterval(() => { state.partida.tempo++; renderClock(); }, 1000);
+        }
+        function stopClock() { clearInterval(clockInterval); }
+
+        function startBleedout(seconds) {
+            state.jogador.situacao = 'bleedout';
+            state.jogador.timerBleedout = seconds;
+            clearInterval(bleedoutInterval);
+            bleedoutInterval = setInterval(() => {
+                state.jogador.timerBleedout--;
+                if(state.jogador.timerBleedout <= 0) {
+                    clearInterval(bleedoutInterval);
+                    dispatch('BLEEDOUT_END', { origin: 'SISTEMA' });
+                } else { renderUI(); }
+            }, 1000);
+        }
+
+        function updatePlayerClass(newClass) {
+            dispatch('CLASS_CHANGE', { origin: state.jogador.nome, classe: newClass });
+        }
+
+        function renderUI() {
+            renderClock();
+            document.getElementById('home-op-status').innerText = state.partida.status.toUpperCase();
+            document.getElementById('pre-player-class').value = state.jogador.classe;
+            
+            const mechList = document.getElementById('pre-mechanics-list');
+            if(mechList) {
+                mechList.innerHTML = `
+                    <li class="${state.partida.mecanicas.medico ? '' : 'disabled'}">Sistema Médico (${state.partida.mecanicas.bleedoutTime}s)</li>
+                    <li class="${state.partida.mecanicas.granada ? '' : 'disabled'}">Granadas Digitais</li>
+                    <li class="${state.partida.mecanicas.uav ? '' : 'disabled'}">UAV / Radar</li>
+                `;
+            }
+
+            document.getElementById('cmd-motor-status').innerText = state.partida.status.toUpperCase();
+            document.getElementById('cmd-btn-start').style.display = state.partida.status === 'aguardando' ? 'block' : 'none';
+            document.getElementById('cmd-btn-pause').style.display = state.partida.status === 'andamento' ? 'block' : 'none';
+            document.getElementById('cmd-btn-end').style.display = (state.partida.status === 'andamento' || state.partida.status === 'pausada') ? 'block' : 'none';
+            
+            document.getElementById('cmd-blue-count').innerText = state.equipes.azul.vivos;
+            document.getElementById('cmd-red-count').innerText = state.equipes.vermelho.vivos;
+
+            const objGrid = document.getElementById('cmd-objectives-list');
+            if(objGrid) {
+                objGrid.innerHTML = '';
+                Object.keys(state.objetivos).forEach(key => {
+                    const obj = state.objetivos[key];
+                    const cssClass = obj.controle === 'azul' ? 'obj-azul' : (obj.controle === 'vermelho' ? 'obj-verm' : 'obj-neutro');
+                    objGrid.innerHTML += `<div class="obj-item ${cssClass}"><span>${obj.nome}</span><span>${obj.controle.toUpperCase()}</span></div>`;
+                });
+            }
+            renderTacticalHUD();
+        }
+
+        function renderTacticalHUD() {
+            const hudIndicator = document.getElementById('hud-status-indicator');
+            const hudTitle = document.getElementById('hud-state-title');
+            const hudDesc = document.getElementById('hud-state-desc');
+            const criticalAction = document.getElementById('hud-critical-action');
+            const modulesGrid = document.getElementById('hud-modules-grid');
+
+            if(!hudIndicator || !hudTitle) return;
+            criticalAction.innerHTML = '';
+            modulesGrid.innerHTML = '';
+
+            if(state.partida.status !== 'andamento') {
+                hudIndicator.className = 'status-indicator';
+                hudIndicator.innerText = state.partida.status.toUpperCase();
+                hudTitle.innerText = 'FORA DE COMBATE';
+                hudTitle.style.color = 'var(--text-muted)';
+                hudDesc.innerText = 'Aguarde o comando da operação.';
+                return;
+            }
+
+            switch(state.jogador.situacao) {
+                case 'ativo':
+                    hudIndicator.className = 'status-indicator active';
+                    hudIndicator.innerText = 'OPERACIONAL';
+                    hudTitle.innerText = 'SETOR SEGURO';
+                    hudTitle.style.color = 'var(--tactical-green-light)';
+                    hudDesc.innerText = `Pronto para engajamento. | ${state.jogador.classe}`;
+                    criticalAction.innerHTML = `<button class="btn-danger" onclick="dispatch('PLAYER_HIT', {origin: '${state.jogador.nome}'})">DECLARAR HIT</button>`;
+                    
+                    if(state.partida.mecanicas.granada && state.jogador.recursos.granadas > 0) {
+                        modulesGrid.innerHTML += `<button onclick="dispatch('USE_GRENADE')">GRANADA (${state.jogador.recursos.granadas})</button>`;
+                    }
+                    modulesGrid.innerHTML += `<button onclick="dispatch('CAPTURE_OBJ', {target: 'alfa', origin: '${state.jogador.nome}'})">CAPTURAR ALFA</button>`;
+                    break;
+
+                case 'atingido':
+                case 'bleedout':
+                    hudIndicator.className = 'status-indicator hit';
+                    hudIndicator.innerText = 'FERIDO';
+                    hudTitle.innerText = 'VOCÊ FOI ATINGIDO';
+                    hudTitle.style.color = 'var(--tactical-yellow)';
+                    hudDesc.innerText = `Aguardando atendimento. Tempo: ${state.jogador.timerBleedout}s`;
+                    criticalAction.innerHTML = `<button class="btn-success" onclick="dispatch('MEDIC_HEAL', {origin: 'MÉDICO'})">SIMULAR CURA</button>`;
+                    break;
+
+                case 'morto':
+                    hudIndicator.className = 'status-indicator hit';
+                    hudIndicator.innerText = 'ELIMINADO';
+                    hudTitle.innerText = 'BAIXA CONFIRMADA';
+                    hudTitle.style.color = 'var(--tactical-red-light)';
+                    hudDesc.innerText = 'Retorne à Safezone.';
+                    break;
+            }
+        }
+
+        function renderClock() {
+            const hudClock = document.getElementById('hud-clock');
+            if(!hudClock) return;
+            const h = Math.floor(state.partida.tempo / 3600).toString().padStart(2, '0');
+            const m = Math.floor((state.partida.tempo % 3600) / 60).toString().padStart(2, '0');
+            const s = (state.partida.tempo % 60).toString().padStart(2, '0');
+            hudClock.innerText = `${h}:${m}:${s}`;
+        }
+
+        window.onload = () => { renderUI(); };
+    </script>
 </body>
 </html>
