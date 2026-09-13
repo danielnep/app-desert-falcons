@@ -3,53 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Desert Falcons - Sistema Completo</title>
+    <title>Desert Falcons - Tactical OS</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Simulador Dev (Controle de Testes) -->
-    <div class="dev-switcher">
-        <button id="btn-view-cmd" class="active" onclick="switchView('comando')">📡 COMANDO</button>
-        <button id="btn-view-jog" onclick="switchView('jogador')">🔫 JOGADOR</button>
-    </div>
+    <!-- A. ENTRADA -->
+    <section id="view-splash" class="view-layer active fullscreen-center">
+        <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/main/assets/IMG-20260912-WA0015(1).png" alt="Desert Falcons" class="splash-logo">
+        <div class="loader">Carregando Motor Tático...</div>
+    </section>
 
-    <!-- CAMADA 1: DASHBOARD DO COMANDO -->
-    <div id="view-comando" class="view-layer active">
-        <h2 class="section-title">DASHBOARD DA OPERAÇÃO</h2>
-        
-        <div class="cmd-grid">
-            <div class="cmd-card">
-                <h3>Status do Motor</h3>
-                <p id="cmd-status">AGUARDANDO</p>
-                <button class="btn-cmd" id="btn-iniciar" onclick="dispararEvento('MATCH_START')">Iniciar Partida</button>
-                <button class="btn-cmd danger" style="display:none;" id="btn-encerrar" onclick="dispararEvento('MATCH_END')">Encerrar</button>
+    <section id="view-inicio" class="view-layer with-nav">
+        <header class="top-bar">
+            <div class="logo-mini">DF</div>
+            <h1>Base de Operações</h1>
+        </header>
+        <div class="content-area">
+            <div id="no-match-alert" class="card alert-card" style="display: none;">
+                <h3>Nenhuma Operação Ativa</h3>
+                <p>Aguarde o Comando iniciar o briefing.</p>
             </div>
-            <div class="cmd-card">
-                <h3>Operadores Vivos</h3>
-                <p style="color: var(--blue-team);">Azul: <span id="cmd-vivos-azul">12</span></p>
-                <p style="color: var(--danger);">Vermelho: <span id="cmd-vivos-verm">12</span></p>
+            <div id="available-match-card" class="card tactical-card">
+                <span class="badge warning">OPERAÇÃO DISPONÍVEL</span>
+                <h2 id="home-op-name" style="margin-top: 10px;">Operação Red Sand</h2>
+                <p><strong>Status:</strong> <span id="home-op-status">Aguardando Check-in</span></p>
+                <button class="btn-primary mt-3" onclick="requestEntry()">SOLICITAR ENTRADA</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- B. JOGADOR: PRÉ-JOGO (HUB) -->
+    <section id="view-prejogo" class="view-layer with-nav">
+        <header class="top-bar">
+            <h1>Central de Preparação</h1>
+            <button class="btn-icon" onclick="switchView('inicio')">✖</button>
+        </header>
+        <div class="content-area">
+            <div class="grid-2">
+                <div class="card status-card">
+                    <h3>Sua Identidade</h3>
+                    <h2 class="bronze-text" id="pre-player-name">DANI</h2>
+                    <p>Equipe: <strong id="pre-player-team">AZUL</strong></p>
+                    <div class="mt-2">
+                        <label>Classe:</label>
+                        <select id="pre-player-class" class="tactical-select" onchange="updatePlayerClass(this.value)">
+                            <option value="Assalto">Assalto</option>
+                            <option value="Médico">Médico</option>
+                            <option value="Recon">Recon</option>
+                            <option value="Suporte">Suporte</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Briefing da Missão</h3>
+                    <p id="pre-briefing-text" class="text-muted">Capturar e manter os setores Alfa e Bravo. Regras de engajamento restritas.</p>
+                    <h4 class="mt-2 bronze-text">Mecânicas Ativas</h4>
+                    <ul class="mechanics-list" id="pre-mechanics-list">
+                        <!-- Preenchido via JS -->
+                    </ul>
+                </div>
+            </div>
+            <div class="card mt-2">
+                <h3>Equipe (Roster)</h3>
+                <div id="pre-team-list" class="team-list">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+            <button class="btn-success mt-3 btn-large" onclick="confirmReady()">ESTOU PRONTO (DEPLOY)</button>
+        </div>
+    </section>
+
+    <!-- B. JOGADOR: PAINEL TÁTICO (COMBATE) -->
+    <section id="view-tatico" class="view-layer combat-hud">
+        <div class="hud-top">
+            <div>
+                <span id="hud-op-name" class="hud-title">OPERAÇÃO X</span>
+                <span id="hud-clock" class="hud-time">12:42:00</span>
+            </div>
+            <div id="hud-status-indicator" class="status-indicator active">ATIVO</div>
+        </div>
+
+        <div class="hud-center">
+            <!-- UI reage ao estado do jogador -->
+            <div id="hud-state-display" class="state-display">
+                <h2 id="hud-state-title">SETOR SEGURO</h2>
+                <p id="hud-state-desc">Aguardando contato visual.</p>
             </div>
         </div>
 
-        <h3 class="section-title" style="font-size: 0.9rem;">REGISTRO DE EVENTOS (MOTOR)</h3>
-        <div class="log-box" id="cmd-logs"></div>
-    </div>
-
-    <!-- CAMADA 2: PAINEL TÁTICO DO JOGADOR -->
-    <div id="view-jogador" class="view-layer">
-        <div class="hud-header">
-            <h1 id="ui-op-name">Operação Blackout</h1>
-            <div class="hud-time" id="ui-time">00:00:00</div>
+        <div class="hud-bottom">
+            <div id="hud-critical-action" class="critical-zone">
+                <!-- Botão HIT ou Médico injetado aqui dinamicamente -->
+            </div>
+            <div id="hud-modules-grid" class="modules-grid">
+                <!-- Granadas, UAV, Objetivos injetados aqui -->
+            </div>
         </div>
+    </section>
 
-        <div id="ui-status-box" class="status-display offline">
-            <h2 id="ui-status-title">FORA DE COMBATE</h2>
-            <p id="ui-status-desc">Aguarde o Comando iniciar a operação.</p>
+    <!-- C. COMANDO: DASHBOARD -->
+    <section id="view-comando" class="view-layer with-nav">
+        <header class="top-bar border-red">
+            <h1>DASHBOARD COMANDO</h1>
+        </header>
+        <div class="content-area">
+            <div class="grid-2">
+                <div class="card">
+                    <h3>Motor da Partida</h3>
+                    <h2 id="cmd-motor-status" class="bronze-text mb-2">AGUARDANDO</h2>
+                    <button id="cmd-btn-start" class="btn-primary" onclick="dispatch('MATCH_START')">INICIAR OPERAÇÃO</button>
+                    <button id="cmd-btn-pause" class="btn-warning mt-2" style="display:none;" onclick="dispatch('MATCH_PAUSE')">PAUSAR</button>
+                    <button id="cmd-btn-end" class="btn-danger mt-2" style="display:none;" onclick="dispatch('MATCH_END')">ENCERRAR</button>
+                </div>
+                <div class="card">
+                    <h3>Controle de Efetivo</h3>
+                    <div class="team-stats">
+                        <div class="team-blue">
+                            <span>AZUL</span>
+                            <h2 id="cmd-blue-count">0</h2>
+                        </div>
+                        <div class="team-red">
+                            <span>VERM</span>
+                            <h2 id="cmd-red-count">0</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-2">
+                <h3>Objetivos em Campo</h3>
+                <div class="objectives-grid" id="cmd-objectives-list">
+                    <!-- Injetado via JS -->
+                </div>
+            </div>
+
+            <div class="card mt-2 p-0">
+                <h3 class="p-3 pb-0 border-bottom-0">Eventos em Tempo Real</h3>
+                <div id="cmd-live-logs" class="terminal-logs">
+                    <!-- Injetado via JS -->
+                </div>
+            </div>
         </div>
+    </section>
 
-        <div id="ui-critical-action"></div>
-    </div>
+    <!-- D. PERFIL & E. CONHECIMENTO -->
+    <section id="view-perfil" class="view-layer with-nav">
+        <header class="top-bar"><h1>Seu Perfil</h1></header>
+        <div class="content-area text-center">
+            <div class="avatar-large">D</div>
+            <h2 class="mt-2 bronze-text">DANI</h2>
+            <p class="text-muted">#DF-001</p>
+            <div class="grid-2 mt-3">
+                <div class="card"><h3>Hits</h3><h2>42</h2></div>
+                <div class="card"><h3>Curados</h3><h2>15</h2></div>
+            </div>
+            <button class="btn-danger mt-4" onclick="logout()">DESCONECTAR</button>
+        </div>
+    </section>
+
+    <!-- NAVEGAÇÃO GLOBAL (Fora de Combate) -->
+    <nav id="global-nav" class="bottom-nav">
+        <button class="nav-btn active" onclick="switchView('inicio', this)">Início</button>
+        <button class="nav-btn" onclick="switchView('comando', this)">Comando</button>
+        <button class="nav-btn" onclick="switchView('perfil', this)">Perfil</button>
+    </nav>
 
     <script src="app.js"></script>
 </body>
