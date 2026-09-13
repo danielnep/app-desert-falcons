@@ -6,14 +6,16 @@
     <title>Desert Falcons - App</title>
     <style>
         :root {
-            --bg-color: #0d0d0f;
-            --surface-color: #1a1a1e;
-            --primary-color: #ff7300; /* Laranja Tático */
-            --text-main: #f0f0f5;
-            --text-muted: #a8a8b3;
-            --border-color: #323238;
-            --success: #04d361;
-            --danger: #f75a68;
+            /* Cores extraídas da logo oficial */
+            --bg-color: #0a0a0c;
+            --surface-color: #18181a;
+            --primary-color: #A67C52; /* Bronze/Ocre do Falcão */
+            --primary-dark: #82603f;
+            --text-main: #EBEBEB; /* Gelo do Escudo */
+            --text-muted: #8c8c94;
+            --border-color: #2a2a2e;
+            --success: #3A5F43; /* Verde Tático */
+            --danger: #8B2C2C; /* Vermelho Escuro */
         }
 
         * {
@@ -38,28 +40,24 @@
             padding: 16px 20px;
             display: flex;
             align-items: center;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 2px solid var(--primary-color);
             z-index: 10;
         }
 
-        .logo {
-            width: 36px;
-            height: 36px;
-            background-color: var(--primary-color);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 900;
-            color: var(--bg-color);
+        .logo-img {
+            width: 42px;
+            height: 42px;
             margin-right: 12px;
+            border-radius: 50%;
+            border: 1px solid var(--primary-color);
+            object-fit: cover;
         }
 
         header h1 {
             font-size: 1.1rem;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--text-main);
+            color: var(--primary-color);
         }
 
         /* Containers */
@@ -67,7 +65,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 16px;
-            padding-bottom: 80px; /* Espaço para o menu */
+            padding-bottom: 80px;
         }
 
         .screen, .sub-screen {
@@ -89,6 +87,7 @@
             color: var(--primary-color);
             margin-bottom: 16px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         /* Cards & Elementos */
@@ -122,13 +121,13 @@
             margin-bottom: 8px;
         }
 
-        .badge.alert { background-color: rgba(247, 90, 104, 0.2); color: var(--danger); }
-        .badge.ok { background-color: rgba(4, 211, 97, 0.2); color: var(--success); }
+        .badge.alert { background-color: var(--danger); color: var(--text-main); }
+        .badge.ok { background-color: var(--success); color: var(--text-main); }
 
         /* Botões */
         button {
             background-color: var(--primary-color);
-            color: var(--bg-color);
+            color: #000;
             border: none;
             padding: 12px 16px;
             border-radius: 6px;
@@ -137,15 +136,19 @@
             cursor: pointer;
             text-transform: uppercase;
             margin-top: 8px;
-            transition: opacity 0.2s;
+            transition: background-color 0.2s;
         }
 
-        button:active { opacity: 0.8; }
+        button:active { background-color: var(--primary-dark); }
         
         button.secondary {
             background-color: transparent;
             border: 1px solid var(--primary-color);
             color: var(--primary-color);
+        }
+
+        button.secondary:active {
+            background-color: rgba(166, 124, 82, 0.1);
         }
 
         /* Menu Interno (Abas do Evento) */
@@ -167,7 +170,7 @@
 
         .sub-nav button.active-tab {
             background-color: var(--primary-color);
-            color: var(--bg-color);
+            color: #000;
             border-color: var(--primary-color);
         }
 
@@ -207,7 +210,7 @@
 <body>
 
     <header>
-        <div class="logo">DF</div>
+        <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/main/assets/IMG-20260912-WA0015(1).png" alt="Logo Desert Falcons" class="logo-img" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Crect width=\'100\' height=\'100\' fill=\'%23A67C52\'/%3E%3Ctext x=\'50\' y=\'55\' font-family=\'Arial\' font-size=\'40\' fill=\'black\' text-anchor=\'middle\'%3EDF%3C/text%3E%3C/svg%3E'">
         <h1>Desert Falcons</h1>
     </header>
 
@@ -255,9 +258,8 @@
             </div>
         </section>
 
-        <!-- 3. TELA EVENTOS (O CORAÇÃO DO APP) -->
+        <!-- 3. TELA EVENTOS -->
         <section id="tela-eventos" class="screen">
-            <!-- Lista de Eventos -->
             <div id="lista-eventos" class="sub-screen active">
                 <h2>Operações Abertas</h2>
                 <div class="card">
@@ -275,24 +277,21 @@
                 </div>
             </div>
 
-            <!-- Detalhes do Evento (Presença, Times, Resultado) -->
             <div id="detalhes-evento" class="sub-screen">
                 <button class="secondary" style="width: auto; padding: 6px 12px; margin-bottom: 16px;" onclick="voltarParaListaEventos()">← Voltar</button>
                 <h2>Operação Blackout</h2>
                 
-                <!-- Navegação Interna da Partida -->
                 <div class="sub-nav">
                     <button class="tab-btn active-tab" onclick="trocarAbaEvento('aba-checkin', this)">Check-in</button>
                     <button class="tab-btn" onclick="trocarAbaEvento('aba-times', this)">Times</button>
                     <button class="tab-btn" onclick="trocarAbaEvento('aba-placar', this)">Placar</button>
                 </div>
 
-                <!-- Aba: Check-in / Presença -->
                 <div id="aba-checkin" class="aba-conteudo active">
                     <div class="card">
                         <h3>Sua Situação</h3>
                         <p>Você ainda não confirmou presença.</p>
-                        <button style="background-color: var(--success);" onclick="this.innerText='Presença Confirmada'">Confirmar Presença</button>
+                        <button style="background-color: var(--success); color: var(--text-main);" onclick="this.innerText='Presença Confirmada'">Confirmar Presença</button>
                     </div>
                     <div class="card">
                         <h3>Lista de Confirmados (12)</h3>
@@ -300,9 +299,8 @@
                     </div>
                 </div>
 
-                <!-- Aba: Organização de Times -->
                 <div id="aba-times" class="aba-conteudo" style="display: none;">
-                    <div class="card" style="border-left: 4px solid #3b82f6;">
+                    <div class="card" style="border-left: 4px solid #4a6fa5;">
                         <h3>Time Azul (Rangers)</h3>
                         <p>Dani, Ghost, Viper...</p>
                     </div>
@@ -313,13 +311,12 @@
                     <button class="secondary">Embaralhar Times Aleatoriamente</button>
                 </div>
 
-                <!-- Aba: Resultado / Placar -->
                 <div id="aba-placar" class="aba-conteudo" style="display: none;">
                     <div class="card">
                         <h3>Registro de Pontuação</h3>
                         <p>Partida em andamento...</p>
-                        <button style="background-color: #3b82f6; margin-bottom: 8px;">Ponto Time Azul</button>
-                        <button style="background-color: var(--danger);">Ponto Time Vermelho</button>
+                        <button style="background-color: #4a6fa5; color: #fff; margin-bottom: 8px;">Ponto Time Azul</button>
+                        <button style="background-color: var(--danger); color: #fff;">Ponto Time Vermelho</button>
                     </div>
                     <button class="secondary">Encerrar Partida e Salvar Histórico</button>
                 </div>
@@ -340,7 +337,7 @@
                 <p>Vitórias Registradas: 15</p>
             </div>
             <button class="secondary">Configurações da Conta</button>
-            <button style="background-color: var(--danger);">Sair (Logout)</button>
+            <button style="background-color: var(--danger); color: var(--text-main);">Sair (Logout)</button>
         </section>
     </main>
 
@@ -365,7 +362,6 @@
     </nav>
 
     <script>
-        // Navegação Principal (Menu Inferior)
         function navegarPara(idTela, elementoClicado) {
             document.querySelectorAll('.screen').forEach(tela => tela.classList.remove('active'));
             document.getElementById(idTela).classList.add('active');
@@ -380,23 +376,19 @@
                 });
             }
 
-            // Reseta a tela de eventos para a lista sempre que acessar pelo menu
             if(idTela === 'tela-eventos') voltarParaListaEventos();
         }
 
-        // Navegação Interna: Abrir Detalhes do Evento
         function abrirDetalhesEvento() {
             document.getElementById('lista-eventos').classList.remove('active');
             document.getElementById('detalhes-evento').classList.add('active');
         }
 
-        // Navegação Interna: Voltar para Lista de Eventos
         function voltarParaListaEventos() {
             document.getElementById('detalhes-evento').classList.remove('active');
             document.getElementById('lista-eventos').classList.add('active');
         }
 
-        // Navegação Interna: Abas dentro do Evento (Check-in, Times, Placar)
         function trocarAbaEvento(idAba, elementoClicado) {
             document.querySelectorAll('.aba-conteudo').forEach(aba => aba.style.display = 'none');
             document.getElementById(idAba).style.display = 'block';
