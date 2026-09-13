@@ -1,195 +1,240 @@
 /**
- * AIRSOFT TACTICAL OS - MOTOR CENTRAL (CORRIGIDO)
- * Arquitetura: Estado -> Regras -> UI
+ * DESERT FALCONS — MOTOR DA DEMO
+ * Foco: gerenciamento de partida, equipe, comunicação e eventos.
+ * Fluxo: ESTADO -> EVENTO -> UI
  */
 
-const state = {
-    app: { currentView: 'splash' },
+const STORAGE_KEY = 'df_demo_state_v2';
+
+const defaultState = () => ({
+    app: { currentView: 'inicio' },
     partida: {
-        ativa: false,
+        ativa: true,
         status: 'aguardando',
         nome: 'Operação Red Sand',
         tempo: 0,
-        mecanicas: { medico: true, bleedoutTime: 60, granada: true, uav: true, jammer: false }
+        ultimoEvento: null
+    },
+    equipes: {
+        azul: { nome: 'AZUL', total: 12, ativos: 12 },
+        vermelho: { nome: 'VERMELHO', total: 12, ativos: 12 }
     },
     objetivos: {
         alfa: { nome: 'Setor Alfa', controle: 'neutro' },
         bravo: { nome: 'Setor Bravo', controle: 'neutro' }
     },
-    equipes: {
-        azul: { vivos: 12, total: 12 },
-        vermelho: { vivos: 12, total: 12 }
-    },
     jogador: {
         id: 'DF-001',
-        nome: 'Dani',
+        nome: 'DANI',
         equipe: 'azul',
         classe: 'Assalto',
         situacao: 'aguardando',
-        timerBleedout: 0,
-        recursos: { granadas: 2, uavAtivo: false }
-    }
-};
+        radio: { ligado: true, canal: '01', sinal: 'OK' }
+    },
+    eventos: []
+});
 
+let state = loadState();
 let clockInterval = null;
-let bleedoutInterval = null;
+
+function clone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? { ...defaultState(), ...JSON.parse(saved) } : defaultState();
+    } catch (error) {
+        return defaultState();
+    }
+}
+
+function persist() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
 
 function initApp() {
-    setTimeout(() => {
-        state.partida.ativa = true;
-        // Força a remoção da splash e ativa o início sem falha de DOM
-        const splash = document.getElementById('view-splash');
-        if(splash) splash.classList.remove('active');
-        
-        switchView('inicio');
-        renderUI();
-    }, 800);
+    const splash = document.getElementById('view-splash');
+    if (splash) splash.classList.remove('active');
+    state.app.currentView = 'inicio';
+    renderUI();
+    switchClock();
 }
 
 function switchView(targetView, navElement = null) {
     state.app.currentView = targetView;
-    
-    document.querySelectorAll('.view-layer').forEach(el => el.classList.remove('active'));
-    
-    const targetElement = document.getElementById(`view-${targetView}`);
-    if(targetElement) {
-        targetElement.classList.add('active');
-    }
 
-    if(navElement) {
+    document.querySelectorAll('.view-layer').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById(`view-${targetView}`);
+    if (target) target.classList.add('active');
+
+    if (navElement) {
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
         navElement.classList.add('active');
     }
 
     const globalNav = document.getElementById('global-nav');
-    if(globalNav) {
-        if(targetView === 'tatico' || targetView === 'prejogo' || targetView === 'splash') {
-            globalNav.style.display = 'none';
-        } else {
-            globalNav.style.display = 'flex';
-        }
+    if (globalNav) {
+        globalNav.style.display = ['tatico', 'prejogo', 'splash'].includes(targetView) ? 'none' : 'flex';
     }
 
     renderUI();
 }
 
-function requestEntry() { switchView('prejogo'); }
-function confirmReady() { 
-    if(state.partida.status === 'andamento') {
-        state.jogador.situacao = 'ativo';
-    }
-    switchView('tatico'); 
+function requestEntry() {
+    addEvent('CHECK_IN', state.jogador.nome, 'Entrada solicitada');
+    switchView('prejogo');
 }
-function logout() { switchView('splash'); setTimeout(initApp, 800); }
 
-function dispatch(evento, payload = null) {
-    const timeLog = new Date().toTimeString().substring(0, 8);
-    const origin = payload?.origin || 'SISTEMA';
-    logEvent(timeLog, evento, origin);
+function confirmReady() {
+    if (state.partida.status === 'andamento') {
+        setPlayerStatus('ativo', 'PLAYER_READY');
+    }
+    addEvent('DEPLOY', state.jogador.nome, 'Jogador pronto');
+    switchView('tatico');
+}
 
-    switch(evento) {
+function logout() {
+    state = defaultState();
+    persist();
+    switchView('inicio');
+    switchClock();
+}
+
+function dispatch(evento, payload = {}) {
+    const actor = payload.origin || state.jogador.nome;
+
+    switch (evento) {
         case 'MATCH_START':
+            if (state.partida.status === 'andamento') return;
             state.partida.status = 'andamento';
-            state.equipes.azul.vivos = state.equipes.azul.total;
-            state.equipes.vermelho.vivos = state.equipes.vermelho.total;
-            if(state.app.currentView === 'tatico' || state.app.currentView === 'prejogo') {
-                state.jogador.situacao = 'ativo';
-            }
+            state.partida.ultimoEvento = 'Partida iniciada';
+            addEvent('MATCH_START', actor, 'Partida iniciada');
             startClock();
             break;
-            
+
         case 'MATCH_PAUSE':
+            if (state.partida.status !== 'andamento') return;
             state.partida.status = 'pausada';
+            state.partida.ultimoEvento = 'Partida pausada';
+            addEvent('MATCH_PAUSE', actor, 'Partida pausada');
             stopClock();
+            break;
+
+        case 'MATCH_RESUME':
+            if (state.partida.status !== 'pausada') return;
+            state.partida.status = 'andamento';
+            state.partida.ultimoEvento = 'Partida retomada';
+            addEvent('MATCH_RESUME', actor, 'Partida retomada');
+            startClock();
             break;
 
         case 'MATCH_END':
             state.partida.status = 'encerrada';
-            state.jogador.situacao = 'aguardando';
+            state.partida.ultimoEvento = 'Partida encerrada';
+            addEvent('MATCH_END', actor, 'Partida encerrada');
             stopClock();
-            clearInterval(bleedoutInterval);
             break;
 
         case 'CLASS_CHANGE':
-            state.jogador.classe = payload.classe;
-            if(payload.classe === 'Assalto') state.jogador.recursos.granadas = 2;
-            else if(payload.classe === 'Recon') state.jogador.recursos.granadas = 1;
-            else state.jogador.recursos.granadas = 0;
+            state.jogador.classe = payload.classe || state.jogador.classe;
+            addEvent('CLASS_CHANGE', actor, `Classe alterada para ${state.jogador.classe}`);
             break;
 
-        case 'PLAYER_HIT':
-            if(state.jogador.situacao === 'ativo') {
-                state.jogador.situacao = 'atingido';
-                state.equipes[state.jogador.equipe].vivos--;
-                if(state.partida.mecanicas.medico) {
-                    startBleedout(state.partida.mecanicas.bleedoutTime);
-                } else {
-                    state.jogador.situacao = 'morto';
-                }
+        case 'PLAYER_ACTIVE':
+            if (state.partida.status === 'andamento') setPlayerStatus('ativo', 'PLAYER_ACTIVE');
+            break;
+
+        case 'PLAYER_OUT':
+            if (state.jogador.situacao === 'ativo') {
+                setPlayerStatus('fora', 'PLAYER_OUT');
             }
             break;
 
-        case 'MEDIC_HEAL':
-            if(state.jogador.situacao === 'atingido' || state.jogador.situacao === 'bleedout') {
-                state.jogador.situacao = 'ativo';
-                state.equipes[state.jogador.equipe].vivos++;
-                clearInterval(bleedoutInterval);
-            }
+        case 'TEAM_RETURN':
+            setPlayerStatus('aguardando', 'TEAM_RETURN');
             break;
 
-        case 'BLEEDOUT_END':
-            state.jogador.situacao = 'morto';
+        case 'CAPTURE_OBJ': {
+            const target = payload.target;
+            if (!state.objetivos[target] || state.jogador.situacao !== 'ativo') return;
+            state.objetivos[target].controle = state.jogador.equipe;
+            addEvent('OBJECTIVE_UPDATE', actor, `${state.objetivos[target].nome} controlado por ${state.jogador.equipe.toUpperCase()}`);
+            break;
+        }
+
+        case 'RADIO_TOGGLE':
+            state.jogador.radio.ligado = !state.jogador.radio.ligado;
+            state.jogador.radio.sinal = state.jogador.radio.ligado ? 'OK' : 'OFF';
+            addEvent('RADIO', actor, state.jogador.radio.ligado ? 'Comunicação online' : 'Comunicação offline');
             break;
 
-        case 'USE_GRENADE':
-            if(state.jogador.recursos.granadas > 0 && state.jogador.situacao === 'ativo') {
-                state.jogador.recursos.granadas--;
-            }
+        case 'RADIO_CHANNEL':
+            state.jogador.radio.canal = payload.canal || state.jogador.radio.canal;
+            addEvent('RADIO_CHANNEL', actor, `Canal ${state.jogador.radio.canal}`);
             break;
 
-        case 'USE_UAV':
-            if(!state.jogador.recursos.uavAtivo && state.jogador.situacao === 'ativo') {
-                state.jogador.recursos.uavAtivo = true;
-                setTimeout(() => {
-                    state.jogador.recursos.uavAtivo = false;
-                    dispatch('UAV_EXPIRED');
-                }, 15000);
-            }
+        case 'RADIO_PING':
+            if (!state.jogador.radio.ligado) return;
+            addEvent('RADIO_PING', actor, `Ping enviado no canal ${state.jogador.radio.canal}`);
             break;
 
-        case 'CAPTURE_OBJ':
-            if(state.jogador.situacao === 'ativo') {
-                state.objetivos[payload.target].controle = state.jogador.equipe;
-            }
+        case 'TEAM_STATUS':
+            if (!state.jogador.radio.ligado) return;
+            addEvent('TEAM_STATUS', actor, `Status enviado no canal ${state.jogador.radio.canal}`);
             break;
     }
+
+    persist();
     renderUI();
 }
 
-function logEvent(time, event, actor) {
-    const logsContainer = document.getElementById('cmd-live-logs');
-    if(!logsContainer) return;
-    logsContainer.innerHTML = `<div class="log-line"><span class="log-time">[${time}]</span><span class="log-actor">${actor}:</span> ${event}</div>` + logsContainer.innerHTML;
+function setPlayerStatus(nextStatus, eventType = 'PLAYER_STATUS') {
+    const previous = state.jogador.situacao;
+    if (previous === nextStatus) return;
+
+    if (previous === 'ativo') {
+        state.equipes[state.jogador.equipe].ativos = Math.max(0, state.equipes[state.jogador.equipe].ativos - 1);
+    }
+
+    if (nextStatus === 'ativo') {
+        state.equipes[state.jogador.equipe].ativos = Math.min(
+            state.equipes[state.jogador.equipe].total,
+            state.equipes[state.jogador.equipe].ativos + 1
+        );
+    }
+
+    state.jogador.situacao = nextStatus;
+    addEvent(eventType, state.jogador.nome, `Estado: ${previous.toUpperCase()} → ${nextStatus.toUpperCase()}`);
+}
+
+function addEvent(type, actor, message) {
+    const now = new Date();
+    const time = now.toLocaleTimeString('pt-BR', { hour12: false });
+    state.eventos.unshift({ time, type, actor, message });
+    state.eventos = state.eventos.slice(0, 40);
+    state.partida.ultimoEvento = message;
+    renderLogs();
 }
 
 function startClock() {
-    clearInterval(clockInterval);
-    clockInterval = setInterval(() => { state.partida.tempo++; renderClock(); }, 1000);
+    stopClock();
+    clockInterval = setInterval(() => {
+        state.partida.tempo += 1;
+        persist();
+        renderClock();
+    }, 1000);
 }
 
-function stopClock() { clearInterval(clockInterval); }
+function stopClock() {
+    if (clockInterval) clearInterval(clockInterval);
+    clockInterval = null;
+}
 
-function startBleedout(seconds) {
-    state.jogador.situacao = 'bleedout';
-    state.jogador.timerBleedout = seconds;
-    clearInterval(bleedoutInterval);
-    bleedoutInterval = setInterval(() => {
-        state.jogador.timerBleedout--;
-        if(state.jogador.timerBleedout <= 0) {
-            clearInterval(bleedoutInterval);
-            dispatch('BLEEDOUT_END', { origin: 'SISTEMA' });
-        } else { renderUI(); }
-    }, 1000);
+function switchClock() {
+    stopClock();
+    if (state.partida.status === 'andamento') startClock();
 }
 
 function updatePlayerClass(newClass) {
@@ -197,132 +242,177 @@ function updatePlayerClass(newClass) {
 }
 
 function renderUI() {
+    renderHome();
+    renderPreGame();
+    renderCommand();
+    renderProfile();
+    renderTacticalHUD();
+    renderLogs();
     renderClock();
+    persist();
+}
 
-    if(state.partida.ativa) {
-        const noMatch = document.getElementById('no-match-alert');
-        const availMatch = document.getElementById('available-match-card');
-        if(noMatch) noMatch.style.display = 'none';
-        if(availMatch) availMatch.style.display = 'block';
-        const homeStatus = document.getElementById('home-op-status');
-        if(homeStatus) homeStatus.innerText = state.partida.status.toUpperCase();
-    }
+function renderHome() {
+    const name = document.getElementById('home-op-name');
+    const status = document.getElementById('home-op-status');
+    if (name) name.innerText = state.partida.nome;
+    if (status) status.innerText = labelStatus(state.partida.status);
+}
 
-    const selectClass = document.getElementById('pre-player-class');
-    if(selectClass) selectClass.value = state.jogador.classe;
-    
+function renderPreGame() {
+    const playerName = document.getElementById('pre-player-name');
+    const team = document.getElementById('pre-player-team');
+    const select = document.getElementById('pre-player-class');
+    const briefing = document.getElementById('pre-briefing-text');
     const mechList = document.getElementById('pre-mechanics-list');
-    if(mechList) {
+
+    if (playerName) playerName.innerText = state.jogador.nome;
+    if (team) team.innerText = state.equipes[state.jogador.equipe].nome;
+    if (select) select.value = state.jogador.classe;
+    if (briefing) briefing.innerText = 'Partida configurada. Acompanhe o estado da equipe, objetivos e comunicação pelo painel.';
+
+    if (mechList) {
         mechList.innerHTML = `
-            <li class="${state.partida.mecanicas.medico ? '' : 'disabled'}">Sistema Médico (${state.partida.mecanicas.bleedoutTime}s)</li>
-            <li class="${state.partida.mecanicas.granada ? '' : 'disabled'}">Granadas Digitais</li>
-            <li class="${state.partida.mecanicas.uav ? '' : 'disabled'}">UAV / Radar</li>
+            <li>Controle de estado do jogador</li>
+            <li>Eventos em tempo real</li>
+            <li>Comunicação por canal</li>
+            <li>Objetivos com estado persistente</li>
         `;
     }
+}
 
-    const cmdStatus = document.getElementById('cmd-motor-status');
-    if(cmdStatus) cmdStatus.innerText = state.partida.status.toUpperCase();
-    
-    const btnStart = document.getElementById('cmd-btn-start');
-    const btnPause = document.getElementById('cmd-btn-pause');
-    const btnEnd = document.getElementById('cmd-btn-end');
-    
-    if(btnStart) btnStart.style.display = state.partida.status === 'aguardando' ? 'block' : 'none';
-    if(btnPause) btnPause.style.display = state.partida.status === 'andamento' ? 'block' : 'none';
-    if(btnEnd) btnEnd.style.display = (state.partida.status === 'andamento' || state.partida.status === 'pausada') ? 'block' : 'none';
-    
-    const blueCount = document.getElementById('cmd-blue-count');
-    const redCount = document.getElementById('cmd-red-count');
-    if(blueCount) blueCount.innerText = state.equipes.azul.vivos;
-    if(redCount) redCount.innerText = state.equipes.vermelho.vivos;
+function renderCommand() {
+    const status = document.getElementById('cmd-motor-status');
+    const start = document.getElementById('cmd-btn-start');
+    const pause = document.getElementById('cmd-btn-pause');
+    const end = document.getElementById('cmd-btn-end');
+    const blue = document.getElementById('cmd-blue-count');
+    const red = document.getElementById('cmd-red-count');
+    const grid = document.getElementById('cmd-objectives-list');
 
-    const objGrid = document.getElementById('cmd-objectives-list');
-    if(objGrid) {
-        objGrid.innerHTML = '';
-        Object.keys(state.objetivos).forEach(key => {
-            const obj = state.objetivos[key];
-            const cssClass = obj.controle === 'azul' ? 'obj-azul' : (obj.controle === 'vermelho' ? 'obj-verm' : 'obj-neutro');
-            objGrid.innerHTML += `<div class="obj-item ${cssClass}"><span>${obj.nome}</span><span>${obj.controle.toUpperCase()}</span></div>`;
-        });
+    if (status) status.innerText = labelStatus(state.partida.status);
+    if (start) start.style.display = state.partida.status === 'aguardando' ? 'block' : 'none';
+    if (pause) {
+        pause.style.display = state.partida.status === 'andamento' ? 'block' : 'none';
+        pause.innerText = 'PAUSAR';
     }
+    if (end) end.style.display = ['andamento', 'pausada'].includes(state.partida.status) ? 'block' : 'none';
 
-    renderTacticalHUD();
+    if (blue) blue.innerText = state.equipes.azul.ativos;
+    if (red) red.innerText = state.equipes.vermelho.ativos;
+
+    if (grid) {
+        grid.innerHTML = Object.values(state.objetivos).map(obj => {
+            const owner = obj.controle === 'neutro' ? 'NEUTRO' : obj.controle.toUpperCase();
+            const css = obj.controle === 'azul' ? 'obj-azul' : obj.controle === 'vermelho' ? 'obj-verm' : 'obj-neutro';
+            return `<div class="obj-item ${css}"><span>${obj.nome}</span><span>${owner}</span></div>`;
+        }).join('');
+    }
+}
+
+function renderProfile() {
+    const profileName = document.getElementById('profile-name');
+    const profileId = document.getElementById('profile-id');
+    if (profileName) profileName.innerText = state.jogador.nome;
+    if (profileId) profileId.innerText = state.jogador.id;
 }
 
 function renderTacticalHUD() {
-    const hudIndicator = document.getElementById('hud-status-indicator');
-    const hudTitle = document.getElementById('hud-state-title');
-    const hudDesc = document.getElementById('hud-state-desc');
-    const criticalAction = document.getElementById('hud-critical-action');
-    const modulesGrid = document.getElementById('hud-modules-grid');
+    const indicator = document.getElementById('hud-status-indicator');
+    const title = document.getElementById('hud-state-title');
+    const desc = document.getElementById('hud-state-desc');
+    const critical = document.getElementById('hud-critical-action');
+    const modules = document.getElementById('hud-modules-grid');
 
-    if(!hudIndicator || !hudTitle) return;
+    if (!indicator || !title || !desc || !critical || !modules) return;
 
-    criticalAction.innerHTML = '';
-    modulesGrid.innerHTML = '';
+    indicator.className = 'status-indicator';
+    critical.innerHTML = '';
+    modules.innerHTML = '';
 
-    if(state.partida.status !== 'andamento') {
-        hudIndicator.className = 'status-indicator';
-        hudIndicator.innerText = state.partida.status.toUpperCase();
-        hudTitle.innerText = 'FORA DE COMBATE';
-        hudTitle.style.color = 'var(--text-muted)';
-        hudDesc.innerText = 'Aguarde o comando da operação.';
+    if (state.partida.status !== 'andamento') {
+        indicator.innerText = labelStatus(state.partida.status);
+        title.innerText = state.partida.status === 'encerrada' ? 'PARTIDA ENCERRADA' : 'AGUARDANDO COMANDO';
+        title.style.color = 'var(--text-muted)';
+        desc.innerText = 'O painel acompanha automaticamente o estado global da partida.';
         return;
     }
 
-    switch(state.jogador.situacao) {
-        case 'ativo':
-            hudIndicator.className = 'status-indicator active';
-            hudIndicator.innerText = 'OPERACIONAL';
-            hudTitle.innerText = 'SETOR SEGURO';
-            hudTitle.style.color = 'var(--tactical-green-light)';
-            hudDesc.innerText = `Pronto para engajamento. | ${state.jogador.classe}`;
-            
-            criticalAction.innerHTML = `<button class="btn-danger" onclick="dispatch('PLAYER_HIT', {origin: '${state.jogador.nome}'})">DECLARAR HIT</button>`;
-            
-            if(state.partida.mecanicas.granada && state.jogador.recursos.granadas > 0) {
-                modulesGrid.innerHTML += `<button onclick="dispatch('USE_GRENADE')">GRANADA (${state.jogador.recursos.granadas})</button>`;
-            }
-            if(state.jogador.classe === 'Médico') {
-                modulesGrid.innerHTML += `<button class="module-active" style="color:var(--tactical-green-light); border-color:var(--tactical-green-light);">SCAN NFC MÉDICO</button>`;
-            }
-            if(state.jogador.classe === 'Recon' && state.partida.mecanicas.uav) {
-                if(state.jogador.recursos.uavAtivo) {
-                    modulesGrid.innerHTML += `<button class="module-active" style="color:var(--tactical-yellow);">UAV VARRENDO...</button>`;
-                } else {
-                    modulesGrid.innerHTML += `<button onclick="dispatch('USE_UAV')">SOLICITAR UAV</button>`;
-                }
-            }
-            modulesGrid.innerHTML += `<button onclick="dispatch('CAPTURE_OBJ', {target: 'alfa', origin: '${state.jogador.nome}'})">CAPTURAR ALFA</button>`;
-            break;
+    if (state.jogador.situacao === 'ativo') {
+        indicator.className = 'status-indicator active';
+        indicator.innerText = 'ATIVO';
+        title.innerText = 'STATUS OPERACIONAL';
+        title.style.color = 'var(--tactical-green-light)';
+        desc.innerText = `Equipe ${state.equipes[state.jogador.equipe].nome} • Classe ${state.jogador.classe}`;
 
-        case 'atingido':
-        case 'bleedout':
-            hudIndicator.className = 'status-indicator hit';
-            hudIndicator.innerText = 'FERIDO';
-            hudTitle.innerText = 'VOCÊ FOI ATINGIDO';
-            hudTitle.style.color = 'var(--tactical-yellow)';
-            hudDesc.innerText = `Aguardando atendimento médico. Tempo restante: ${state.jogador.timerBleedout}s`;
-            criticalAction.innerHTML = `<button class="btn-success" onclick="dispatch('MEDIC_HEAL', {origin: 'SISTEMA/MEDICO'})">SIMULAR CURA ALLIADA</button>`;
-            break;
+        critical.innerHTML = `<button class="btn-warning" onclick="dispatch('PLAYER_OUT')">ALTERAR STATUS</button>`;
 
-        case 'morto':
-            hudIndicator.className = 'status-indicator hit';
-            hudIndicator.innerText = 'ELIMINADO';
-            hudTitle.innerText = 'BAIXA CONFIRMADA';
-            hudTitle.style.color = 'var(--tactical-red-light)';
-            hudDesc.innerText = 'Retorne imediatamente para a Safezone. Respawn indisponível.';
-            break;
+        modules.innerHTML = `
+            <button class="module-active" onclick="dispatch('RADIO_TOGGLE')">RÁDIO ${state.jogador.radio.ligado ? 'ONLINE' : 'OFFLINE'}</button>
+            <button onclick="dispatch('RADIO_PING')">PING EQUIPE</button>
+            <button onclick="dispatch('TEAM_STATUS')">STATUS EQUIPE</button>
+            <button onclick="dispatch('CAPTURE_OBJ', {target:'alfa'})">ATUALIZAR ALFA</button>
+            <button onclick="dispatch('CAPTURE_OBJ', {target:'bravo'})">ATUALIZAR BRAVO</button>
+            <button onclick="cycleRadioChannel()">CANAL ${state.jogador.radio.canal}</button>
+        `;
+        return;
     }
+
+    indicator.className = 'status-indicator hit';
+    indicator.innerText = state.jogador.situacao.toUpperCase();
+    title.innerText = state.jogador.situacao === 'fora' ? 'FORA DA PARTIDA' : 'AGUARDANDO';
+    title.style.color = 'var(--tactical-yellow)';
+    desc.innerText = 'O estado pode ser alterado pelo controle da partida.';
+    critical.innerHTML = `<button class="btn-success" onclick="dispatch('PLAYER_ACTIVE')">VOLTAR PARA ATIVO</button>`;
+    modules.innerHTML = `<button onclick="dispatch('RADIO_TOGGLE')">RÁDIO ${state.jogador.radio.ligado ? 'ONLINE' : 'OFFLINE'}</button>`;
+}
+
+function cycleRadioChannel() {
+    const channels = ['01', '02', '03', '04', '05', '06'];
+    const index = channels.indexOf(state.jogador.radio.canal);
+    const next = channels[(index + 1) % channels.length];
+    dispatch('RADIO_CHANNEL', { canal: next });
+}
+
+function renderLogs() {
+    const container = document.getElementById('cmd-live-logs');
+    if (!container) return;
+
+    container.innerHTML = state.eventos.map(event => `
+        <div class="log-line">
+            <span class="log-time">[${event.time}]</span>
+            <span class="log-actor">${escapeHtml(event.actor)}:</span>
+            ${escapeHtml(event.message)}
+        </div>
+    `).join('');
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 }
 
 function renderClock() {
     const hudClock = document.getElementById('hud-clock');
-    if(!hudClock) return;
+    if (!hudClock) return;
     const h = Math.floor(state.partida.tempo / 3600).toString().padStart(2, '0');
     const m = Math.floor((state.partida.tempo % 3600) / 60).toString().padStart(2, '0');
     const s = (state.partida.tempo % 60).toString().padStart(2, '0');
     hudClock.innerText = `${h}:${m}:${s}`;
+}
+
+function labelStatus(status) {
+    return ({
+        aguardando: 'AGUARDANDO',
+        briefing: 'BRIEFING',
+        andamento: 'EM ANDAMENTO',
+        pausada: 'PAUSADA',
+        encerrada: 'ENCERRADA'
+    })[status] || String(status).toUpperCase();
 }
 
 window.onload = initApp;
