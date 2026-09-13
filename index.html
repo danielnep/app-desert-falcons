@@ -3,213 +3,344 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Desert Falcons - Airsoft Squad</title>
+    <title>Desert Falcons - App</title>
     <style>
         :root {
-            /* Cores extraídas do padrão tático discutido */
-            --desert-sand: #E3C598;
-            --tactical-olive: #4B5320;
-            --matte-black: #121212;
-            --dark-gray: #1E1E1E;
-            --text-light: #E0E0E0;
-            --alert-red: #8B0000;
+            --bg-color: #0d0d0f;
+            --surface-color: #1a1a1e;
+            --primary-color: #ff7300; /* Laranja Tático */
+            --text-main: #f0f0f5;
+            --text-muted: #a8a8b3;
+            --border-color: #323238;
+            --success: #04d361;
+            --danger: #f75a68;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Courier New', Courier, monospace; /* Vibe terminal/militar */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
 
         body {
-            background-color: var(--matte-black);
-            color: var(--text-light);
+            background-color: var(--bg-color);
+            color: var(--text-main);
             display: flex;
             flex-direction: column;
             height: 100vh;
+            overflow: hidden;
         }
 
-        /* Header Tático */
+        /* Topbar */
         header {
-            background-color: var(--dark-gray);
-            padding: 15px 20px;
+            background-color: var(--surface-color);
+            padding: 16px 20px;
             display: flex;
             align-items: center;
-            border-bottom: 2px solid var(--tactical-olive);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 10;
         }
 
-        .logo-img {
-            width: 40px;
-            height: 40px;
-            margin-right: 15px;
-            border-radius: 50%;
-            border: 2px solid var(--desert-sand);
+        .logo {
+            width: 36px;
+            height: 36px;
+            background-color: var(--primary-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: var(--bg-color);
+            margin-right: 12px;
         }
 
         header h1 {
-            color: var(--desert-sand);
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
+            color: var(--text-main);
         }
 
-        /* Área de Conteúdo (Telas) */
+        /* Containers */
         main {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
-            position: relative;
+            padding: 16px;
+            padding-bottom: 80px; /* Espaço para o menu */
         }
 
-        .screen {
+        .screen, .sub-screen {
             display: none;
-            animation: fadeIn 0.3s ease;
+            animation: fadeSlide 0.2s ease;
         }
 
-        .screen.active {
+        .active {
             display: block;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+        @keyframes fadeSlide {
+            from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         h2 {
-            color: var(--tactical-olive);
-            border-bottom: 1px solid var(--tactical-olive);
-            padding-bottom: 5px;
-            margin-bottom: 15px;
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            margin-bottom: 16px;
             text-transform: uppercase;
         }
 
-        /* Componentes Genéricos */
+        /* Cards & Elementos */
         .card {
-            background-color: var(--dark-gray);
-            border-left: 4px solid var(--desert-sand);
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
         }
 
-        button.action-btn {
-            background-color: var(--tactical-olive);
-            color: var(--text-light);
-            border: none;
-            padding: 12px;
-            width: 100%;
+        .card h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: var(--text-main);
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
             font-weight: bold;
             text-transform: uppercase;
-            border-radius: 4px;
-            margin-top: 10px;
-        }
-        
-        button.action-btn:active {
-            background-color: var(--desert-sand);
-            color: var(--matte-black);
+            margin-bottom: 8px;
         }
 
-        /* Navegação Inferior */
-        nav {
-            background-color: var(--dark-gray);
+        .badge.alert { background-color: rgba(247, 90, 104, 0.2); color: var(--danger); }
+        .badge.ok { background-color: rgba(4, 211, 97, 0.2); color: var(--success); }
+
+        /* Botões */
+        button {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            border: none;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            width: 100%;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin-top: 8px;
+            transition: opacity 0.2s;
+        }
+
+        button:active { opacity: 0.8; }
+        
+        button.secondary {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* Menu Interno (Abas do Evento) */
+        .sub-nav {
             display: flex;
-            justify-content: space-around;
-            padding: 10px 0;
-            border-top: 1px solid var(--tactical-olive);
+            gap: 8px;
+            margin-bottom: 16px;
+            overflow-x: auto;
+        }
+        
+        .sub-nav button {
+            margin: 0;
+            padding: 8px;
+            font-size: 0.8rem;
+            background-color: var(--surface-color);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .sub-nav button.active-tab {
+            background-color: var(--primary-color);
+            color: var(--bg-color);
+            border-color: var(--primary-color);
+        }
+
+        /* Bottom Nav */
+        nav {
+            background-color: var(--surface-color);
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 24px;
+            border-top: 1px solid var(--border-color);
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            z-index: 10;
         }
 
         .nav-item {
-            color: #777;
-            text-align: center;
-            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.7rem;
             text-transform: uppercase;
-            cursor: pointer;
-            padding: 5px;
-            flex: 1;
-        }
-
-        .nav-item.active {
-            color: var(--desert-sand);
             font-weight: bold;
         }
 
+        .nav-item.active {
+            color: var(--primary-color);
+        }
+
         .nav-icon {
-            display: block;
-            font-size: 1.5rem;
-            margin-bottom: 3px;
+            font-size: 1.4rem;
+            margin-bottom: 4px;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/main/assets/IMG-20260912-WA0015(1).png" alt="Logo" class="logo-img">
+        <div class="logo">DF</div>
         <h1>Desert Falcons</h1>
     </header>
 
     <main>
-        <!-- TELA INÍCIO -->
+        <!-- 1. TELA INÍCIO -->
         <section id="tela-inicio" class="screen active">
-            <h2>Base de Operações</h2>
+            <h2>Visão Geral</h2>
             <div class="card">
-                <h3>Próxima Missão</h3>
-                <p><strong>Data:</strong> 25/09/2026</p>
-                <p><strong>Local:</strong> Fábrica Abandonada</p>
-                <button class="action-btn" onclick="navegarPara('tela-eventos')">Fazer Check-in</button>
+                <span class="badge alert">Comunicado Oficial</span>
+                <h3>Regra de Engajamento</h3>
+                <p>Proibido disparos a menos de 5 metros na próxima operação. Rendição obrigatória.</p>
             </div>
-            <div class="card" style="border-left-color: var(--alert-red);">
-                <h3>Comunicado do Comando</h3>
-                <p>Uso de cronógrafo obrigatório antes do briefing. Limite de 400 FPS cravado.</p>
+            <div class="card">
+                <h3>Próxima Operação</h3>
+                <p><strong>Data:</strong> 25/09/2026 - 08:00h</p>
+                <p><strong>Local:</strong> CQB Matadouro</p>
+                <button onclick="navegarPara('tela-eventos')">Ver Detalhes</button>
             </div>
         </section>
 
-        <!-- TELA PERFIL -->
+        <!-- 2. TELA EQUIPE & MEMBROS -->
+        <section id="tela-equipe" class="screen">
+            <h2>Sua Equipe</h2>
+            <div class="card">
+                <h3>Desert Falcons Alpha</h3>
+                <p>Membros Ativos: 18</p>
+                <p>Comandante: Ghost</p>
+                <button class="secondary">Gerar Link de Convite</button>
+            </div>
+            
+            <h2>Membros (Roster)</h2>
+            <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3>Dani</h3>
+                    <p>Assalto</p>
+                </div>
+                <span class="badge ok">Ativo</span>
+            </div>
+            <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3>Viper</h3>
+                    <p>Sniper</p>
+                </div>
+                <span class="badge ok">Ativo</span>
+            </div>
+        </section>
+
+        <!-- 3. TELA EVENTOS (O CORAÇÃO DO APP) -->
+        <section id="tela-eventos" class="screen">
+            <!-- Lista de Eventos -->
+            <div id="lista-eventos" class="sub-screen active">
+                <h2>Operações Abertas</h2>
+                <div class="card">
+                    <h3>Operação Blackout</h3>
+                    <p>25/09/2026 | CQB Matadouro</p>
+                    <p>Presenças: 12 confirmados</p>
+                    <button onclick="abrirDetalhesEvento()">Acessar Painel da Partida</button>
+                </div>
+                
+                <h2 style="margin-top: 24px;">Histórico de Partidas</h2>
+                <div class="card">
+                    <h3>Operação Red Sand</h3>
+                    <p>01/09/2026 | Vitória (Time Azul)</p>
+                    <button class="secondary">Ver Placar Final</button>
+                </div>
+            </div>
+
+            <!-- Detalhes do Evento (Presença, Times, Resultado) -->
+            <div id="detalhes-evento" class="sub-screen">
+                <button class="secondary" style="width: auto; padding: 6px 12px; margin-bottom: 16px;" onclick="voltarParaListaEventos()">← Voltar</button>
+                <h2>Operação Blackout</h2>
+                
+                <!-- Navegação Interna da Partida -->
+                <div class="sub-nav">
+                    <button class="tab-btn active-tab" onclick="trocarAbaEvento('aba-checkin', this)">Check-in</button>
+                    <button class="tab-btn" onclick="trocarAbaEvento('aba-times', this)">Times</button>
+                    <button class="tab-btn" onclick="trocarAbaEvento('aba-placar', this)">Placar</button>
+                </div>
+
+                <!-- Aba: Check-in / Presença -->
+                <div id="aba-checkin" class="aba-conteudo active">
+                    <div class="card">
+                        <h3>Sua Situação</h3>
+                        <p>Você ainda não confirmou presença.</p>
+                        <button style="background-color: var(--success);" onclick="this.innerText='Presença Confirmada'">Confirmar Presença</button>
+                    </div>
+                    <div class="card">
+                        <h3>Lista de Confirmados (12)</h3>
+                        <p>Ghost, Viper, Snake, +9...</p>
+                    </div>
+                </div>
+
+                <!-- Aba: Organização de Times -->
+                <div id="aba-times" class="aba-conteudo" style="display: none;">
+                    <div class="card" style="border-left: 4px solid #3b82f6;">
+                        <h3>Time Azul (Rangers)</h3>
+                        <p>Dani, Ghost, Viper...</p>
+                    </div>
+                    <div class="card" style="border-left: 4px solid var(--danger);">
+                        <h3>Time Vermelho (Insurgentes)</h3>
+                        <p>Snake, Hunter, Bear...</p>
+                    </div>
+                    <button class="secondary">Embaralhar Times Aleatoriamente</button>
+                </div>
+
+                <!-- Aba: Resultado / Placar -->
+                <div id="aba-placar" class="aba-conteudo" style="display: none;">
+                    <div class="card">
+                        <h3>Registro de Pontuação</h3>
+                        <p>Partida em andamento...</p>
+                        <button style="background-color: #3b82f6; margin-bottom: 8px;">Ponto Time Azul</button>
+                        <button style="background-color: var(--danger);">Ponto Time Vermelho</button>
+                    </div>
+                    <button class="secondary">Encerrar Partida e Salvar Histórico</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. TELA MEU PERFIL -->
         <section id="tela-perfil" class="screen">
             <h2>Meu Perfil</h2>
             <div class="card">
-                <h3>Operador: Dani</h3>
-                <p><strong>Função:</strong> Assalto / Batedor</p>
-                <p><strong>Status:</strong> Ativo</p>
-                <p><strong>Identidade Única:</strong> #DF-998</p>
+                <h3>Identidade: Dani</h3>
+                <p><strong>Tag:</strong> #DF-001</p>
+                <p><strong>Função Padrão:</strong> Assalto</p>
             </div>
             <div class="card">
-                <h3>Histórico</h3>
-                <p>Partidas Jogadas: 12</p>
-                <p>Vitórias do Esquadrão: 8</p>
+                <h3>Estatísticas de Combate</h3>
+                <p>Eventos Participados: 24</p>
+                <p>Vitórias Registradas: 15</p>
             </div>
-            <button class="action-btn">Editar Loadout</button>
-        </section>
-
-        <!-- TELA EQUIPE -->
-        <section id="tela-equipe" class="screen">
-            <h2>Esquadrão</h2>
-            <div class="card">
-                <h3>Líderes</h3>
-                <p>- Comandante Alfa</p>
-                <p>- Sargento Bravo</p>
-            </div>
-            <div class="card">
-                <h3>Membros Ativos (14/20)</h3>
-                <p>Visualizar lista completa de operadores...</p>
-                <button class="action-btn" style="margin-top: 10px;">Convidar Recruta</button>
-            </div>
-        </section>
-
-        <!-- TELA EVENTOS -->
-        <section id="tela-eventos" class="screen">
-            <h2>Lista de Presença</h2>
-            <div class="card">
-                <h3>Operação Nightfall</h3>
-                <p><strong>Status:</strong> Aguardando Check-in</p>
-                <button class="action-btn" style="background-color: var(--alert-red);" onclick="this.innerText='CONFIRMADO'; this.style.backgroundColor='var(--tactical-olive)';">Confirmar Presença</button>
-            </div>
-            <div class="card">
-                <h3>Placar Anterior</h3>
-                <p>Operação Carga Pesada: <strong>VITÓRIA</strong></p>
-                <button class="action-btn">Ver Detalhes</button>
-            </div>
+            <button class="secondary">Configurações da Conta</button>
+            <button style="background-color: var(--danger);">Sair (Logout)</button>
         </section>
     </main>
 
@@ -234,32 +365,46 @@
     </nav>
 
     <script>
-        // Lógica simples de navegação entre telas via DOM
+        // Navegação Principal (Menu Inferior)
         function navegarPara(idTela, elementoClicado) {
-            // Esconde todas as telas
-            document.querySelectorAll('.screen').forEach(tela => {
-                tela.classList.remove('active');
-            });
-            
-            // Mostra a tela alvo
+            document.querySelectorAll('.screen').forEach(tela => tela.classList.remove('active'));
             document.getElementById(idTela).classList.add('active');
 
-            // Atualiza o menu inferior (se o clique veio do menu)
             if(elementoClicado) {
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.classList.remove('active');
-                });
+                document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
                 elementoClicado.classList.add('active');
             } else {
-                // Se navegou por um botão interno, força o menu a sincronizar
                 document.querySelectorAll('.nav-item').forEach(item => {
                     item.classList.remove('active');
-                    if (item.innerText.toLowerCase().includes(idTela.split('-')[1])) {
-                        item.classList.add('active');
-                    }
+                    if (item.getAttribute('onclick').includes(idTela)) item.classList.add('active');
                 });
             }
+
+            // Reseta a tela de eventos para a lista sempre que acessar pelo menu
+            if(idTela === 'tela-eventos') voltarParaListaEventos();
+        }
+
+        // Navegação Interna: Abrir Detalhes do Evento
+        function abrirDetalhesEvento() {
+            document.getElementById('lista-eventos').classList.remove('active');
+            document.getElementById('detalhes-evento').classList.add('active');
+        }
+
+        // Navegação Interna: Voltar para Lista de Eventos
+        function voltarParaListaEventos() {
+            document.getElementById('detalhes-evento').classList.remove('active');
+            document.getElementById('lista-eventos').classList.add('active');
+        }
+
+        // Navegação Interna: Abas dentro do Evento (Check-in, Times, Placar)
+        function trocarAbaEvento(idAba, elementoClicado) {
+            document.querySelectorAll('.aba-conteudo').forEach(aba => aba.style.display = 'none');
+            document.getElementById(idAba).style.display = 'block';
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active-tab'));
+            elementoClicado.classList.add('active-tab');
         }
     </script>
 </body>
 </html>
+
