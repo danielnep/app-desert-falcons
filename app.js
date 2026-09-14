@@ -1,8 +1,9 @@
 /* =========================================================
-   DESERT FALCONS — APP CORE
+   DESERT FALCONS — GAME CORE
+   Estado único compartilhado entre DEV/JOGADOR/ORGANIZADOR
    ========================================================= */
 
-const KEY = 'df_game_terminal_v6';
+const KEY = 'df_game_terminal_v7';
 
 let state = load();
 
@@ -18,81 +19,144 @@ let radioChunks = [];
 let pttDown = false;
 
 const DEMO_CENTER = {
-  lat: -19.9167,
-  lng: -43.9345
+  lat:-19.9167,
+  lng:-43.9345
 };
 
+
 /* =========================================================
-   ESTADO
+   ESTADO INICIAL
    ========================================================= */
 
 function initial(){
+
   return {
-    screen:'tactical',
 
     role:'player',
 
+    screen:'lobby',
+
     dev:{
-      enabled:false
+      enabled:false,
+      simulatedPlayers:0
     },
 
     match:{
+
+      created:false,
+
       name:'Operação Red Sand',
-      status:'aguardando',
+
+      status:'draft',
+
       seconds:0,
+
       map:'Complexo Industrial',
+
       mode:'Simulação'
+
     },
 
     organizer:{
+
+      name:'Daniel',
+
+      participates:false,
+
       briefingTitle:'Briefing da Operação',
-      briefingText:'Objetivo, regras da partida, condições de participação e orientações gerais.'
+
+      briefingText:
+        'Objetivo, regras da partida, condições de participação e orientações gerais.'
+
     },
 
     player:{
+
       id:'DF-001',
+
       name:'Daniel',
+
       team:'azul',
+
       class:'Assalto',
-      status:'aguardando',
-      radio:true,
-      channel:'01',
-      radioVolume:70,
-      briefingAck:false,
+
       participation:false,
-      selfie:null,
+
+      request:'none',
+
+      status:'aguardando',
+
+      radio:true,
+
+      channel:'01',
+
+      radioVolume:70,
+
       locked:true
+
     },
 
     gps:{
+
       lat:null,
+
       lng:null,
+
       accuracy:null,
+
       ready:false
+
     },
 
     objectives:{
-      alfa:{name:'Setor Alfa',control:'neutro'},
-      bravo:{name:'Setor Bravo',control:'neutro'}
-    },
 
-    events:[]
+      alfa:{
+        name:'Setor Alfa',
+        control:'neutro'
+      },
+
+      bravo:{
+        name:'Setor Bravo',
+        control:'neutro'
+      }
+
+    }
+
   };
 }
 
-function load(){
-  try{
-    const raw = localStorage.getItem(KEY);
-    if(!raw) return initial();
 
-    return merge(initial(), JSON.parse(raw));
+/* =========================================================
+   STORAGE
+   ========================================================= */
+
+function load(){
+
+  try{
+
+    const raw =
+      localStorage.getItem(KEY);
+
+    if(!raw){
+      return initial();
+    }
+
+    return merge(
+      initial(),
+      JSON.parse(raw)
+    );
+
   }catch{
+
     return initial();
   }
 }
 
+
 function merge(a,b){
+
   return {
+
     ...a,
     ...b,
 
@@ -124,17 +188,24 @@ function merge(a,b){
     objectives:{
       ...a.objectives,
       ...(b.objectives || {})
-    },
+    }
 
-    events:Array.isArray(b.events) ? b.events : []
   };
 }
 
+
 function save(){
+
   try{
-    localStorage.setItem(KEY, JSON.stringify(state));
+
+    localStorage.setItem(
+      KEY,
+      JSON.stringify(state)
+    );
+
   }catch{}
 }
+
 
 /* =========================================================
    UTILITÁRIOS
@@ -144,28 +215,43 @@ function q(id){
   return document.getElementById(id);
 }
 
+
 function fmt(sec){
+
   return [
+
     Math.floor(sec / 3600),
+
     Math.floor(sec / 60) % 60,
+
     sec % 60
+
   ]
-  .map(x => String(x).padStart(2,'0'))
+  .map(
+    x => String(x).padStart(2,'0')
+  )
   .join(':');
+
 }
 
+
 function toast(text){
-  const x = document.createElement('div');
 
-  x.className = 'app-toast';
-  x.textContent = text;
+  const element =
+    document.createElement('div');
 
-  x.style.cssText = `
+  element.className =
+    'app-toast';
+
+  element.textContent =
+    text;
+
+  element.style.cssText = `
     position:fixed;
     left:50%;
     bottom:18px;
     transform:translateX(-50%);
-    z-index:9999;
+    z-index:10000;
     padding:10px 14px;
     background:#222;
     border:1px solid #555;
@@ -173,35 +259,416 @@ function toast(text){
     font-size:10px;
   `;
 
-  document.body.appendChild(x);
+  document.body.appendChild(element);
 
-  setTimeout(() => x.remove(), 2200);
+  setTimeout(
+    () => element.remove(),
+    2200
+  );
 }
 
+
 /* =========================================================
-   NAVEGAÇÃO — CADA ABERTURA É UMA TELA
+   NAVEGAÇÃO
    ========================================================= */
 
 function showScreen(screen){
 
-  document.querySelectorAll('.app-screen').forEach(s => {
-    s.classList.remove('active');
-  });
+  state.screen = screen;
 
-  const target = q(`screen-${screen}`);
+  document
+    .querySelectorAll('.app-screen')
+    .forEach(element => {
 
-  if(target){
-    target.classList.add('active');
-    state.screen = screen;
+      element.classList.toggle(
+        'active',
+        element.id === `screen-${screen}`
+      );
+
+    });
+
+  save();
+
+  render();
+
+}
+
+
+function goBack(screen){
+
+  showScreen(screen);
+
+}
+
+
+/* =========================================================
+   DEV
+   ========================================================= */
+
+function openDev(){
+
+  showScreen('dev');
+
+}
+
+
+function toggleDev(){
+
+  state.dev.enabled =
+    !state.dev.enabled;
+
+  save();
+
+  render();
+
+}
+
+
+function setDevRole(role){
+
+  /*
+    IMPORTANTE:
+
+    trocar de papel NÃO cria estado novo.
+
+    O mesmo state continua existindo.
+  */
+
+  state.role = role;
+
+  save();
+
+  if(role === 'organizer'){
+
+    showScreen('organizer');
+
+  }else{
+
+    showScreen(
+      state.match.status === 'live'
+        ? 'tactical'
+        : 'lobby'
+    );
+
+  }
+
+}
+
+
+function setSimulatedPlayers(count){
+
+  state.dev.simulatedPlayers =
+    Number(count);
+
+  save();
+
+  render();
+
+}
+
+
+/* =========================================================
+   PARTIDA
+   ========================================================= */
+
+function saveMatch(){
+
+  state.match.name =
+    q('orgMatchName')?.value.trim() ||
+    state.match.name;
+
+  state.match.map =
+    q('orgMap')?.value ||
+    state.match.map;
+
+  state.match.mode =
+    q('orgMode')?.value ||
+    state.match.mode;
+
+  state.organizer.briefingTitle =
+    q('orgBriefingTitle')?.value.trim() ||
+    state.organizer.briefingTitle;
+
+  state.organizer.briefingText =
+    q('orgBriefingText')?.value.trim() ||
+    state.organizer.briefingText;
+
+
+  state.match.created = true;
+
+  if(state.match.status !== 'live'){
+    state.match.status = 'scheduled';
+  }
+
+
+  save();
+
+  render();
+
+  openMatchSavedModal();
+
+}
+
+
+/* =========================================================
+   POPUP APÓS SALVAR
+   ========================================================= */
+
+function openMatchSavedModal(){
+
+  modal(
+    'PARTIDA SALVA',
+    `
+      <p>
+        <strong>${escapeHtml(state.match.name)}</strong>
+      </p>
+
+      <p>
+        A partida foi criada e agora está disponível
+        para entrada dos jogadores.
+      </p>
+
+      <p>
+        ${state.match.map} ·
+        ${state.match.mode}
+      </p>
+
+      <div class="modal-actions">
+
+        <button
+          class="primary-large"
+          onclick="enterSavedMatch()">
+          ENTRAR NO JOGO
+        </button>
+
+        <button
+          class="secondary-large"
+          onclick="closeModal()">
+          CONTINUAR ORGANIZAÇÃO
+        </button>
+
+      </div>
+    `
+  );
+
+}
+
+
+function enterSavedMatch(){
+
+  closeModal();
+
+  if(
+    state.role === 'organizer' &&
+    state.organizer.participates
+  ){
+
+    state.player.participation = true;
+
+    state.player.status =
+      state.match.status === 'live'
+        ? 'ativo'
+        : 'aguardando';
+
     save();
+
+    showScreen(
+      state.match.status === 'live'
+        ? 'tactical'
+        : 'lobby'
+    );
+
+    return;
+  }
+
+  showScreen('lobby');
+
+}
+
+
+/* =========================================================
+   PARTICIPAÇÃO DO ORGANIZADOR
+   ========================================================= */
+
+function toggleOrganizerParticipation(){
+
+  state.organizer.participates =
+    !state.organizer.participates;
+
+  if(state.organizer.participates){
+
+    state.player.participation = true;
+
+  }else{
+
+    state.player.participation = false;
+
+  }
+
+  save();
+
+  render();
+
+}
+
+
+/* =========================================================
+   JOGADOR
+   ========================================================= */
+
+function openMatchDetails(){
+
+  if(!state.match.created){
+
+    toast(
+      'Nenhuma partida está disponível.'
+    );
+
+    return;
+  }
+
+  showScreen('details');
+
+}
+
+
+function confirmPresence(){
+
+  if(!state.match.created){
+
+    toast(
+      'Nenhuma partida disponível.'
+    );
+
+    return;
+  }
+
+
+  if(state.match.status === 'scheduled'){
+
+    state.player.participation = true;
+
+    state.player.request = 'confirmed';
+
+    state.player.status = 'aguardando';
+
+    save();
+
+    toast(
+      'Presença confirmada.'
+    );
+
+    showScreen('lobby');
+
+    return;
+  }
+
+
+  if(state.match.status === 'live'){
+
+    state.player.request = 'requested';
+
+    save();
+
+    toast(
+      'Solicitação de entrada enviada ao organizador.'
+    );
+
+    render();
+
+  }
+
+}
+
+
+/* =========================================================
+   INICIAR PARTIDA
+   ========================================================= */
+
+function startMatch(){
+
+  /*
+    DEV permite iniciar com apenas Daniel.
+    Não exigimos número mínimo de jogadores.
+  */
+
+  if(!state.match.created){
+
+    saveMatch();
+
+    return;
+  }
+
+
+  state.match.status = 'live';
+
+  state.match.seconds = 0;
+
+
+  if(state.organizer.participates){
+
+    state.player.participation = true;
+
+    state.player.status = 'ativo';
+
+  }
+
+
+  save();
+
+
+  if(
+    state.role === 'organizer'
+  ){
+
+    state.player.locked = true;
+
+    showScreen('tactical');
+
+    lockPanel();
+
+  }else{
+
+    showScreen('lobby');
+
   }
 
   render();
+
 }
 
-function goBack(screen='tactical'){
-  showScreen(screen);
+
+/* =========================================================
+   DEV — JOGADORES SIMULADOS
+   ========================================================= */
+
+function getSimulatedNames(){
+
+  return [
+    'FALCON-02',
+    'FALCON-03',
+    'FALCON-04'
+  ];
 }
+
+
+function simulatedPlayerCount(){
+
+  return state.dev.simulatedPlayers;
+}
+
+
+function totalPlayers(){
+
+  const own =
+    state.organizer.participates
+      ? 1
+      : 0;
+
+  return own +
+    simulatedPlayerCount();
+}
+
 
 /* =========================================================
    TIMER
@@ -211,536 +678,33 @@ function startTimer(){
 
   clearInterval(timer);
 
-  timer = setInterval(() => {
+  timer =
+    setInterval(
+      () => {
 
-    if(state.match.status !== 'andamento'){
-      return;
-    }
+        if(
+          state.match.status !== 'live'
+        ){
+          return;
+        }
 
-    state.match.seconds++;
+        state.match.seconds++;
 
-    if(q('gameClock')){
-      q('gameClock').textContent = fmt(state.match.seconds);
-    }
+        if(q('gameClock')){
 
-    save();
+          q('gameClock').textContent =
+            fmt(state.match.seconds);
 
-  },1000);
-}
+        }
 
-/* =========================================================
-   BLOQUEIO DO PAINEL
-   ========================================================= */
+        save();
 
-function lockPanel(){
-
-  state.player.locked = true;
-
-  q('touchGuard')?.classList.add('visible');
-  q('manualLock')?.classList.remove('hidden');
-
-  save();
-  resetInactivity();
-}
-
-function unlockPanel(){
-
-  state.player.locked = false;
-
-  q('touchGuard')?.classList.remove('visible');
-  q('manualLock')?.classList.remove('hidden');
-
-  save();
-  resetInactivity();
-}
-
-function resetInactivity(){
-
-  clearTimeout(inactivityTimer);
-
-  if(
-    state.match.status !== 'andamento' ||
-    state.player.locked
-  ){
-    return;
-  }
-
-  inactivityTimer = setTimeout(() => {
-    lockPanel();
-  },30000);
-}
-
-function initTouchGuard(){
-
-  const guard = q('touchGuard');
-
-  if(!guard) return;
-
-  const begin = e => {
-
-    if(state.match.status !== 'andamento'){
-      return;
-    }
-
-    e.preventDefault();
-
-    unlockStart = performance.now();
-
-    const bar = guard.querySelector('.unlock-track i');
-
-    clearInterval(unlockTimer);
-
-    unlockTimer = setInterval(() => {
-
-      const progress =
-        Math.min(
-          100,
-          ((performance.now() - unlockStart) / 1200) * 100
-        );
-
-      if(bar){
-        bar.style.width = `${progress}%`;
-      }
-
-      if(progress >= 100){
-
-        clearInterval(unlockTimer);
-
-        unlockPanel();
-
-        navigator.vibrate?.(25);
-      }
-
-    },25);
-  };
-
-  const cancel = () => {
-
-    clearInterval(unlockTimer);
-
-    const bar = guard.querySelector('.unlock-track i');
-
-    if(bar){
-      bar.style.width = '0';
-    }
-  };
-
-  guard.addEventListener('pointerdown',begin);
-
-  ['pointerup','pointercancel','pointerleave']
-    .forEach(event => {
-      guard.addEventListener(event,cancel);
-    });
-}
-
-function manualLock(){
-
-  if(state.match.status === 'andamento'){
-    lockPanel();
-  }
-}
-
-/* =========================================================
-   GPS
-   ========================================================= */
-
-function startGps(){
-
-  if(!navigator.geolocation){
-    return;
-  }
-
-  clearWatch();
-
-  watchId = navigator.geolocation.watchPosition(
-
-    pos => {
-
-      state.gps = {
-        lat:pos.coords.latitude,
-        lng:pos.coords.longitude,
-        accuracy:pos.coords.accuracy,
-        ready:true
-      };
-
-      save();
-
-      renderGps();
-      positionPlayerOnFictionalMap();
-    },
-
-    () => {
-
-      state.gps.ready = false;
-
-      renderGps();
-    },
-
-    {
-      enableHighAccuracy:true,
-      maximumAge:5000,
-      timeout:10000
-    }
-  );
-}
-
-function clearWatch(){
-
-  if(watchId !== null){
-
-    navigator.geolocation.clearWatch(watchId);
-
-    watchId = null;
-  }
-}
-
-function renderGps(){
-
-  const s = q('gpsStatus');
-  const c = q('gpsCoords');
-  const a = q('gpsAccuracy');
-
-  if(!s || !c || !a){
-    return;
-  }
-
-  if(state.gps.ready){
-
-    s.textContent = '● GPS ATIVO';
-
-    c.textContent =
-      `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)}`;
-
-    a.textContent =
-      `PRECISÃO ±${Math.round(state.gps.accuracy)} M`;
-
-  }else{
-
-    s.textContent = '● GPS AGUARDANDO';
-    c.textContent = 'LOCALIZAÇÃO DEMO';
-    a.textContent = 'PRECISÃO —';
-  }
-}
-
-function positionPlayerOnFictionalMap(){
-
-  const marker = q('playerMapMarker');
-
-  if(!marker) return;
-
-  const lat =
-    state.gps.ready
-      ? state.gps.lat
-      : DEMO_CENTER.lat;
-
-  const lng =
-    state.gps.ready
-      ? state.gps.lng
-      : DEMO_CENTER.lng;
-
-  const dx = Math.max(
-    -1,
-    Math.min(
-      1,
-      (lng - DEMO_CENTER.lng) * 700
-    )
-  );
-
-  const dy = Math.max(
-    -1,
-    Math.min(
-      1,
-      (lat - DEMO_CENTER.lat) * 700
-    )
-  );
-
-  marker.style.left = `${50 + dx * 24}%`;
-  marker.style.top = `${52 - dy * 24}%`;
-}
-
-function centerMap(){
-
-  positionPlayerOnFictionalMap();
-
-  const marker = q('playerMapMarker');
-
-  marker?.animate(
-    [
-      {
-        transform:'translate(-50%,-50%) scale(1)'
       },
-      {
-        transform:'translate(-50%,-50%) scale(1.25)'
-      },
-      {
-        transform:'translate(-50%,-50%) scale(1)'
-      }
-    ],
-    {
-      duration:450
-    }
-  );
-}
-
-/* =========================================================
-   BRIEFING / PARTICIPAÇÃO
-   ========================================================= */
-
-function renderBriefing(){
-
-  const title = q('briefingTitle');
-  const body = q('briefingBody');
-
-  if(title){
-    title.textContent = state.organizer.briefingTitle;
-  }
-
-  if(body){
-
-    body.innerHTML = `
-      <p>
-        <strong>${state.match.name}</strong>
-      </p>
-
-      <p>
-        ${state.organizer.briefingText}
-      </p>
-
-      <p>
-        MAPA: ${state.match.map}
-      </p>
-
-      <p>
-        MODELO: ${state.match.mode}
-      </p>
-    `;
-  }
-}
-
-function briefingChanged(){
-
-  state.player.briefingAck =
-    !!q('briefingAck')?.checked;
-
-  save();
-
-  updateParticipationButton();
-}
-
-function updateParticipationButton(){
-
-  const button = q('confirmParticipation');
-
-  if(!button) return;
-
-  button.disabled = !(
-    state.player.briefingAck &&
-    state.player.selfie
-  );
-}
-
-/* =========================================================
-   SELFIE
-   ========================================================= */
-
-async function captureSelfie(){
-
-  const preview = q('selfiePreview');
-
-  try{
-
-    if(!navigator.mediaDevices?.getUserMedia){
-      throw new Error();
-    }
-
-    const stream =
-      await navigator.mediaDevices.getUserMedia({
-        video:{
-          facingMode:'user'
-        },
-        audio:false
-      });
-
-    const video = document.createElement('video');
-
-    video.autoplay = true;
-    video.playsInline = true;
-    video.srcObject = stream;
-
-    preview.classList.remove('hidden');
-    preview.innerHTML = '';
-    preview.appendChild(video);
-
-    const snap = document.createElement('button');
-
-    snap.className = 'detail-primary';
-    snap.textContent = 'CAPTURAR';
-
-    preview.appendChild(snap);
-
-    snap.onclick = () => {
-
-      const canvas =
-        document.createElement('canvas');
-
-      canvas.width = 600;
-      canvas.height = 600;
-
-      const ctx = canvas.getContext('2d');
-
-      const s = Math.min(
-        video.videoWidth,
-        video.videoHeight
-      );
-
-      ctx.drawImage(
-        video,
-        (video.videoWidth - s) / 2,
-        (video.videoHeight - s) / 2,
-        s,
-        s,
-        0,
-        0,
-        600,
-        600
-      );
-
-      const now = new Date();
-
-      state.player.selfie = {
-        data:canvas.toDataURL('image/jpeg',.78),
-        timestamp:now.toISOString(),
-        lat:state.gps.lat,
-        lng:state.gps.lng
-      };
-
-      stream.getTracks().forEach(
-        t => t.stop()
-      );
-
-      preview.innerHTML = `
-        <img src="${state.player.selfie.data}" alt="Registro de presença">
-        <span>
-          REGISTRO CAPTURADO ·
-          ${now.toLocaleTimeString('pt-BR',{hour12:false})}
-        </span>
-      `;
-
-      save();
-
-      updateParticipationButton();
-    };
-
-  }catch{
-
-    toast('Câmera indisponível ou permissão negada.');
-  }
-}
-
-function confirmParticipation(){
-
-  if(!(
-    state.player.briefingAck &&
-    state.player.selfie
-  )){
-
-    toast(
-      'Leia o briefing e registre a selfie antes de confirmar.'
+      1000
     );
 
-    return;
-  }
-
-  state.player.participation = true;
-  state.player.status = 'aguardando';
-
-  save();
-
-  startGps();
-
-  showScreen('waiting');
 }
 
-/* =========================================================
-   PARTIDA
-   ========================================================= */
-
-function startMatch(){
-
-  state.match.status = 'andamento';
-  state.match.seconds = 0;
-
-  state.player.status =
-    state.player.participation
-      ? 'ativo'
-      : 'aguardando';
-
-  save();
-
-  if(state.player.participation){
-
-    state.screen = 'tactical';
-
-    state.player.locked = true;
-
-    startGps();
-    lockPanel();
-
-    showScreen('tactical');
-
-  }else{
-
-    toast('Nenhum jogador confirmou participação.');
-  }
-}
-
-/* =========================================================
-   ORGANIZADOR
-   ========================================================= */
-
-function saveOrganizer(){
-
-  const name =
-    q('orgMatchName')?.value.trim();
-
-  const map =
-    q('orgMap')?.value;
-
-  const mode =
-    q('orgMode')?.value;
-
-  const title =
-    q('orgBriefingTitle')?.value.trim();
-
-  const text =
-    q('orgBriefingText')?.value.trim();
-
-  if(name){
-    state.match.name = name;
-  }
-
-  if(map){
-    state.match.map = map;
-  }
-
-  if(mode){
-    state.match.mode = mode;
-  }
-
-  if(title){
-    state.organizer.briefingTitle = title;
-  }
-
-  if(text){
-    state.organizer.briefingText = text;
-  }
-
-  save();
-
-  render();
-
-  toast('Configuração salva.');
-}
 
 /* =========================================================
    RÁDIO
@@ -754,36 +718,48 @@ function toggleRadio(){
   save();
 
   render();
+
 }
+
 
 function setChannel(value){
 
-  state.player.channel = value;
+  state.player.channel =
+    value;
 
   save();
 
   render();
+
 }
+
 
 function setVolume(value){
 
-  state.player.radioVolume = Number(value);
+  state.player.radioVolume =
+    Number(value);
 
   save();
+
 }
+
 
 async function startPtt(){
 
   if(!state.player.radio){
 
-    toast('Rádio desligado.');
+    toast(
+      'Rádio desligado.'
+    );
 
     return;
   }
+
 
   if(pttDown){
     return;
   }
+
 
   pttDown = true;
 
@@ -791,14 +767,20 @@ async function startPtt(){
     ?.classList.add('transmitting');
 
   if(q('radioPtt')){
+
     q('radioPtt').innerHTML =
       '<span class="ptt-icon">●</span><strong>TRANSMITINDO…</strong>';
+
   }
 
+
   if(q('radioTx')){
+
     q('radioTx').textContent =
       'TRANSMITINDO';
+
   }
+
 
   try{
 
@@ -815,21 +797,27 @@ async function startPtt(){
       radioChunks = [];
 
       radioRecorder =
-        new MediaRecorder(radioStream);
+        new MediaRecorder(
+          radioStream
+        );
 
       radioRecorder.ondataavailable =
-        event => {
+        e => {
 
-          if(event.data.size){
-            radioChunks.push(event.data);
+          if(e.data.size){
+            radioChunks.push(e.data);
           }
+
         };
 
       radioRecorder.start();
+
     }
 
   }catch{}
+
 }
+
 
 function stopPtt(){
 
@@ -846,9 +834,11 @@ function stopPtt(){
     radioRecorder.stop();
   }
 
-  radioStream?.getTracks().forEach(
-    track => track.stop()
-  );
+  radioStream
+    ?.getTracks()
+    .forEach(
+      track => track.stop()
+    );
 
   radioStream = null;
   radioRecorder = null;
@@ -857,89 +847,477 @@ function stopPtt(){
     ?.classList.remove('transmitting');
 
   if(q('radioPtt')){
+
     q('radioPtt').innerHTML =
       '<span class="ptt-icon">●</span><strong>SEGURE PARA FALAR</strong>';
+
   }
 
   if(q('radioTx')){
+
     q('radioTx').textContent =
       'PRONTO';
+
   }
+
 }
+
 
 /* =========================================================
-   INSTRUÇÕES
+   GPS
    ========================================================= */
 
-function openInstructions(){
+function startGps(){
 
-  showScreen('instructions');
-
-  const title = q('instructionsTitle');
-  const body = q('instructionsBody');
-
-  if(title){
-    title.textContent =
-      state.organizer.briefingTitle;
+  if(!navigator.geolocation){
+    return;
   }
 
-  if(body){
+  clearWatch();
 
-    body.innerHTML = `
-      <p>
-        <strong>${state.match.name}</strong>
-      </p>
+  watchId =
+    navigator.geolocation.watchPosition(
 
-      <p>
-        ${state.organizer.briefingText}
-      </p>
+      position => {
 
-      <p>
-        <strong>MAPA:</strong>
-        ${state.match.map}
-      </p>
+        state.gps = {
 
-      <p>
-        <strong>MODELO:</strong>
-        ${state.match.mode}
-      </p>
-    `;
+          lat:
+            position.coords.latitude,
+
+          lng:
+            position.coords.longitude,
+
+          accuracy:
+            position.coords.accuracy,
+
+          ready:true
+
+        };
+
+        save();
+
+        renderGps();
+
+        positionPlayerOnFictionalMap();
+
+      },
+
+      () => {
+
+        state.gps.ready = false;
+
+        renderGps();
+
+      },
+
+      {
+        enableHighAccuracy:true,
+        maximumAge:5000,
+        timeout:10000
+      }
+
+    );
+
+}
+
+
+function clearWatch(){
+
+  if(watchId !== null){
+
+    navigator.geolocation.clearWatch(
+      watchId
+    );
+
+    watchId = null;
+
   }
+
 }
 
-/* =========================================================
-   DEV
-   ========================================================= */
 
-function openDev(){
+function renderGps(){
 
-  showScreen('dev');
-}
+  const status =
+    q('gpsStatus');
 
-function toggleDev(){
+  const coords =
+    q('gpsCoords');
 
-  state.dev.enabled =
-    !state.dev.enabled;
+  const accuracy =
+    q('gpsAccuracy');
 
-  save();
+  if(!status || !coords || !accuracy){
+    return;
+  }
 
-  render();
-}
 
-function setDevRole(role){
+  if(state.gps.ready){
 
-  state.role = role;
+    status.textContent =
+      '● GPS ATIVO';
 
-  save();
+    coords.textContent =
+      `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)}`;
 
-  render();
+    accuracy.textContent =
+      `PRECISÃO ±${Math.round(state.gps.accuracy)} M`;
 
-  if(role === 'organizer'){
-    showScreen('organizer');
   }else{
-    showScreen('tactical');
+
+    status.textContent =
+      '● GPS AGUARDANDO';
+
+    coords.textContent =
+      'LOCALIZAÇÃO DEMO';
+
+    accuracy.textContent =
+      'PRECISÃO —';
+
   }
+
 }
+
+
+function positionPlayerOnFictionalMap(){
+
+  const marker =
+    q('playerMapMarker');
+
+  if(!marker){
+    return;
+  }
+
+
+  const lat =
+    state.gps.ready
+      ? state.gps.lat
+      : DEMO_CENTER.lat;
+
+  const lng =
+    state.gps.ready
+      ? state.gps.lng
+      : DEMO_CENTER.lng;
+
+
+  const dx =
+    Math.max(
+      -1,
+      Math.min(
+        1,
+        (lng - DEMO_CENTER.lng) * 700
+      )
+    );
+
+
+  const dy =
+    Math.max(
+      -1,
+      Math.min(
+        1,
+        (lat - DEMO_CENTER.lat) * 700
+      )
+    );
+
+
+  marker.style.left =
+    `${50 + dx * 24}%`;
+
+  marker.style.top =
+    `${52 - dy * 24}%`;
+
+}
+
+
+function centerMap(){
+
+  positionPlayerOnFictionalMap();
+
+}
+
+
+/* =========================================================
+   BRIEFING
+   ========================================================= */
+
+function renderInstructions(){
+
+  const body =
+    q('instructionsBody');
+
+  if(!body){
+    return;
+  }
+
+
+  body.innerHTML = `
+    <p>
+      <strong>${escapeHtml(state.match.name)}</strong>
+    </p>
+
+    <p>
+      ${escapeHtml(state.organizer.briefingText)}
+    </p>
+
+    <p>
+      <strong>MAPA:</strong>
+      ${escapeHtml(state.match.map)}
+    </p>
+
+    <p>
+      <strong>MODELO:</strong>
+      ${escapeHtml(state.match.mode)}
+    </p>
+  `;
+
+}
+
+
+/* =========================================================
+   TRAVA
+   ========================================================= */
+
+function lockPanel(){
+
+  state.player.locked = true;
+
+  q('touchGuard')
+    ?.classList.add('visible');
+
+  q('manualLock')
+    ?.classList.remove('hidden');
+
+  save();
+
+  resetInactivity();
+
+}
+
+
+function unlockPanel(){
+
+  state.player.locked = false;
+
+  q('touchGuard')
+    ?.classList.remove('visible');
+
+  q('manualLock')
+    ?.classList.remove('hidden');
+
+  save();
+
+  resetInactivity();
+
+}
+
+
+function resetInactivity(){
+
+  clearTimeout(
+    inactivityTimer
+  );
+
+  if(
+    state.match.status !== 'live' ||
+    state.player.locked
+  ){
+    return;
+  }
+
+
+  inactivityTimer =
+    setTimeout(
+      lockPanel,
+      30000
+    );
+
+}
+
+
+function manualLock(){
+
+  if(
+    state.match.status === 'live'
+  ){
+
+    lockPanel();
+
+  }
+
+}
+
+
+function initTouchGuard(){
+
+  const guard =
+    q('touchGuard');
+
+  if(!guard){
+    return;
+  }
+
+
+  const begin = event => {
+
+    if(
+      state.match.status !== 'live'
+    ){
+      return;
+    }
+
+    event.preventDefault();
+
+    unlockStart =
+      performance.now();
+
+
+    const bar =
+      guard.querySelector(
+        '.unlock-track i'
+      );
+
+
+    clearInterval(
+      unlockTimer
+    );
+
+
+    unlockTimer =
+      setInterval(
+        () => {
+
+          const progress =
+            Math.min(
+              100,
+              ((performance.now() - unlockStart) / 1200) * 100
+            );
+
+
+          if(bar){
+            bar.style.width =
+              `${progress}%`;
+          }
+
+
+          if(progress >= 100){
+
+            clearInterval(
+              unlockTimer
+            );
+
+            unlockPanel();
+
+            navigator.vibrate?.(25);
+
+          }
+
+        },
+        25
+      );
+
+  };
+
+
+  const cancel = () => {
+
+    clearInterval(
+      unlockTimer
+    );
+
+    const bar =
+      guard.querySelector(
+        '.unlock-track i'
+      );
+
+    if(bar){
+      bar.style.width = '0';
+    }
+
+  };
+
+
+  guard.addEventListener(
+    'pointerdown',
+    begin
+  );
+
+
+  [
+    'pointerup',
+    'pointercancel',
+    'pointerleave'
+  ]
+  .forEach(
+    event =>
+      guard.addEventListener(
+        event,
+        cancel
+      )
+  );
+
+}
+
+
+/* =========================================================
+   MODAL
+   ========================================================= */
+
+function modal(title,body){
+
+  closeModal();
+
+  q('modalRoot').innerHTML = `
+
+    <div class="modal-backdrop"
+         onclick="if(event.target===this)closeModal()">
+
+      <div class="modal">
+
+        <div class="modal-head">
+
+          <h2>
+            ${title}
+          </h2>
+
+          <button
+            class="modal-close"
+            onclick="closeModal()">
+            ✕
+          </button>
+
+        </div>
+
+        <div class="modal-body">
+          ${body}
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+
+function closeModal(){
+
+  q('modalRoot').innerHTML = '';
+
+}
+
+
+function escapeHtml(value){
+
+  return String(value)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#039;");
+
+}
+
 
 /* =========================================================
    RENDER
@@ -947,56 +1325,174 @@ function setDevRole(role){
 
 function render(){
 
+  /* ---------- HEADER ---------- */
+
   q('headerRole').textContent =
     state.role === 'organizer'
       ? 'ORGANIZADOR'
       : 'JOGADOR';
+
 
   q('headerSubtitle').textContent =
     state.role === 'organizer'
       ? 'COMMAND CENTER'
       : 'PLAYER TERMINAL';
 
+
   q('headerMatch').textContent =
-    state.match.status === 'andamento'
-      ? 'EM ANDAMENTO'
-      : state.player.participation
-        ? 'AGUARDANDO'
-        : 'PREPARAÇÃO';
+    !state.match.created
+      ? 'SEM PARTIDA'
+      : state.match.status === 'live'
+        ? 'EM ANDAMENTO'
+        : 'PROGRAMADA';
+
 
   q('devOpen').textContent =
     state.dev.enabled
-      ? 'DEV ATIVO'
-      : 'MODO DEV';
+      ? `DEV · ${state.role === 'organizer' ? 'ORG' : 'PLAYER'}`
+      : 'DEV · OFF';
+
+
+  /* ---------- LOBBY ---------- */
+
+  q('lobbyPlayerName').textContent =
+    state.player.name;
+
+
+  q('lobbyPlayerMeta').textContent =
+    `${state.player.id} · ${state.player.team.toUpperCase()} · ${state.player.class.toUpperCase()}`;
+
+
+  if(state.match.created){
+
+    q('lobbyMatchName').textContent =
+      state.match.name;
+
+    q('lobbyMatchState').textContent =
+      state.match.status === 'live'
+        ? 'EM ANDAMENTO'
+        : 'PROGRAMADA';
+
+    q('lobbyMap').textContent =
+      state.match.map;
+
+    q('lobbyMode').textContent =
+      state.match.mode;
+
+    q('lobbyPlayers').textContent =
+      totalPlayers();
+
+    q('lobbyOrganizer').textContent =
+      'ONLINE';
+
+
+    if(state.match.status === 'live'){
+
+      q('lobbyPrimary').textContent =
+        state.player.request === 'requested'
+          ? 'SOLICITAÇÃO ENVIADA'
+          : 'SOLICITAR ENTRADA';
+
+    }else{
+
+      q('lobbyPrimary').textContent =
+        state.player.participation
+          ? 'PRESENÇA CONFIRMADA'
+          : 'CONFIRMAR PRESENÇA';
+
+    }
+
+  }else{
+
+    q('lobbyMatchName').textContent =
+      'Nenhuma partida criada';
+
+    q('lobbyMatchState').textContent =
+      '—';
+
+    q('lobbyMap').textContent =
+      '—';
+
+    q('lobbyMode').textContent =
+      '—';
+
+    q('lobbyPlayers').textContent =
+      '0';
+
+    q('lobbyOrganizer').textContent =
+      '—';
+
+    q('lobbyPrimary').textContent =
+      'AGUARDANDO PARTIDA';
+
+  }
+
+
+  /* ---------- DETALHES ---------- */
+
+  q('detailsMatchName').textContent =
+    state.match.name;
+
+  q('detailsMap').textContent =
+    state.match.map;
+
+  q('detailsMode').textContent =
+    state.match.mode;
+
+  q('detailsPlayers').textContent =
+    totalPlayers();
+
+
+  q('detailsStateLabel').textContent =
+    state.match.status === 'live'
+      ? 'PARTIDA EM ANDAMENTO'
+      : 'PARTIDA PROGRAMADA';
+
+
+  if(state.match.status === 'live'){
+
+    q('presenceTitle').textContent =
+      'Entrar na partida';
+
+    q('presenceText').textContent =
+      'A partida já começou. Envie uma solicitação de entrada ao organizador.';
+
+    q('confirmPresenceButton').textContent =
+      state.player.request === 'requested'
+        ? 'SOLICITAÇÃO ENVIADA'
+        : 'SOLICITAR ENTRADA';
+
+  }else{
+
+    q('presenceTitle').textContent =
+      'Confirmar presença';
+
+    q('presenceText').textContent =
+      'Confirme sua presença para entrar na partida.';
+
+    q('confirmPresenceButton').textContent =
+      state.player.participation
+        ? 'PRESENÇA CONFIRMADA'
+        : 'CONFIRMAR PRESENÇA';
+
+  }
+
+
+  q('presenceStatus').textContent =
+    state.player.participation
+      ? 'CONFIRMADO'
+      : state.player.request === 'requested'
+        ? 'SOLICITADO'
+        : 'AGUARDANDO';
+
+
+  /* ---------- TÁTICO ---------- */
 
   q('tacticalMatch').textContent =
     state.match.name.toUpperCase();
 
   q('gameClock').textContent =
     fmt(state.match.seconds);
-
-  q('homePlayerName').textContent =
-    state.player.name;
-
-  q('homeIdentity').textContent =
-    `${state.player.id} · ${state.player.team.toUpperCase()} · ${state.player.class.toUpperCase()}`;
-
-  q('profileName').textContent =
-    state.player.name;
-
-  q('profileMeta').textContent =
-    `${state.player.id} · ${state.player.team.toUpperCase()}`;
-
-  q('profileClass').textContent =
-    state.player.class.toUpperCase();
-
-  q('profileStatus').textContent =
-    state.player.status.toUpperCase();
-
-  q('profileRadio').textContent =
-    state.player.radio
-      ? `CH ${state.player.channel}`
-      : 'DESLIGADO';
 
   q('tacticalState').textContent =
     state.player.status === 'ativo'
@@ -1009,107 +1505,32 @@ function render(){
       : 'AGUARDANDO';
 
   q('playerStateDesc').textContent =
-    state.match.status === 'andamento'
+    state.match.status === 'live'
       ? 'Partida em andamento.'
       : 'Aguardando início.';
+
 
   q('radioStatus').textContent =
     state.player.radio
       ? `LIGADO · CH ${state.player.channel}`
       : 'DESLIGADO';
 
+
   q('radioPower').textContent =
     state.player.radio
       ? 'DESLIGAR'
       : 'LIGAR';
 
+
   q('radioChannel').value =
     state.player.channel;
+
 
   q('radioVolume').value =
     state.player.radioVolume;
 
-  if(q('briefingAck')){
-    q('briefingAck').checked =
-      !!state.player.briefingAck;
-  }
 
-  updateParticipationButton();
-
-  renderGps();
-  renderBriefing();
-  renderDev();
-  renderOrganizer();
-
-  const controlled =
-    Object.values(state.objectives)
-      .filter(o => o.control === 'azul')
-      .length;
-
-  q('missionProgress').style.width =
-    `${controlled / 2 * 100}%`;
-
-  q('missionText').textContent =
-    `${Object.values(state.objectives).filter(o => o.control !== 'neutro').length} de 2 setores registrados`;
-
-  positionPlayerOnFictionalMap();
-
-  /* Tela atual */
-  document.querySelectorAll('.app-screen')
-    .forEach(screen => {
-      screen.classList.toggle(
-        'active',
-        screen.id === `screen-${state.screen}`
-      );
-    });
-
-  /* Modo DEV */
-  q('devOpen').style.display =
-    state.role === 'organizer'
-      ? 'none'
-      : 'block';
-
-  /* Trava */
-  if(state.match.status === 'andamento'){
-    if(state.player.locked){
-      q('touchGuard')
-        ?.classList.add('visible');
-    }
-  }
-}
-
-function renderDev(){
-
-  const enabled =
-    state.dev.enabled;
-
-  q('devStateText').textContent =
-    enabled
-      ? 'HABILITADO'
-      : 'DESABILITADO';
-
-  q('devStateDot')
-    ?.classList.toggle('enabled',enabled);
-
-  q('devToggle').textContent =
-    enabled
-      ? 'DESABILITAR DEV'
-      : 'HABILITAR DEV';
-
-  document.querySelectorAll('.role-option')
-    .forEach(button => {
-      button.classList.toggle(
-        'active',
-        button.dataset.role === state.role
-      );
-    });
-}
-
-function renderOrganizer(){
-
-  if(!q('orgMatchName')){
-    return;
-  }
+  /* ---------- ORGANIZADOR ---------- */
 
   q('orgMatchName').value =
     state.match.name;
@@ -1126,16 +1547,118 @@ function renderOrganizer(){
   q('orgBriefingText').value =
     state.organizer.briefingText;
 
-  q('orgAttendance').textContent =
-    state.player.participation
-      ? 'CONFIRMADO'
-      : 'AGUARDANDO';
+
+  q('organizerParticipateToggle').textContent =
+    state.organizer.participates
+      ? 'SIM'
+      : 'NÃO';
+
+
+  q('organizerParticipateToggle')
+    .classList.toggle(
+      'on',
+      state.organizer.participates
+    );
+
 
   q('orgReadyCount').textContent =
-    state.player.participation
-      ? '1/1'
-      : '0/1';
+    totalPlayers();
+
+
+  q('orgSimCount').textContent =
+    state.dev.simulatedPlayers;
+
+
+  /* ---------- DEV ---------- */
+
+  q('devStateText').textContent =
+    state.dev.enabled
+      ? 'HABILITADO'
+      : 'DESABILITADO';
+
+
+  q('devStateDot')
+    .classList.toggle(
+      'enabled',
+      state.dev.enabled
+    );
+
+
+  q('devToggle').textContent =
+    state.dev.enabled
+      ? 'DESABILITAR DEV'
+      : 'HABILITAR DEV';
+
+
+  document
+    .querySelectorAll('.role-option')
+    .forEach(button => {
+
+      button.classList.toggle(
+        'active',
+        button.dataset.role === state.role
+      );
+
+    });
+
+
+  document
+    .querySelectorAll('[data-sim-count]')
+    .forEach(button => {
+
+      button.classList.toggle(
+        'active',
+        Number(button.dataset.simCount) ===
+        state.dev.simulatedPlayers
+      );
+
+    });
+
+
+  q('devSimInfo').textContent =
+    state.dev.simulatedPlayers === 0
+      ? 'Nenhum jogador simulado.'
+      : `${state.dev.simulatedPlayers} jogador(es) simulado(s).`;
+
+
+  /* ---------- GPS ---------- */
+
+  renderGps();
+
+  positionPlayerOnFictionalMap();
+
+  renderInstructions();
+
+
+  /* ---------- TELAS ---------- */
+
+  document
+    .querySelectorAll('.app-screen')
+    .forEach(screen => {
+
+      screen.classList.toggle(
+        'active',
+        screen.id === `screen-${state.screen}`
+      );
+
+    });
+
+
+  /* ---------- TRAVA ---------- */
+
+  if(
+    state.screen === 'tactical' &&
+    state.match.status === 'live' &&
+    state.player.locked
+  ){
+
+    q('touchGuard')
+      ?.classList.add('visible');
+
+  }
+
 }
+
 
 /* =========================================================
    RESET
@@ -1144,18 +1667,25 @@ function renderOrganizer(){
 function resetDemo(){
 
   clearWatch();
+
   stopPtt();
+
   clearInterval(timer);
+
+  closeModal();
 
   state = initial();
 
   save();
 
   startTimer();
-  render();
 
-  toast('Demonstração resetada.');
+  showScreen('lobby');
+
+  toast('Ambiente resetado.');
+
 }
+
 
 /* =========================================================
    EVENTOS
@@ -1164,13 +1694,23 @@ function resetDemo(){
 function bind(){
 
   /* DEV */
+
   q('devOpen')
-    ?.addEventListener('click',openDev);
+    ?.addEventListener(
+      'click',
+      openDev
+    );
+
 
   q('devToggle')
-    ?.addEventListener('click',toggleDev);
+    ?.addEventListener(
+      'click',
+      toggleDev
+    );
 
-  document.querySelectorAll('.role-option')
+
+  document
+    .querySelectorAll('.role-option')
     .forEach(button => {
 
       button.addEventListener(
@@ -1179,167 +1719,159 @@ function bind(){
 
           if(!state.dev.enabled){
 
-            toast('Habilite o modo DEV primeiro.');
+            toast(
+              'Habilite o modo DEV primeiro.'
+            );
 
             return;
           }
 
-          setDevRole(button.dataset.role);
+          setDevRole(
+            button.dataset.role
+          );
+
         }
       );
+
     });
 
-  /* Voltar */
-  document.querySelectorAll('[data-back]')
-    .forEach(button => {
 
-      button.addEventListener(
-        'click',
-        () => {
-          goBack(button.dataset.back);
-        }
-      );
-    });
-
-  /* Detalhes */
-  document.querySelectorAll('.detail-tab')
+  document
+    .querySelectorAll('[data-sim-count]')
     .forEach(button => {
 
       button.addEventListener(
         'click',
         () => {
 
-          const detail =
-            button.dataset.detail;
+          if(!state.dev.enabled){
 
-          document.querySelectorAll('.detail-tab')
-            .forEach(tab => {
-              tab.classList.toggle(
-                'active',
-                tab === button
-              );
-            });
-
-          document.querySelectorAll('.detail-pane')
-            .forEach(pane => {
-              pane.classList.toggle(
-                'active',
-                pane.id === `detail-${detail}`
-              );
-            });
-        }
-      );
-    });
-
-  document.querySelectorAll('[data-detail]:not(.detail-tab)')
-    .forEach(button => {
-
-      button.addEventListener(
-        'click',
-        () => {
-
-          showScreen('details');
-
-          const detail =
-            button.dataset.detail;
-
-          const tab =
-            document.querySelector(
-              `.detail-tab[data-detail="${detail}"]`
+            toast(
+              'Habilite o modo DEV primeiro.'
             );
 
-          tab?.click();
+            return;
+          }
+
+          setSimulatedPlayers(
+            button.dataset.simCount
+          );
+
         }
       );
+
     });
 
-  /* Briefing / presença */
-  q('briefingAck')
-    ?.addEventListener(
-      'change',
-      briefingChanged
-    );
 
-  q('selfieButton')
-    ?.addEventListener(
-      'click',
-      captureSelfie
-    );
+  /* NAVEGAÇÃO */
 
-  q('confirmParticipation')
-    ?.addEventListener(
-      'click',
-      confirmParticipation
-    );
+  document
+    .querySelectorAll('[data-back]')
+    .forEach(button => {
 
-  /* Rádio */
-  q('radioPower')
-    ?.addEventListener(
-      'click',
-      toggleRadio
-    );
+      button.addEventListener(
+        'click',
+        () => {
 
-  q('radioChannel')
-    ?.addEventListener(
-      'change',
-      e => setChannel(e.target.value)
-    );
+          goBack(
+            button.dataset.back
+          );
 
-  q('radioVolume')
-    ?.addEventListener(
-      'input',
-      e => setVolume(e.target.value)
-    );
+        }
+      );
 
-  q('radioPtt')
-    ?.addEventListener(
-      'pointerdown',
-      startPtt
-    );
-
-  ['pointerup','pointercancel','pointerleave']
-    .forEach(event => {
-
-      q('radioPtt')
-        ?.addEventListener(
-          event,
-          stopPtt
-        );
     });
 
-  /* Mapa */
-  q('mapCenter')
+
+  /* LOBBY */
+
+  q('lobbyPrimary')
     ?.addEventListener(
       'click',
-      centerMap
+      () => {
+
+        if(!state.match.created){
+
+          toast(
+            'Nenhuma partida disponível.'
+          );
+
+          return;
+        }
+
+
+        if(state.match.status === 'live'){
+
+          confirmPresence();
+
+        }else{
+
+          confirmPresence();
+
+        }
+
+      }
     );
 
-  /* Ações */
-  q('instructionsButton')
+
+  q('openDetailsButton')
     ?.addEventListener(
       'click',
-      openInstructions
+      openMatchDetails
     );
 
-  q('hitButton')
+
+  q('organizerQuickButton')
     ?.addEventListener(
       'click',
-      () => toast('Evento de demonstração lançado.')
+      () => {
+
+        if(
+          state.role !== 'organizer' &&
+          !state.dev.enabled
+        ){
+
+          toast(
+            'Ative o DEV e selecione ORGANIZADOR.'
+          );
+
+          return;
+        }
+
+        state.role = 'organizer';
+
+        save();
+
+        showScreen('organizer');
+
+      }
     );
 
-  /* Trava */
-  q('manualLock')
+
+  /* DETALHES */
+
+  q('confirmPresenceButton')
     ?.addEventListener(
       'click',
-      manualLock
+      confirmPresence
     );
 
-  /* Organizador */
-  q('saveBriefing')
+
+  /* ORGANIZADOR */
+
+  q('organizerParticipateToggle')
     ?.addEventListener(
       'click',
-      saveOrganizer
+      toggleOrganizerParticipation
     );
+
+
+  q('saveMatchButton')
+    ?.addEventListener(
+      'click',
+      saveMatch
+    );
+
 
   q('startMatchButton')
     ?.addEventListener(
@@ -1347,13 +1879,112 @@ function bind(){
       startMatch
     );
 
+
   q('resetDemoButton')
     ?.addEventListener(
       'click',
       resetDemo
     );
 
+
+  /* RÁDIO */
+
+  q('radioPower')
+    ?.addEventListener(
+      'click',
+      toggleRadio
+    );
+
+
+  q('radioChannel')
+    ?.addEventListener(
+      'change',
+      event =>
+        setChannel(
+          event.target.value
+        )
+    );
+
+
+  q('radioVolume')
+    ?.addEventListener(
+      'input',
+      event =>
+        setVolume(
+          event.target.value
+        )
+    );
+
+
+  q('radioPtt')
+    ?.addEventListener(
+      'pointerdown',
+      startPtt
+    );
+
+
+  [
+    'pointerup',
+    'pointercancel',
+    'pointerleave'
+  ]
+  .forEach(event => {
+
+    q('radioPtt')
+      ?.addEventListener(
+        event,
+        stopPtt
+      );
+
+  });
+
+
+  /* MAPA */
+
+  q('mapCenter')
+    ?.addEventListener(
+      'click',
+      centerMap
+    );
+
+
+  /* INSTRUÇÕES */
+
+  q('instructionsButton')
+    ?.addEventListener(
+      'click',
+      () => {
+
+        showScreen('instructions');
+
+      }
+    );
+
+
+  q('hitButton')
+    ?.addEventListener(
+      'click',
+      () => {
+
+        toast(
+          'Evento de demonstração lançado.'
+        );
+
+      }
+    );
+
+
+  /* TRAVA */
+
+  q('manualLock')
+    ?.addEventListener(
+      'click',
+      manualLock
+    );
+
+
   initTouchGuard();
+
 
   document.addEventListener(
     'pointerdown',
@@ -1363,15 +1994,17 @@ function bind(){
         state.screen === 'tactical' &&
         !state.player.locked
       ){
+
         resetInactivity();
+
       }
 
     },
-    {
-      passive:true
-    }
+    {passive:true}
   );
+
 }
+
 
 /* =========================================================
    START
@@ -1382,11 +2015,18 @@ document.addEventListener(
   () => {
 
     bind();
+
     startTimer();
+
     render();
 
-    if(state.player.participation){
+    if(
+      state.player.participation
+    ){
+
       startGps();
+
     }
+
   }
 );
