@@ -1,463 +1,908 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#121212">
-  <title>Desert Falcons — Game Terminal</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#121212">
+<title>Desert Falcons — Game Terminal</title>
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-  <header class="df-header">
-    <div class="df-brand">
-      <span class="df-mark">DF</span>
+
+<header class="df-header">
+
+  <div class="df-brand">
+    <span class="df-mark">DF</span>
+
+    <div>
+      <strong>DESERT FALCONS</strong>
+      <small id="headerSubtitle">PLAYER TERMINAL</small>
+    </div>
+  </div>
+
+  <div class="df-header-meta">
+
+    <span id="headerRole">JOGADOR</span>
+
+    <span id="headerMatch">SEM PARTIDA</span>
+
+    <button id="devOpen" class="df-dev-button">
+      DEV · OFF
+    </button>
+
+  </div>
+
+</header>
+
+
+<main class="df-app">
+
+
+<!-- =========================================================
+     LOBBY / JOGADOR
+     ========================================================= -->
+
+<section id="screen-lobby" class="app-screen active">
+
+  <div class="screen-inner">
+
+    <div class="page-head lobby-head">
+
       <div>
-        <strong>DESERT FALCONS</strong>
-        <small id="headerSubtitle">PLAYER TERMINAL</small>
+        <span class="micro">CENTRAL DE PARTIDAS</span>
+        <h1>Entrar em jogo</h1>
       </div>
+
+      <span id="lobbyStatus" class="state-badge">
+        AGUARDANDO
+      </span>
+
     </div>
 
-    <div class="df-header-meta">
-      <span id="headerRole">JOGADOR</span>
-      <span id="headerMatch">PREPARAÇÃO</span>
-      <button id="devOpen" class="df-dev-button">MODO DEV</button>
-    </div>
-  </header>
 
-  <main class="df-app">
+    <section id="matchLobbyCard" class="match-lobby-card">
 
-    <!-- =========================================================
-         TELA: JOGADOR / PAINEL TÁTICO
-         ========================================================= -->
-    <section id="screen-tactical" class="app-screen player-screen active">
-      <div class="screen-inner">
+      <div class="match-lobby-top">
 
-        <div class="tactical-topline">
-          <div>
-            <span class="micro">PAINEL TÁTICO</span>
-            <h1 id="tacticalMatch">OPERAÇÃO RED SAND</h1>
-          </div>
-
-          <div class="tactical-top-status">
-            <span id="tacticalState" class="state-live">AGUARDANDO</span>
-            <span id="gameClock" class="clock">00:00:00</span>
-            <button id="manualLock" class="mini-btn hidden">TRAVAR</button>
-          </div>
+        <div>
+          <span class="micro">PARTIDA DISPONÍVEL</span>
+          <h2 id="lobbyMatchName">
+            Nenhuma partida criada
+          </h2>
         </div>
 
-        <div class="tactical-main">
+        <span id="lobbyMatchState"
+              class="match-state">
+          —
+        </span>
 
-          <div class="game-map-block">
-            <div class="block-label">
-              <span>MAPA DO CENÁRIO</span>
-              <span id="gpsStatus">● GPS AGUARDANDO</span>
-            </div>
-
-            <div id="googleMap" class="game-map">
-              <div class="map-gridline"></div>
-              <div class="map-road road-1"></div>
-              <div class="map-road road-2"></div>
-              <div class="map-road road-3"></div>
-
-              <div class="map-building b1"><span>GALPÃO A</span></div>
-              <div class="map-building b2"><span>GALPÃO B</span></div>
-              <div class="map-building b3"><span>APOIO</span></div>
-
-              <div class="map-yard y1"></div>
-              <div class="map-yard y2"></div>
-
-              <div class="map-zone zone-alpha"><span>ALFA</span></div>
-              <div class="map-zone zone-bravo"><span>BRAVO</span></div>
-
-              <div id="playerMapMarker" class="player-marker">
-                <i></i>
-                <b>VOCÊ</b>
-              </div>
-
-              <button id="mapCenter" class="map-center-btn">◎</button>
-              <span class="map-title-chip">ÁREA OPERACIONAL</span>
-            </div>
-
-            <div class="gps-line">
-              <span id="gpsCoords">LOCALIZAÇÃO DEMO</span>
-              <span id="gpsAccuracy">PRECISÃO —</span>
-            </div>
-          </div>
-
-          <aside class="tactical-side">
-
-            <section class="status-strip flat-panel">
-              <span class="micro">SEU ESTADO</span>
-              <strong id="playerStateTitle">AGUARDANDO</strong>
-              <small id="playerStateDesc">Aguardando início.</small>
-            </section>
-
-            <section class="mission-strip flat-panel">
-              <div>
-                <span class="micro">OBJETIVO ATUAL</span>
-                <strong id="missionTitle">ALFA / BRAVO</strong>
-              </div>
-
-              <div class="progress">
-                <i id="missionProgress"></i>
-              </div>
-
-              <small id="missionText">Nenhum setor registrado.</small>
-            </section>
-
-            <!-- RÁDIO: BOTÃO GRANDE -->
-            <section class="radio-console flat-panel">
-              <div class="radio-head">
-                <div>
-                  <span class="micro">RÁDIO</span>
-                  <strong id="radioStatus">LIGADO · CH 01</strong>
-                </div>
-
-                <span id="radioTx">PRONTO</span>
-              </div>
-
-              <div class="radio-controls">
-                <label>
-                  CH
-                  <select id="radioChannel">
-                    <option value="01">01</option>
-                    <option value="02">02</option>
-                    <option value="03">03</option>
-                    <option value="04">04</option>
-                    <option value="05">05</option>
-                  </select>
-                </label>
-
-                <button id="radioPower" class="radio-mini">DESLIGAR</button>
-
-                <label class="volume">
-                  VOL
-                  <input id="radioVolume" type="range" min="0" max="100" value="70">
-                </label>
-              </div>
-
-              <button id="radioPtt" class="radio-ptt">
-                <span class="ptt-icon">●</span>
-                <strong>SEGURE PARA FALAR</strong>
-              </button>
-            </section>
-
-          </aside>
-        </div>
-
-        <div class="action-rail">
-          <button id="hitButton" class="launch-action">
-            <span class="launch-icon">↗</span>
-            <strong>LANÇAR</strong>
-            <small>Evento demo</small>
-          </button>
-
-          <button id="instructionsButton" class="rail-action">
-            <span>≡</span>
-            <strong>INSTRUÇÕES</strong>
-            <small>Briefing e regras</small>
-          </button>
-        </div>
       </div>
 
-      <div id="touchGuard" class="touch-guard visible">
-        <div class="guard-box">
-          <span class="guard-icon">▣</span>
-          <strong>PAINEL PROTEGIDO</strong>
-          <small>Pressione e segure para liberar os controles.</small>
-          <div class="unlock-track"><i></i></div>
-        </div>
-      </div>
-    </section>
 
-    <!-- =========================================================
-         TELA: DETALHES
-         ========================================================= -->
-    <section id="screen-details" class="app-screen">
-      <div class="screen-inner">
+      <div class="match-meta-grid">
 
-        <div class="page-head">
-          <button class="back-button" data-back="tactical">←</button>
-          <div>
-            <span class="micro">DETALHES</span>
-            <h1>Preparação</h1>
-          </div>
+        <div>
+          <span>MAPA</span>
+          <b id="lobbyMap">—</b>
         </div>
 
-        <section class="detail-card identity-detail">
-          <div>
-            <span class="micro">IDENTIDADE</span>
-            <strong id="homePlayerName">Daniel</strong>
-            <p id="homeIdentity">DF-001 · AZUL · ASSALTO</p>
-          </div>
-
-          <span class="ready-line">IDENTIDADE PREENCHIDA</span>
-        </section>
-
-        <div class="detail-tabs">
-          <button class="detail-tab active" data-detail="inicio">INÍCIO</button>
-          <button class="detail-tab" data-detail="briefing">BRIEFING</button>
-          <button class="detail-tab" data-detail="perfil">PERFIL</button>
+        <div>
+          <span>MODELO</span>
+          <b id="lobbyMode">—</b>
         </div>
 
-        <div id="detail-inicio" class="detail-pane active">
-          <section class="detail-card detail-fit">
-            <span class="micro">PREPARAÇÃO</span>
-            <h2>Confirmar participação</h2>
-            <p class="muted">
-              Leia o briefing, registre sua presença e confirme sua participação.
-            </p>
-
-            <div class="prep-grid">
-              <div><span>01</span><b>BRIEFING</b></div>
-              <div><span>02</span><b>SELFIE</b></div>
-              <div><span>03</span><b>CONFIRMAÇÃO</b></div>
-            </div>
-
-            <button class="detail-primary" data-detail="briefing">
-              ABRIR BRIEFING
-            </button>
-          </section>
+        <div>
+          <span>JOGADORES</span>
+          <b id="lobbyPlayers">0</b>
         </div>
 
-        <div id="detail-briefing" class="detail-pane">
-          <section class="detail-card detail-fit">
-            <span class="micro">BRIEFING DO ORGANIZADOR</span>
-            <h2 id="briefingTitle">Briefing da Operação</h2>
-
-            <div id="briefingBody" class="briefing-readonly"></div>
-
-            <label class="ack">
-              <input id="briefingAck" type="checkbox">
-              <span>Recebi, ciente das regras do briefing.</span>
-            </label>
-
-            <p class="responsibility">
-              Ao confirmar, você registra ciência do conteúdo apresentado.
-            </p>
-
-            <button id="selfieButton" class="detail-secondary">
-              CAPTURAR SELFIE DE PRESENÇA
-            </button>
-
-            <div id="selfiePreview" class="selfie-preview hidden"></div>
-
-            <button id="confirmParticipation"
-                    class="detail-primary"
-                    disabled>
-              CONFIRMAR PARTICIPAÇÃO
-            </button>
-          </section>
-        </div>
-
-        <div id="detail-perfil" class="detail-pane">
-          <section class="detail-card detail-fit">
-            <span class="micro">PERFIL</span>
-
-            <div class="profile-line">
-              <div class="avatar">D</div>
-              <div>
-                <h2 id="profileName">Daniel</h2>
-                <p id="profileMeta">DF-001 · AZUL</p>
-              </div>
-            </div>
-
-            <div class="profile-data">
-              <div>
-                <span>CLASSE</span>
-                <b id="profileClass">ASSALTO</b>
-              </div>
-
-              <div>
-                <span>STATUS</span>
-                <b id="profileStatus">AGUARDANDO</b>
-              </div>
-
-              <div>
-                <span>RÁDIO</span>
-                <b id="profileRadio">CH 01</b>
-              </div>
-            </div>
-          </section>
+        <div>
+          <span>ORGANIZADOR</span>
+          <b id="lobbyOrganizer">DISPONÍVEL</b>
         </div>
 
       </div>
-    </section>
 
-    <!-- =========================================================
-         TELA: AGUARDANDO
-         ========================================================= -->
-    <section id="screen-waiting" class="app-screen">
-      <div class="screen-center">
-        <span class="micro">PARTICIPAÇÃO CONFIRMADA</span>
-        <h1>AGUARDANDO INÍCIO</h1>
-        <p id="waitingMatchStatus">AGUARDANDO ORGANIZADOR</p>
 
-        <button class="detail-secondary" data-back="details">
-          VOLTAR
+      <div class="lobby-action-area">
+
+        <button id="lobbyPrimary"
+                class="primary-large">
+          AGUARDANDO PARTIDA
         </button>
+
+        <button id="openDetailsButton"
+                class="secondary-large">
+          VER DETALHES
+        </button>
+
       </div>
+
     </section>
 
-    <!-- =========================================================
-         TELA: INSTRUÇÕES
-         ========================================================= -->
-    <section id="screen-instructions" class="app-screen">
-      <div class="screen-inner">
-        <div class="page-head">
-          <button class="back-button" data-back="tactical">←</button>
-          <div>
-            <span class="micro">BRIEFING E REGRAS</span>
-            <h1 id="instructionsTitle">Instruções</h1>
-          </div>
-        </div>
 
-        <section class="detail-card full-page-card">
-          <div id="instructionsBody"></div>
-        </section>
-      </div>
+    <section class="flat-info">
+
+      <span class="micro">SEU PERFIL</span>
+
+      <strong id="lobbyPlayerName">
+        Daniel
+      </strong>
+
+      <small id="lobbyPlayerMeta">
+        DF-001 · AZUL · ASSALTO
+      </small>
+
     </section>
 
-    <!-- =========================================================
-         TELA: DEV
-         ========================================================= -->
-    <section id="screen-dev" class="app-screen">
-      <div class="screen-inner">
 
-        <div class="page-head">
-          <button class="back-button" data-back="tactical">←</button>
-          <div>
-            <span class="micro">DESENVOLVIMENTO</span>
-            <h1>MODO DEV</h1>
-          </div>
+    <button id="organizerQuickButton"
+            class="wide-outline-button">
+      ABRIR CENTRAL DO ORGANIZADOR
+    </button>
+
+  </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     DETALHES / PRESENÇA
+     ========================================================= -->
+
+<section id="screen-details"
+         class="app-screen">
+
+  <div class="screen-inner">
+
+    <div class="page-head">
+
+      <button class="back-button"
+              data-back="lobby">
+        ←
+      </button>
+
+      <div>
+        <span class="micro">PARTIDA</span>
+        <h1>Detalhes</h1>
+      </div>
+
+    </div>
+
+
+    <section class="detail-card player-detail-card">
+
+      <span class="micro">
+        <span id="detailsStateLabel">PARTIDA PROGRAMADA</span>
+      </span>
+
+      <h2 id="detailsMatchName">
+        Operação Red Sand
+      </h2>
+
+      <div class="details-meta">
+
+        <div>
+          <span>MAPA</span>
+          <b id="detailsMap">Complexo Industrial</b>
         </div>
 
-        <section class="detail-card dev-card">
-          <span class="micro">STATUS</span>
+        <div>
+          <span>MODELO</span>
+          <b id="detailsMode">Simulação</b>
+        </div>
 
-          <div class="dev-status">
-            <strong id="devStateText">DESABILITADO</strong>
-            <span id="devStateDot"></span>
+        <div>
+          <span>PARTICIPANTES</span>
+          <b id="detailsPlayers">1</b>
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <section class="detail-card presence-card">
+
+      <span class="micro">SUA PARTICIPAÇÃO</span>
+
+      <h2 id="presenceTitle">
+        Confirmar presença
+      </h2>
+
+      <p id="presenceText">
+        Confirme sua presença para entrar na partida.
+      </p>
+
+      <div class="presence-status">
+
+        <span>STATUS</span>
+
+        <strong id="presenceStatus">
+          AGUARDANDO
+        </strong>
+
+      </div>
+
+      <button id="confirmPresenceButton"
+              class="primary-large">
+        CONFIRMAR PRESENÇA
+      </button>
+
+    </section>
+
+  </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     TÁTICO
+     ========================================================= -->
+
+<section id="screen-tactical"
+         class="app-screen">
+
+  <div class="screen-inner">
+
+    <div class="tactical-topline">
+
+      <div>
+        <span class="micro">PAINEL TÁTICO</span>
+        <h1 id="tacticalMatch">
+          OPERAÇÃO RED SAND
+        </h1>
+      </div>
+
+      <div class="tactical-top-status">
+
+        <span id="tacticalState"
+              class="state-live">
+          AGUARDANDO
+        </span>
+
+        <span id="gameClock"
+              class="clock">
+          00:00:00
+        </span>
+
+        <button id="manualLock"
+                class="mini-btn hidden">
+          TRAVAR
+        </button>
+
+      </div>
+
+    </div>
+
+
+    <div class="tactical-main">
+
+
+      <div class="game-map-block">
+
+        <div class="block-label">
+
+          <span>MAPA DO CENÁRIO</span>
+
+          <span id="gpsStatus">
+            ● GPS AGUARDANDO
+          </span>
+
+        </div>
+
+
+        <div id="googleMap"
+             class="game-map">
+
+          <div class="map-gridline"></div>
+
+          <div class="map-distortion d1"></div>
+          <div class="map-distortion d2"></div>
+
+          <div class="map-road road-1"></div>
+          <div class="map-road road-2"></div>
+          <div class="map-road road-3"></div>
+
+          <div class="map-building b1">
+            <span>GALPÃO A</span>
           </div>
 
-          <button id="devToggle" class="detail-primary">
-            HABILITAR DEV
+          <div class="map-building b2">
+            <span>GALPÃO B</span>
+          </div>
+
+          <div class="map-building b3">
+            <span>APOIO</span>
+          </div>
+
+          <div class="map-zone zone-alpha">
+            <span>ALFA</span>
+          </div>
+
+          <div class="map-zone zone-bravo">
+            <span>BRAVO</span>
+          </div>
+
+          <div id="playerMapMarker"
+               class="player-marker">
+
+            <i></i>
+            <b>VOCÊ</b>
+
+          </div>
+
+          <button id="mapCenter"
+                  class="map-center-btn">
+            ◎
           </button>
 
-          <div class="dev-role-block">
-            <span class="micro">PAPEL DE TESTE</span>
+          <span class="map-title-chip">
+            ÁREA OPERACIONAL
+          </span>
 
-            <div class="role-choice">
-              <button class="role-option active" data-role="player">
-                JOGADOR
-              </button>
+        </div>
 
-              <button class="role-option" data-role="organizer">
-                ORGANIZADOR
-              </button>
-            </div>
-          </div>
 
-          <div class="dev-info">
-            <span>FUNÇÕES DESENVOLVIDAS</span>
-            <b>TRAVA DE PAINEL</b>
-          </div>
+        <div class="gps-line">
+
+          <span id="gpsCoords">
+            LOCALIZAÇÃO DEMO
+          </span>
+
+          <span id="gpsAccuracy">
+            PRECISÃO —
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <aside class="tactical-side">
+
+
+        <section class="status-strip flat-panel">
+
+          <span class="micro">
+            SEU ESTADO
+          </span>
+
+          <strong id="playerStateTitle">
+            AGUARDANDO
+          </strong>
+
+          <small id="playerStateDesc">
+            Aguardando início.
+          </small>
+
         </section>
 
-      </div>
-    </section>
 
-    <!-- =========================================================
-         TELA: ORGANIZADOR
-         ========================================================= -->
-    <section id="screen-organizer" class="app-screen">
-      <div class="screen-inner">
+        <section class="mission-strip flat-panel">
 
-        <div class="page-head">
           <div>
-            <span class="micro">CENTRAL DO ORGANIZADOR</span>
-            <h1>Preparar partida</h1>
+
+            <span class="micro">
+              OBJETIVO ATUAL
+            </span>
+
+            <strong>
+              ALFA / BRAVO
+            </strong>
+
           </div>
-        </div>
 
-        <div class="organizer-grid">
+          <div class="progress">
+            <i id="missionProgress"></i>
+          </div>
 
-          <section class="org-panel">
-            <span class="micro">CONFIGURAÇÃO</span>
+          <small id="missionText">
+            Nenhum setor registrado.
+          </small>
 
-            <label>
-              NOME
-              <input id="orgMatchName" value="Operação Red Sand">
-            </label>
+        </section>
 
-            <div class="org-two">
-              <label>
-                MAPA
-                <select id="orgMap">
-                  <option>Complexo Industrial</option>
-                  <option>Galpão Central</option>
-                  <option>Área Externa</option>
-                </select>
-              </label>
 
-              <label>
-                MODELO
-                <select id="orgMode">
-                  <option>Simulação</option>
-                  <option>Tecnológico</option>
-                  <option>Arcade</option>
-                </select>
-              </label>
-            </div>
-          </section>
+        <section class="radio-console flat-panel">
 
-          <section class="org-panel">
-            <span class="micro">BRIEFING</span>
+          <div class="radio-head">
 
-            <label>
-              TÍTULO
-              <input id="orgBriefingTitle" value="Briefing da Operação">
-            </label>
+            <div>
 
-            <label>
-              CONTEÚDO
-              <textarea id="orgBriefingText">Objetivo, regras da partida, condições de participação e orientações gerais.</textarea>
-            </label>
+              <span class="micro">
+                RÁDIO
+              </span>
 
-            <button id="saveBriefing" class="detail-primary">
-              SALVAR
-            </button>
-          </section>
+              <strong id="radioStatus">
+                LIGADO · CH 01
+              </strong>
 
-          <section class="org-panel">
-            <span class="micro">PRESENÇA</span>
-
-            <div class="org-status-row">
-              <span>DANIEL</span>
-              <b id="orgAttendance">AGUARDANDO</b>
             </div>
 
-            <div class="org-status-row">
-              <span>JOGADORES</span>
-              <b id="orgReadyCount">0/1</b>
-            </div>
+            <span id="radioTx">
+              PRONTO
+            </span>
 
-            <button id="startMatchButton" class="detail-primary">
-              INICIAR PARTIDA
+          </div>
+
+
+          <div class="radio-controls">
+
+            <label>
+              CH
+
+              <select id="radioChannel">
+                <option value="01">01</option>
+                <option value="02">02</option>
+                <option value="03">03</option>
+                <option value="04">04</option>
+                <option value="05">05</option>
+              </select>
+
+            </label>
+
+
+            <button id="radioPower"
+                    class="radio-mini">
+              DESLIGAR
             </button>
 
-            <button id="resetDemoButton" class="detail-secondary">
-              RESETAR DEMO
-            </button>
-          </section>
 
-        </div>
+            <label class="volume">
+
+              VOL
+
+              <input id="radioVolume"
+                     type="range"
+                     min="0"
+                     max="100"
+                     value="70">
+
+            </label>
+
+          </div>
+
+
+          <button id="radioPtt"
+                  class="radio-ptt">
+
+            <span class="ptt-icon">●</span>
+
+            <strong>
+              SEGURE PARA FALAR
+            </strong>
+
+          </button>
+
+        </section>
+
+      </aside>
+
+    </div>
+
+
+    <div class="action-rail">
+
+      <button id="hitButton"
+              class="launch-action">
+
+        <span class="launch-icon">↗</span>
+
+        <strong>
+          LANÇAR
+        </strong>
+
+        <small>
+          Evento demo
+        </small>
+
+      </button>
+
+
+      <button id="instructionsButton"
+              class="rail-action">
+
+        <span>≡</span>
+
+        <strong>
+          INSTRUÇÕES
+        </strong>
+
+        <small>
+          Briefing e regras
+        </small>
+
+      </button>
+
+    </div>
+
+
+  </div>
+
+
+  <div id="touchGuard"
+       class="touch-guard visible">
+
+    <div class="guard-box">
+
+      <span class="guard-icon">
+        ▣
+      </span>
+
+      <strong>
+        PAINEL PROTEGIDO
+      </strong>
+
+      <small>
+        Pressione e segure para liberar os controles.
+      </small>
+
+      <div class="unlock-track">
+        <i></i>
       </div>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     ORGANIZADOR
+     ========================================================= -->
+
+<section id="screen-organizer"
+         class="app-screen">
+
+  <div class="screen-inner">
+
+    <div class="page-head">
+
+      <div>
+        <span class="micro">
+          CENTRAL DO ORGANIZADOR
+        </span>
+
+        <h1>
+          Preparar partida
+        </h1>
+      </div>
+
+      <span class="state-badge">
+        ORGANIZADOR
+      </span>
+
+    </div>
+
+
+    <div class="organizer-layout">
+
+
+      <section class="org-panel">
+
+        <span class="micro">
+          PARTIDA
+        </span>
+
+        <label>
+          NOME
+
+          <input id="orgMatchName"
+                 value="Operação Red Sand">
+        </label>
+
+
+        <div class="org-two">
+
+          <label>
+            MAPA
+
+            <select id="orgMap">
+              <option>Complexo Industrial</option>
+              <option>Galpão Central</option>
+              <option>Área Externa</option>
+            </select>
+
+          </label>
+
+
+          <label>
+            MODELO
+
+            <select id="orgMode">
+              <option>Simulação</option>
+              <option>Tecnológico</option>
+              <option>Arcade</option>
+            </select>
+
+          </label>
+
+        </div>
+
+      </section>
+
+
+
+      <section class="org-panel">
+
+        <span class="micro">
+          BRIEFING
+        </span>
+
+        <label>
+          TÍTULO
+
+          <input id="orgBriefingTitle"
+                 value="Briefing da Operação">
+
+        </label>
+
+        <label>
+          CONTEÚDO
+
+          <textarea id="orgBriefingText">Objetivo, regras da partida, condições de participação e orientações gerais.</textarea>
+
+        </label>
+
+      </section>
+
+
+
+      <section class="org-panel">
+
+        <span class="micro">
+          ORGANIZADOR
+        </span>
+
+        <div class="org-toggle-row">
+
+          <div>
+            <strong>
+              PARTICIPAR DA PARTIDA
+            </strong>
+
+            <small>
+              O organizador pode jogar ou apenas administrar.
+            </small>
+          </div>
+
+          <button id="organizerParticipateToggle"
+                  class="toggle-button">
+            NÃO
+          </button>
+
+        </div>
+
+
+        <div class="org-status-row">
+
+          <span>
+            PARTICIPANTES
+          </span>
+
+          <b id="orgReadyCount">
+            0
+          </b>
+
+        </div>
+
+
+        <div class="org-status-row">
+
+          <span>
+            JOGADORES SIMULADOS
+          </span>
+
+          <b id="orgSimCount">
+            0
+          </b>
+
+        </div>
+
+      </section>
+
+
+
+      <section class="org-actions">
+
+        <button id="saveMatchButton"
+                class="primary-large">
+          SALVAR PARTIDA
+        </button>
+
+
+        <button id="startMatchButton"
+                class="secondary-large">
+          INICIAR PARTIDA
+        </button>
+
+
+        <button id="resetDemoButton"
+                class="reset-button">
+          RESETAR
+        </button>
+
+      </section>
+
+
+    </div>
+
+  </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     DEV
+     ========================================================= -->
+
+<section id="screen-dev"
+         class="app-screen">
+
+  <div class="screen-inner">
+
+    <div class="page-head">
+
+      <button class="back-button"
+              data-back="lobby">
+        ←
+      </button>
+
+      <div>
+
+        <span class="micro">
+          DESENVOLVIMENTO
+        </span>
+
+        <h1>
+          Modo DEV
+        </h1>
+
+      </div>
+
+    </div>
+
+
+    <section class="detail-card dev-card">
+
+      <div class="dev-status">
+
+        <div>
+          <span class="micro">
+            AMBIENTE
+          </span>
+
+          <strong id="devStateText">
+            DESABILITADO
+          </strong>
+        </div>
+
+        <span id="devStateDot"
+              class="dev-dot"></span>
+
+      </div>
+
+
+      <button id="devToggle"
+              class="primary-large">
+        HABILITAR DEV
+      </button>
+
+
+      <div class="dev-section">
+
+        <span class="micro">
+          EU SOU
+        </span>
+
+        <div class="role-choice">
+
+          <button class="role-option active"
+                  data-role="player">
+            JOGADOR
+          </button>
+
+          <button class="role-option"
+                  data-role="organizer">
+            ORGANIZADOR
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div class="dev-section">
+
+        <span class="micro">
+          SIMULAR JOGADORES
+        </span>
+
+        <div class="sim-player-choice">
+
+          <button data-sim-count="0">0</button>
+          <button data-sim-count="1">1</button>
+          <button data-sim-count="2">2</button>
+          <button data-sim-count="3">3</button>
+
+        </div>
+
+        <small id="devSimInfo">
+          Nenhum jogador simulado.
+        </small>
+
+      </div>
+
+
     </section>
 
-  </main>
+  </div>
 
-  <script src="app.js" defer></script>
+</section>
+
+
+
+<!-- =========================================================
+     INSTRUÇÕES
+     ========================================================= -->
+
+<section id="screen-instructions"
+         class="app-screen">
+
+  <div class="screen-inner">
+
+    <div class="page-head">
+
+      <button class="back-button"
+              data-back="tactical">
+        ←
+      </button>
+
+      <div>
+
+        <span class="micro">
+          BRIEFING
+        </span>
+
+        <h1>
+          Instruções
+        </h1>
+
+      </div>
+
+    </div>
+
+
+    <section class="detail-card full-page-card">
+
+      <div id="instructionsBody"></div>
+
+    </section>
+
+  </div>
+
+</section>
+
+
+
+<!-- =========================================================
+     MODAL
+     ========================================================= -->
+
+<div id="modalRoot"></div>
+
+</main>
+
+
+<script src="app.js" defer></script>
+
 </body>
-     </html>
+  </html>
