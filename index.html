@@ -5,52 +5,537 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#121212">
 <title>Desert Falcons — Game Terminal</title>
+
+<!-- =========================================================
+     ESTILOS PRINCIPAIS
+     ========================================================= -->
 <link rel="stylesheet" href="style.css">
-<link rel="stylesheet" href="ui.css">
-<link rel="stylesheet" href="palette.css">
-<link rel="stylesheet" href="readability.css">
 </head>
+
 <body>
+
+<!-- =========================================================
+     CABEÇALHO
+     ========================================================= -->
 <header class="df-header">
-  <div class="df-brand"><span class="df-mark">DF</span><div><strong>DESERT FALCONS</strong><small id="headerSubtitle">PLAYER TERMINAL</small></div></div>
-  <div class="df-header-meta"><span id="headerRole">JOGADOR</span><span id="headerMatch">PREPARAÇÃO</span><button id="roleToggle" class="df-role">ORGANIZADOR</button></div>
-</header>
-<main class="df-app">
-<nav id="playerNav" class="player-nav" aria-label="Navegação do jogador">
-  <button class="player-nav-btn active" data-view="tactical"><span class="nav-icon">▦</span><strong>PAINEL TÁTICO</strong><small>Visão da partida</small></button>
-  <button class="player-nav-btn" data-view="details"><span class="nav-icon">☰</span><strong>DETALHES</strong><small>Preparação e perfil</small></button>
-</nav>
-<section id="screen-tactical" class="player-view tactical-view active">
-  <div class="tactical-topline"><div><span class="micro">PAINEL TÁTICO</span><h1 id="tacticalMatch">OPERAÇÃO RED SAND</h1></div><div class="tactical-top-status"><span id="tacticalState" class="state-live">ATIVO</span><span id="gameClock" class="clock">00:00:00</span><button id="manualLock" class="mini-btn">TRAVAR</button></div></div>
-  <div class="tactical-main">
-    <div class="game-map-block">
-      <div class="block-label"><span>MAPA DO CENÁRIO</span><span id="gpsStatus">● GPS AGUARDANDO</span></div>
-      <div id="googleMap" class="game-map"><div class="map-gridline"></div><div class="map-road road-1"></div><div class="map-road road-2"></div><div class="map-road road-3"></div><div class="map-building b1"><span>GALPÃO A</span></div><div class="map-building b2"><span>GALPÃO B</span></div><div class="map-building b3"><span>APOIO</span></div><div class="map-yard y1"></div><div class="map-yard y2"></div><div class="map-zone zone-alpha"><span>ALFA</span></div><div class="map-zone zone-bravo"><span>BRAVO</span></div><div id="playerMapMarker" class="player-marker"><i></i><b>VOCÊ</b></div><button id="mapCenter" class="map-center-btn">◎</button><span class="map-title-chip">ÁREA OPERACIONAL</span></div>
-      <div class="gps-line"><span id="gpsCoords">LOCALIZAÇÃO DEMO</span><span id="gpsAccuracy">PRECISÃO —</span></div>
+  <div class="df-brand">
+    <span class="df-mark">DF</span>
+
+    <div>
+      <strong>DESERT FALCONS</strong>
+      <small id="headerSubtitle">PLAYER TERMINAL</small>
     </div>
+  </div>
+
+  <div class="df-header-meta">
+    <span id="headerRole">JOGADOR</span>
+    <span id="headerMatch">PREPARAÇÃO</span>
+
+    <!--
+      Não é mais um alternador livre de função.
+      O comportamento dele é controlado pelo app.js.
+    -->
+    <button id="devOpenButton" class="df-role">MODO DEV</button>
+  </div>
+</header>
+
+<main class="df-app">
+
+<!-- =========================================================
+     NAVEGAÇÃO DO JOGADOR
+     ========================================================= -->
+<nav id="playerNav" class="player-nav" aria-label="Navegação do jogador">
+  <button class="player-nav-btn active" data-view="tactical">
+    <span class="nav-icon">▦</span>
+    <strong>INÍCIO</strong>
+    <small>Painel da partida</small>
+  </button>
+
+  <button class="player-nav-btn" data-view="details">
+    <span class="nav-icon">☰</span>
+    <strong>DETALHES</strong>
+    <small>Preparação e perfil</small>
+  </button>
+</nav>
+
+<!-- =========================================================
+     PAINEL TÁTICO / JOGADOR
+     ========================================================= -->
+<section id="screen-tactical" class="player-view tactical-view active">
+
+  <div class="tactical-topline">
+    <div>
+      <span class="micro">PAINEL TÁTICO</span>
+      <h1 id="tacticalMatch">OPERAÇÃO RED SAND</h1>
+    </div>
+
+    <div class="tactical-top-status">
+      <span id="tacticalState" class="state-live">AGUARDANDO</span>
+      <span id="gameClock" class="clock">00:00:00</span>
+      <button id="manualLock" class="mini-btn hidden">TRAVAR</button>
+    </div>
+  </div>
+
+  <div class="tactical-main">
+
+    <!-- MAPA VISUAL DO CENÁRIO -->
+    <div class="game-map-block">
+      <div class="block-label">
+        <span>MAPA DO CENÁRIO</span>
+        <span id="gpsStatus">● GPS AGUARDANDO</span>
+      </div>
+
+      <div id="googleMap" class="game-map">
+
+        <div class="map-gridline"></div>
+
+        <div class="map-road road-1"></div>
+        <div class="map-road road-2"></div>
+        <div class="map-road road-3"></div>
+
+        <div class="map-building b1"><span>GALPÃO A</span></div>
+        <div class="map-building b2"><span>GALPÃO B</span></div>
+        <div class="map-building b3"><span>APOIO</span></div>
+
+        <div class="map-yard y1"></div>
+        <div class="map-yard y2"></div>
+
+        <div class="map-zone zone-alpha"><span>ALFA</span></div>
+        <div class="map-zone zone-bravo"><span>BRAVO</span></div>
+
+        <div id="playerMapMarker" class="player-marker">
+          <i></i>
+          <b>VOCÊ</b>
+        </div>
+
+        <button id="mapCenter" class="map-center-btn">◎</button>
+
+        <span class="map-title-chip">ÁREA OPERACIONAL</span>
+      </div>
+
+      <div class="gps-line">
+        <span id="gpsCoords">LOCALIZAÇÃO DEMO</span>
+        <span id="gpsAccuracy">PRECISÃO —</span>
+      </div>
+    </div>
+
+    <!-- STATUS / OBJETIVO / RÁDIO -->
     <aside class="tactical-side">
-      <section class="status-strip"><span class="micro">SEU ESTADO</span><strong id="playerStateTitle">ATIVO</strong><small id="playerStateDesc">Partida em andamento.</small></section>
-      <section class="mission-strip"><div><span class="micro">OBJETIVO ATUAL</span><strong id="missionTitle">ALFA / BRAVO</strong></div><div class="progress"><i id="missionProgress"></i></div><small id="missionText">Aguardando atualização.</small></section>
-      <section class="radio-console"><div class="radio-head"><div><span class="micro">RÁDIO</span><strong id="radioStatus">LIGADO · CH 01</strong></div><span id="radioTx">PRONTO</span></div><div class="radio-row"><label>CH<select id="radioChannel"><option value="01">01</option><option value="02">02</option><option value="03">03</option><option value="04">04</option><option value="05">05</option></select></label><button id="radioPower" class="radio-mini">DESLIGAR</button><label class="volume">VOL<input id="radioVolume" type="range" min="0" max="100" value="70"></label></div><button id="radioPtt" class="radio-ptt">SEGURE PARA FALAR</button></section>
+
+      <section class="status-strip">
+        <span class="micro">SEU ESTADO</span>
+        <strong id="playerStateTitle">AGUARDANDO</strong>
+        <small id="playerStateDesc">Aguardando início da partida.</small>
+      </section>
+
+      <section class="mission-strip">
+        <div>
+          <span class="micro">OBJETIVO ATUAL</span>
+          <strong id="missionTitle">ALFA / BRAVO</strong>
+        </div>
+
+        <div class="progress">
+          <i id="missionProgress"></i>
+        </div>
+
+        <small id="missionText">Aguardando atualização.</small>
+      </section>
+
+      <!-- RÁDIO VISUAL / ADMINISTRATIVO -->
+      <section class="radio-console">
+        <div class="radio-head">
+          <div>
+            <span class="micro">RÁDIO</span>
+            <strong id="radioStatus">LIGADO · CH 01</strong>
+          </div>
+
+          <span id="radioTx">PRONTO</span>
+        </div>
+
+        <div class="radio-row">
+          <label>
+            CH
+            <select id="radioChannel">
+              <option value="01">01</option>
+              <option value="02">02</option>
+              <option value="03">03</option>
+              <option value="04">04</option>
+              <option value="05">05</option>
+            </select>
+          </label>
+
+          <button id="radioPower" class="radio-mini">DESLIGAR</button>
+
+          <label class="volume">
+            VOL
+            <input id="radioVolume" type="range" min="0" max="100" value="70">
+          </label>
+
+          <button id="radioPtt" class="radio-ptt">SEGURE PARA FALAR</button>
+        </div>
+      </section>
     </aside>
   </div>
-  <div class="action-rail"><button id="hitButton" class="launch-action"><span class="launch-icon">↗</span><strong>LANÇAR</strong><small>Evento demo</small></button><button id="instructionsButton" class="rail-action"><span>≡</span><strong>INSTRUÇÕES</strong><small>Briefing e regras</small></button><div class="rail-note"><span>PAINEL PRINCIPAL</span><small>Informação de partida em um único lugar.</small></div></div>
-  <div id="touchGuard" class="touch-guard visible"><div class="guard-box"><span class="guard-icon">▣</span><strong>PAINEL PROTEGIDO</strong><small>Pressione e segure para liberar os controles.</small><div class="unlock-track"><i></i></div></div></div>
+
+  <div class="action-rail">
+    <button id="hitButton" class="launch-action">
+      <span class="launch-icon">↗</span>
+      <strong>EVENTO</strong>
+      <small>Registro de demonstração</small>
+    </button>
+
+    <button id="instructionsButton" class="rail-action">
+      <span>≡</span>
+      <strong>INSTRUÇÕES</strong>
+      <small>Briefing e regras</small>
+    </button>
+
+    <div class="rail-note">
+      <span>PAINEL PRINCIPAL</span>
+      <small>Informações da partida em um único lugar.</small>
+    </div>
+  </div>
+
+  <!-- PROTEÇÃO DO PAINEL -->
+  <div id="touchGuard" class="touch-guard visible">
+    <div class="guard-box">
+      <span class="guard-icon">▣</span>
+      <strong>PAINEL PROTEGIDO</strong>
+      <small>Pressione e segure para liberar os controles.</small>
+      <div class="unlock-track">
+        <i></i>
+      </div>
+    </div>
+  </div>
+
 </section>
+
+<!-- =========================================================
+     DETALHES DO JOGADOR
+     ========================================================= -->
 <section id="screen-details" class="player-view details-view">
-  <div class="details-head"><div><span class="micro">DETALHES</span><h1>Preparação do jogador</h1></div><span class="details-state">CONFIGURAÇÃO</span></div>
+
+  <div class="details-head">
+    <div>
+      <span class="micro">DETALHES</span>
+      <h1>Preparação do jogador</h1>
+    </div>
+
+    <span class="details-state">CONFIGURAÇÃO</span>
+  </div>
+
   <div class="details-scroll">
-    <section class="detail-card identity-detail"><div class="detail-title"><span>01</span><div><span class="micro">IDENTIDADE</span><strong id="homePlayerName">DANI</strong></div></div><p id="homeIdentity">DF-001 · AZUL · ASSALTO</p><span class="ready-line">IDENTIDADE PREENCHIDA</span></section>
-    <div class="detail-tabs"><button class="detail-tab active" data-detail="inicio">INÍCIO</button><button class="detail-tab" data-detail="briefing">BRIEFING</button><button class="detail-tab" data-detail="perfil">PERFIL</button></div>
-    <div id="detail-inicio" class="detail-pane active"><section class="detail-card"><span class="micro">PREPARAÇÃO</span><h2>Confirmar participação</h2><p class="muted">Leia o briefing configurado pelo organizador, registre a presença e aguarde o início da partida.</p><div class="prep-line"><span>01</span><b>Briefing</b></div><div class="prep-line"><span>02</span><b>Selfie de presença</b></div><div class="prep-line"><span>03</span><b>Confirmação</b></div><button class="detail-primary" data-detail="briefing">ABRIR BRIEFING</button></section></div>
-    <div id="detail-briefing" class="detail-pane"><section class="detail-card"><span class="micro">BRIEFING DO ORGANIZADOR</span><h2 id="briefingTitle">Briefing da Operação</h2><div id="briefingBody" class="briefing-readonly"></div><label class="ack"><input id="briefingAck" type="checkbox"><span>Recebi, ciente das regras do briefing.</span></label><p class="responsibility">Ao confirmar, você registra ciência do conteúdo apresentado.</p><button id="selfieButton" class="detail-secondary">CAPTURAR SELFIE DE PRESENÇA</button><div id="selfiePreview" class="selfie-preview hidden"></div><button id="confirmParticipation" class="detail-primary" disabled>CONFIRMAR PARTICIPAÇÃO</button></section></div>
-    <div id="detail-perfil" class="detail-pane"><section class="detail-card"><span class="micro">PERFIL</span><div class="profile-line"><div class="avatar">D</div><div><h2 id="profileName">DANI</h2><p id="profileMeta">DF-001 · AZUL</p></div></div><div class="profile-data"><div><span>CLASSE</span><b id="profileClass">ASSALTO</b></div><div><span>STATUS</span><b id="profileStatus">AGUARDANDO</b></div><div><span>RÁDIO</span><b id="profileRadio">CH 01</b></div></div></section></div>
+
+    <!-- IDENTIDADE -->
+    <section class="detail-card identity-detail">
+      <div class="detail-title">
+        <span>01</span>
+
+        <div>
+          <span class="micro">IDENTIDADE</span>
+          <strong id="homePlayerName">Daniel</strong>
+        </div>
+      </div>
+
+      <p id="homeIdentity">DF-001 · AZUL · ASSALTO</p>
+      <span class="ready-line">IDENTIDADE PREENCHIDA</span>
+    </section>
+
+    <!-- 3 ABAS -->
+    <div class="detail-tabs">
+      <button class="detail-tab active" data-detail="inicio">INÍCIO</button>
+      <button class="detail-tab" data-detail="briefing">BRIEFING</button>
+      <button class="detail-tab" data-detail="perfil">PERFIL</button>
+    </div>
+
+    <!-- INÍCIO -->
+    <div id="detail-inicio" class="detail-pane active">
+      <section class="detail-card">
+        <span class="micro">PREPARAÇÃO</span>
+        <h2>Confirmar participação</h2>
+
+        <p class="muted">
+          Leia o briefing configurado pelo organizador, registre a presença
+          e aguarde o início da partida.
+        </p>
+
+        <div class="prep-line">
+          <span>01</span>
+          <b>Briefing</b>
+        </div>
+
+        <div class="prep-line">
+          <span>02</span>
+          <b>Registro de presença</b>
+        </div>
+
+        <div class="prep-line">
+          <span>03</span>
+          <b>Confirmação</b>
+        </div>
+
+        <button class="detail-primary" data-detail="briefing">
+          ABRIR BRIEFING
+        </button>
+      </section>
+    </div>
+
+    <!-- BRIEFING -->
+    <div id="detail-briefing" class="detail-pane">
+
+      <section class="detail-card">
+
+        <span class="micro">BRIEFING DO ORGANIZADOR</span>
+
+        <h2 id="briefingTitle">Briefing da Operação</h2>
+
+        <div id="briefingBody" class="briefing-readonly"></div>
+
+        <label class="ack">
+          <input id="briefingAck" type="checkbox">
+          <span>Recebi, ciente das regras do briefing.</span>
+        </label>
+
+        <p class="responsibility">
+          Ao confirmar, você registra ciência do conteúdo apresentado.
+        </p>
+
+        <button id="selfieButton" class="detail-secondary">
+          REGISTRAR PRESENÇA
+        </button>
+
+        <div id="selfiePreview" class="selfie-preview hidden"></div>
+
+        <button id="confirmParticipation" class="detail-primary" disabled>
+          CONFIRMAR PARTICIPAÇÃO
+        </button>
+
+      </section>
+    </div>
+
+    <!-- PERFIL -->
+    <div id="detail-perfil" class="detail-pane">
+
+      <section class="detail-card">
+
+        <span class="micro">PERFIL</span>
+
+        <div class="profile-line">
+          <div class="avatar">D</div>
+
+          <div>
+            <h2 id="profileName">Daniel</h2>
+            <p id="profileMeta">DF-001 · AZUL</p>
+          </div>
+        </div>
+
+        <div class="profile-data">
+          <div>
+            <span>CLASSE</span>
+            <b id="profileClass">ASSALTO</b>
+          </div>
+
+          <div>
+            <span>STATUS</span>
+            <b id="profileStatus">AGUARDANDO</b>
+          </div>
+
+          <div>
+            <span>RÁDIO</span>
+            <b id="profileRadio">CH 01</b>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
   </div>
 </section>
-<section id="screen-waiting" class="player-view waiting-view"><div class="waiting-box"><span class="micro">PARTICIPAÇÃO CONFIRMADA</span><h1>AGUARDANDO INÍCIO</h1><p id="waitingMatchStatus">AGUARDANDO ORGANIZADOR</p></div></section>
-<section id="screen-organizer" class="organizer-view"><div class="org-header"><div><span class="micro">CENTRAL DO ORGANIZADOR</span><h1>Preparar partida</h1></div><button id="backToPlayer" class="mini-btn">MODO JOGADOR</button></div><div class="org-grid"><section class="org-panel"><span class="micro">CONFIGURAÇÃO</span><label>NOME<input id="orgMatchName" value="Operação Red Sand"></label><div class="org-two"><label>MAPA<select id="orgMap"><option>Complexo Industrial</option><option>Galpão Central</option><option>Área Externa</option></select></label><label>MODELO<select id="orgMode"><option>Simulação</option><option>Tecnológico</option><option>Arcade</option></select></label></div></section><section class="org-panel"><span class="micro">BRIEFING — EDITÁVEL PELO ORGANIZADOR</span><label>TÍTULO<input id="orgBriefingTitle" value="Briefing da Operação"></label><label>CONTEÚDO<textarea id="orgBriefingText">Objetivo, regras da partida, condições de participação e orientações gerais.</textarea></label><button id="saveBriefing" class="detail-primary">SALVAR</button></section><section class="org-panel"><span class="micro">MÓDULOS</span><div class="module-toggles"><button data-module="medical" class="module-toggle on">MÉDICO</button><button data-module="zone" class="module-toggle on">ZONA DE EVENTO</button><button data-module="score" class="module-toggle">PONTUAÇÃO</button><button data-module="tracking" class="module-toggle">RASTREAMENTO</button><button data-module="objectives" class="module-toggle on">OBJETIVOS</button><button data-module="events" class="module-toggle">EVENTOS ESPECIAIS</button></div></section><section class="org-panel"><span class="micro">PRESENÇA / PARTIDA</span><div class="org-status-row"><span>DANI</span><b id="orgAttendance">AGUARDANDO</b></div><div class="org-status-row"><span>JOGADORES</span><b id="orgReadyCount">0/1</b></div><button id="startMatchButton" class="detail-primary">INICIAR PARTIDA</button><button id="resetDemoButton" class="detail-secondary">RESETAR DEMO</button></section></div></section>
+
+<!-- =========================================================
+     TELA DE ESPERA
+     ========================================================= -->
+<section id="screen-waiting" class="player-view waiting-view">
+
+  <div class="waiting-box">
+    <span class="micro">PARTICIPAÇÃO CONFIRMADA</span>
+    <h1>AGUARDANDO INÍCIO</h1>
+    <p id="waitingMatchStatus">AGUARDANDO ORGANIZADOR</p>
+  </div>
+
+</section>
+
+<!-- =========================================================
+     CENTRAL DO ORGANIZADOR
+     ========================================================= -->
+<section id="screen-organizer" class="organizer-view">
+
+  <div class="org-header">
+
+    <div>
+      <span class="micro">CENTRAL DO ORGANIZADOR</span>
+      <h1>Preparar partida</h1>
+    </div>
+
+    <span id="organizerAuthority" class="authority-badge">
+      CONTROLE AUTORIZADO
+    </span>
+  </div>
+
+  <!-- CONFIGURAÇÃO -->
+  <section class="org-section">
+    <div class="org-section-head">
+      <div>
+        <span class="micro">01</span>
+        <h2>CONFIGURAÇÃO</h2>
+      </div>
+    </div>
+
+    <div class="org-fields">
+
+      <label>
+        NOME
+        <input id="orgMatchName" value="Operação Red Sand">
+      </label>
+
+      <label>
+        MAPA
+        <select id="orgMap">
+          <option>Complexo Industrial</option>
+          <option>Galpão Central</option>
+          <option>Área Externa</option>
+        </select>
+      </label>
+
+      <label>
+        MODELO
+        <select id="orgMode">
+          <option>Simulação</option>
+          <option>Tecnológico</option>
+          <option>Arcade</option>
+        </select>
+      </label>
+
+    </div>
+  </section>
+
+  <!-- BRIEFING -->
+  <section class="org-section">
+
+    <div class="org-section-head">
+      <div>
+        <span class="micro">02</span>
+        <h2>BRIEFING</h2>
+      </div>
+    </div>
+
+    <label>
+      TÍTULO
+      <input id="orgBriefingTitle" value="Briefing da Operação">
+    </label>
+
+    <label>
+      CONTEÚDO
+      <textarea id="orgBriefingText">Objetivo, regras da partida, condições de participação e orientações gerais.</textarea>
+    </label>
+
+    <button id="saveBriefing" class="detail-primary">
+      SALVAR CONFIGURAÇÃO
+    </button>
+
+  </section>
+
+  <!-- MÓDULOS -->
+  <section class="org-section">
+
+    <div class="org-section-head">
+      <div>
+        <span class="micro">03</span>
+        <h2>MÓDULOS</h2>
+      </div>
+
+      <small>ON / OFF</small>
+    </div>
+
+    <div class="module-toggles">
+      <button data-module="medical" class="module-toggle on">MÉDICO</button>
+      <button data-module="zone" class="module-toggle on">ZONA DE EVENTO</button>
+      <button data-module="score" class="module-toggle">PONTUAÇÃO</button>
+      <button data-module="tracking" class="module-toggle">RASTREAMENTO</button>
+      <button data-module="objectives" class="module-toggle on">OBJETIVOS</button>
+      <button data-module="events" class="module-toggle">EVENTOS ESPECIAIS</button>
+    </div>
+
+  </section>
+
+  <!-- PRESENÇA -->
+  <section class="org-section">
+
+    <div class="org-section-head">
+      <div>
+        <span class="micro">04</span>
+        <h2>PRESENÇA / PARTIDA</h2>
+      </div>
+    </div>
+
+    <div class="org-status-row">
+      <span>Daniel</span>
+      <b id="orgAttendance">AGUARDANDO</b>
+    </div>
+
+    <div class="org-status-row">
+      <span>JOGADORES</span>
+      <b id="orgReadyCount">0/1</b>
+    </div>
+
+    <div class="org-action-row">
+
+      <button id="startMatchButton" class="detail-primary">
+        INICIAR PARTIDA
+      </button>
+
+      <button id="endMatchButton" class="detail-danger hidden">
+        ENCERRAR PARTIDA
+      </button>
+
+      <button id="resetDemoButton" class="detail-secondary">
+        RESETAR DEMO
+      </button>
+
+    </div>
+
+  </section>
+
+  <!-- SOLICITAÇÕES -->
+  <section class="org-section">
+
+    <div class="org-section-head">
+      <div>
+        <span class="micro">05</span>
+        <h2>SOLICITAÇÕES</h2>
+      </div>
+    </div>
+
+    <div id="organizerRequests" class="request-list">
+      <div class="empty-state">Nenhuma solicitação pendente.</div>
+    </div>
+
+  </section>
+
+</section>
+
 </main>
+
+<!-- =========================================================
+     MODAIS / TOASTS
+     ========================================================= -->
 <div id="modalRoot"></div>
+
+<!-- =========================================================
+     DEV CONTROLS
+     ========================================================= -->
+<div id="devRoot"></div>
+
 <script src="app.js" defer></script>
 </body>
-</html>
+    </html>
