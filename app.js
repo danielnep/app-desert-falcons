@@ -1,43 +1,1392 @@
-const KEY='df_game_terminal_v5';let state=load();let timer=null,unlockTimer=null,unlockStart=0,inactivityTimer=null,watchId=null,radioRecorder=null,radioStream=null,radioChunks=[],pttDown=false;const DEMO_CENTER={lat:-19.9167,lng:-43.9345};
-function initial(){return{view:'tactical',role:'player',detail:'inicio',match:{name:'Operação Red Sand',status:'aguardando',seconds:0,map:'Complexo Industrial',mode:'Simulação'},organizer:{briefingTitle:'Briefing da Operação',briefingText:'Objetivo, regras da partida, condições de participação e orientações gerais.'},player:{id:'DF-001',name:'DANI',team:'azul',class:'Assalto',status:'aguardando',radio:true,channel:'01',radioVolume:70,briefingAck:false,participation:false,selfie:null,locked:true},gps:{lat:null,lng:null,accuracy:null,ready:false},objectives:{alfa:{name:'Setor Alfa',control:'neutro'},bravo:{name:'Setor Bravo',control:'neutro'}},modules:{medical:true,zone:true,score:false,tracking:false,objectives:true,events:false},events:[]}}
-function load(){try{const x=JSON.parse(localStorage.getItem(KEY));return x?merge(initial(),x):initial()}catch{return initial()}}
-function merge(a,b){return{...a,...b,match:{...a.match,...(b.match||{})},organizer:{...a.organizer,...(b.organizer||{})},player:{...a.player,...(b.player||{})},gps:{...a.gps,...(b.gps||{})},modules:{...a.modules,...(b.modules||{})},objectives:{...a.objectives,...(b.objectives||{})},events:Array.isArray(b.events)?b.events:[]}}
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
-function q(id){return document.getElementById(id)}
-function toast(text){const x=document.createElement('div');x.className='app-toast';x.textContent=text;document.body.appendChild(x);setTimeout(()=>x.remove(),2200)}
-function fmt(sec){return[Math.floor(sec/3600),Math.floor(sec/60)%60,sec%60].map(x=>String(x).padStart(2,'0')).join(':')}
-function activatePlayerView(view){q('screen-tactical')?.classList.toggle('active',view==='tactical');q('screen-details')?.classList.toggle('active',view==='details');document.querySelectorAll('.player-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===view))}
-function setPlayerView(view){if(state.role!=='player')return;if(state.match.status==='andamento'&&state.player.participation&&view==='details'){toast('Detalhes indisponíveis durante a partida.');activatePlayerView('tactical');return}state.view=view;activatePlayerView(view);save();render()}
-function setDetail(detail){state.detail=detail;document.querySelectorAll('.detail-tab').forEach(b=>b.classList.toggle('active',b.dataset.detail===detail));document.querySelectorAll('.detail-pane').forEach(p=>p.classList.toggle('active',p.id==='detail-'+detail));save()}
-function show(view){if(view==='home')view='details';if(view==='tactical'||view==='details'){setPlayerView(view);return}if(view==='organizer'){state.role='organizer';state.view='organizer';save();render();return}if(view==='waiting'){state.view='waiting';state.role='player';q('screen-waiting')?.classList.add('active');q('screen-tactical')?.classList.remove('active');q('screen-details')?.classList.remove('active');save();render()}}
-function startTimer(){clearInterval(timer);timer=setInterval(()=>{if(state.match.status==='andamento'){state.match.seconds++;if(q('gameClock'))q('gameClock').textContent=fmt(state.match.seconds);save()}},1000)}
-function briefingChanged(){state.player.briefingAck=!!q('briefingAck')?.checked;save();updateParticipationButton()}
-function updateParticipationButton(){const b=q('confirmParticipation');if(b)b.disabled=!(state.player.briefingAck&&state.player.selfie)}
-async function captureSelfie(){const preview=q('selfiePreview');try{if(!navigator.mediaDevices?.getUserMedia)throw new Error();const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'},audio:false});const video=document.createElement('video');video.autoplay=true;video.playsInline=true;video.srcObject=stream;preview.classList.remove('hidden');preview.innerHTML='';preview.appendChild(video);const snap=document.createElement('button');snap.className='detail-primary';snap.textContent='CAPTURAR';preview.appendChild(snap);snap.onclick=()=>{const canvas=document.createElement('canvas');canvas.width=600;canvas.height=600;const ctx=canvas.getContext('2d'),s=Math.min(video.videoWidth,video.videoHeight);ctx.drawImage(video,(video.videoWidth-s)/2,(video.videoHeight-s)/2,s,s,0,0,600,600);const now=new Date();ctx.fillStyle='rgba(0,0,0,.72)';ctx.fillRect(0,530,600,70);ctx.fillStyle='#fff';ctx.font='16px monospace';ctx.fillText(now.toLocaleString('pt-BR'),15,555);ctx.font='13px monospace';ctx.fillText(state.gps.ready?`${state.gps.lat.toFixed(5)}, ${state.gps.lng.toFixed(5)}`:'LOCALIZAÇÃO NÃO DISPONÍVEL',15,578);state.player.selfie={data:canvas.toDataURL('image/jpeg',.78),timestamp:now.toISOString(),lat:state.gps.lat,lng:state.gps.lng};stream.getTracks().forEach(t=>t.stop());preview.innerHTML=`<img src="${state.player.selfie.data}" alt="Registro de presença"><span>REGISTRO CAPTURADO · ${now.toLocaleTimeString('pt-BR',{hour12:false})}</span>`;save();updateParticipationButton()}}catch{toast('Câmera indisponível ou permissão negada.')}}
-function confirmParticipation(){if(!(state.player.briefingAck&&state.player.selfie)){toast('Leia o briefing e registre a selfie antes de confirmar.');return}state.player.participation=true;state.player.status='aguardando';save();state.view='waiting';state.role='player';q('screen-waiting')?.classList.add('active');q('screen-tactical')?.classList.remove('active');q('screen-details')?.classList.remove('active');startGps();render()}
-function startMatch(){state.match.status='andamento';state.match.seconds=0;state.player.status=state.player.participation?'ativo':'aguardando';save();if(state.player.participation){state.role='player';state.view='tactical';lockPanel();startGps()}else{state.role='organizer';state.view='organizer'}render()}
-function saveOrganizer(){const name=q('orgMatchName')?.value.trim(),map=q('orgMap')?.value,mode=q('orgMode')?.value,title=q('orgBriefingTitle')?.value.trim(),text=q('orgBriefingText')?.value.trim();if(name)state.match.name=name;if(map)state.match.map=map;if(mode)state.match.mode=mode;if(title)state.organizer.briefingTitle=title;if(text)state.organizer.briefingText=text;save();render();toast('Configuração salva.')}
-function toggleRadio(){state.player.radio=!state.player.radio;save();render()}
-function setChannel(v){state.player.channel=v;save();render()}
-function setVolume(v){state.player.radioVolume=Number(v);save()}
-async function startPtt(){if(!state.player.radio){toast('Rádio desligado.');return}if(pttDown)return;pttDown=true;q('radioPtt')?.classList.add('transmitting');if(q('radioPtt'))q('radioPtt').textContent='TRANSMITINDO…';if(q('radioTx'))q('radioTx').textContent='TRANSMITINDO';try{if(navigator.mediaDevices?.getUserMedia&&window.MediaRecorder){radioStream=await navigator.mediaDevices.getUserMedia({audio:true});radioChunks=[];radioRecorder=new MediaRecorder(radioStream);radioRecorder.ondataavailable=e=>e.data.size&&radioChunks.push(e.data);radioRecorder.onstop=()=>{radioStream?.getTracks().forEach(t=>t.stop());radioStream=null;radioRecorder=null};radioRecorder.start()}}catch{}}
-function stopPtt(){if(!pttDown)return;pttDown=false;if(radioRecorder?.state==='recording')radioRecorder.stop();radioStream?.getTracks().forEach(t=>t.stop());radioStream=null;radioRecorder=null;if(q('radioPtt')){q('radioPtt').classList.remove('transmitting');q('radioPtt').textContent='SEGURE PARA FALAR'}if(q('radioTx'))q('radioTx').textContent='PRONTO'}
-function lockPanel(){state.player.locked=true;q('touchGuard')?.classList.add('visible');q('manualLock')?.classList.add('hidden');save();resetInactivity()}
-function unlockPanel(){state.player.locked=false;q('touchGuard')?.classList.remove('visible');q('manualLock')?.classList.remove('hidden');save();resetInactivity()}
-function initTouchGuard(){const guard=q('touchGuard');if(!guard)return;const begin=e=>{if(state.match.status!=='andamento')return;e.preventDefault();unlockStart=performance.now();const bar=guard.querySelector('.unlock-track i');clearInterval(unlockTimer);unlockTimer=setInterval(()=>{const p=Math.min(100,(performance.now()-unlockStart)/1200*100);if(bar)bar.style.width=p+'%';if(p>=100){clearInterval(unlockTimer);unlockPanel();navigator.vibrate?.(25)}},25)};const cancel=()=>{clearInterval(unlockTimer);const bar=guard.querySelector('.unlock-track i');if(bar)bar.style.width='0'};guard.addEventListener('pointerdown',begin);['pointerup','pointercancel','pointerleave'].forEach(e=>guard.addEventListener(e,cancel))}
-function manualLock(){if(state.match.status==='andamento')lockPanel()}
-function resetInactivity(){clearTimeout(inactivityTimer);if(state.match.status!=='andamento'||state.player.locked)return;inactivityTimer=setTimeout(lockPanel,30000)}
-function startGps(){if(!navigator.geolocation)return;clearWatch();watchId=navigator.geolocation.watchPosition(pos=>{state.gps={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,ready:true};save();renderGps();positionPlayerOnFictionalMap()},()=>{state.gps.ready=false;renderGps()},{enableHighAccuracy:true,maximumAge:5000,timeout:10000})}
-function clearWatch(){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}}
-function renderGps(){const s=q('gpsStatus'),c=q('gpsCoords'),a=q('gpsAccuracy');if(!s||!c||!a)return;if(state.gps.ready){s.textContent='● GPS ATIVO';c.textContent=`${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)}`;a.textContent=`PRECISÃO ±${Math.round(state.gps.accuracy)} M`}else{s.textContent='● GPS AGUARDANDO';c.textContent='LOCALIZAÇÃO DEMO';a.textContent='PRECISÃO —'}}
-function positionPlayerOnFictionalMap(){const m=q('playerMapMarker');if(!m)return;const lat=state.gps.ready?state.gps.lat:DEMO_CENTER.lat,lng=state.gps.ready?state.gps.lng:DEMO_CENTER.lng;const dx=Math.max(-1,Math.min(1,(lng-DEMO_CENTER.lng)*700)),dy=Math.max(-1,Math.min(1,(lat-DEMO_CENTER.lat)*700));m.style.left=`${50+dx*24}%`;m.style.top=`${52-dy*24}%`}
-function centerMap(){positionPlayerOnFictionalMap();const m=q('playerMapMarker');m?.animate([{transform:'translate(-50%,-50%) scale(1)'},{transform:'translate(-50%,-50%) scale(1.25)'},{transform:'translate(-50%,-50%) scale(1)'}],{duration:450})}
-function openInstructions(){modal('BRIEFING E REGRAS',`<div class="rule-card"><b>${state.organizer.briefingTitle}</b><p>${state.organizer.briefingText}</p></div><button class="detail-primary" onclick="closeModal()">FECHAR</button>`)}
-function modal(title,body){closeModal();q('modalRoot').innerHTML=`<div class="modal-backdrop" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="modal-head"><h2>${title}</h2><button onclick="closeModal()">✕</button></div><div class="modal-body">${body}</div></div></div>`}
-function closeModal(){stopPtt();q('modalRoot').innerHTML=''}
-function renderBriefing(){const t=q('briefingTitle'),b=q('briefingBody');if(t)t.textContent=state.organizer.briefingTitle;if(b)b.innerHTML=`<p><strong>${state.match.name}</strong> · ${state.match.map} · ${state.match.mode}</p><p style="margin-top:6px">${state.organizer.briefingText}</p>`}
-function renderOrganizer(){if(!q('orgMatchName'))return;q('orgMatchName').value=state.match.name;q('orgMap').value=state.match.map;q('orgMode').value=state.match.mode;q('orgBriefingTitle').value=state.organizer.briefingTitle;q('orgBriefingText').value=state.organizer.briefingText;q('orgAttendance').textContent=state.player.participation?'CONFIRMADO':'AGUARDANDO';q('orgReadyCount').textContent=state.player.participation?'1/1':'0/1';document.querySelectorAll('.module-toggle').forEach(b=>b.classList.toggle('on',!!state.modules[b.dataset.module]))}
-function render(){q('headerRole').textContent=state.role==='organizer'?'ORGANIZADOR':'JOGADOR';q('headerSubtitle').textContent=state.role==='organizer'?'COMMAND CENTER':'PLAYER TERMINAL';q('headerMatch').textContent=state.match.status==='andamento'?'EM ANDAMENTO':state.player.participation?'AGUARDANDO':'PREPARAÇÃO';q('roleToggle').textContent=state.role==='organizer'?'MODO JOGADOR':'ORGANIZADOR';q('homePlayerName').textContent=state.player.name;q('homeIdentity').textContent=`${state.player.id} · ${state.player.team.toUpperCase()} · ${state.player.class.toUpperCase()}`;q('profileName').textContent=state.player.name;q('profileMeta').textContent=`${state.player.id} · ${state.player.team.toUpperCase()}`;q('profileClass').textContent=state.player.class.toUpperCase();q('profileStatus').textContent=state.player.status.toUpperCase();q('profileRadio').textContent=state.player.radio?`CH ${state.player.channel}`:'DESLIGADO';if(q('briefingAck'))q('briefingAck').checked=!!state.player.briefingAck;updateParticipationButton();q('tacticalMatch').textContent=state.match.name.toUpperCase();q('tacticalState').textContent=state.player.status==='ativo'?'ATIVO':'AGUARDANDO';q('radioStatus').textContent=state.player.radio?`LIGADO · CH ${state.player.channel}`:'DESLIGADO';q('radioPower').textContent=state.player.radio?'DESLIGAR':'LIGAR';q('radioChannel').value=state.player.channel;q('radioVolume').value=state.player.radioVolume;q('playerStateTitle').textContent=state.player.status==='ativo'?'ATIVO':'AGUARDANDO';q('playerStateDesc').textContent=state.match.status==='andamento'?'Partida em andamento.':'Aguardando início.';q('missionProgress').style.width=(Object.values(state.objectives).filter(o=>o.control==='azul').length/2*100)+'%';q('missionText').textContent=`${Object.values(state.objectives).filter(o=>o.control!=='neutro').length} de 2 setores registrados`;q('gameClock').textContent=fmt(state.match.seconds);renderGps();positionPlayerOnFictionalMap();renderBriefing();renderOrganizer();const org=state.role==='organizer';q('playerNav').style.display=org?'none':'grid';q('screen-organizer').style.display=org?'block':'none';if(org){q('screen-tactical')?.classList.remove('active');q('screen-details')?.classList.remove('active');q('screen-waiting')?.classList.remove('active');}else{q('screen-organizer')?.style.removeProperty('display');q('screen-waiting')?.classList.remove('active');activatePlayerView(state.view==='details'?'details':'tactical');}}
-function resetDemo(){clearWatch();stopPtt();clearInterval(timer);localStorage.removeItem(KEY);state=initial();save();startTimer();render();toast('Demonstração resetada.')}
-function bind(){document.querySelectorAll('.player-nav-btn').forEach(b=>b.addEventListener('click',()=>setPlayerView(b.dataset.view)));document.querySelectorAll('.detail-tab').forEach(b=>b.addEventListener('click',()=>setDetail(b.dataset.detail)));document.querySelectorAll('[data-detail]:not(.detail-tab)').forEach(b=>b.addEventListener('click',()=>setDetail(b.dataset.detail)));q('roleToggle')?.addEventListener('click',()=>{state.role=state.role==='organizer'?'player':'organizer';state.view=state.role==='organizer'?'organizer':'tactical';save();render()});q('backToPlayer')?.addEventListener('click',()=>{state.role='player';state.view='tactical';save();render()});q('briefingAck')?.addEventListener('change',briefingChanged);q('selfieButton')?.addEventListener('click',captureSelfie);q('confirmParticipation')?.addEventListener('click',confirmParticipation);q('radioPower')?.addEventListener('click',toggleRadio);q('radioChannel')?.addEventListener('change',e=>setChannel(e.target.value));q('radioVolume')?.addEventListener('input',e=>setVolume(e.target.value));q('radioPtt')?.addEventListener('pointerdown',startPtt);['pointerup','pointercancel','pointerleave'].forEach(e=>q('radioPtt')?.addEventListener(e,stopPtt));q('mapCenter')?.addEventListener('click',centerMap);q('instructionsButton')?.addEventListener('click',openInstructions);q('hitButton')?.addEventListener('click',()=>toast('Evento de demonstração lançado.'));q('manualLock')?.addEventListener('click',manualLock);q('saveBriefing')?.addEventListener('click',saveOrganizer);q('startMatchButton')?.addEventListener('click',startMatch);q('resetDemoButton')?.addEventListener('click',resetDemo);document.querySelectorAll('.module-toggle').forEach(b=>b.addEventListener('click',()=>{const k=b.dataset.module;state.modules[k]=!state.modules[k];save();renderOrganizer()}));initTouchGuard();document.addEventListener('pointerdown',()=>{if(state.view==='tactical'&&!state.player.locked)resetInactivity()},{passive:true})}
-document.addEventListener('DOMContentLoaded',()=>{bind();startTimer();render();if(state.player.participation)startGps()});
+/* =========================================================
+   DESERT FALCONS — APP CORE
+   ========================================================= */
+
+const KEY = 'df_game_terminal_v6';
+
+let state = load();
+
+let timer = null;
+let unlockTimer = null;
+let unlockStart = 0;
+let inactivityTimer = null;
+let watchId = null;
+
+let radioRecorder = null;
+let radioStream = null;
+let radioChunks = [];
+let pttDown = false;
+
+const DEMO_CENTER = {
+  lat: -19.9167,
+  lng: -43.9345
+};
+
+/* =========================================================
+   ESTADO
+   ========================================================= */
+
+function initial(){
+  return {
+    screen:'tactical',
+
+    role:'player',
+
+    dev:{
+      enabled:false
+    },
+
+    match:{
+      name:'Operação Red Sand',
+      status:'aguardando',
+      seconds:0,
+      map:'Complexo Industrial',
+      mode:'Simulação'
+    },
+
+    organizer:{
+      briefingTitle:'Briefing da Operação',
+      briefingText:'Objetivo, regras da partida, condições de participação e orientações gerais.'
+    },
+
+    player:{
+      id:'DF-001',
+      name:'Daniel',
+      team:'azul',
+      class:'Assalto',
+      status:'aguardando',
+      radio:true,
+      channel:'01',
+      radioVolume:70,
+      briefingAck:false,
+      participation:false,
+      selfie:null,
+      locked:true
+    },
+
+    gps:{
+      lat:null,
+      lng:null,
+      accuracy:null,
+      ready:false
+    },
+
+    objectives:{
+      alfa:{name:'Setor Alfa',control:'neutro'},
+      bravo:{name:'Setor Bravo',control:'neutro'}
+    },
+
+    events:[]
+  };
+}
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(!raw) return initial();
+
+    return merge(initial(), JSON.parse(raw));
+  }catch{
+    return initial();
+  }
+}
+
+function merge(a,b){
+  return {
+    ...a,
+    ...b,
+
+    dev:{
+      ...a.dev,
+      ...(b.dev || {})
+    },
+
+    match:{
+      ...a.match,
+      ...(b.match || {})
+    },
+
+    organizer:{
+      ...a.organizer,
+      ...(b.organizer || {})
+    },
+
+    player:{
+      ...a.player,
+      ...(b.player || {})
+    },
+
+    gps:{
+      ...a.gps,
+      ...(b.gps || {})
+    },
+
+    objectives:{
+      ...a.objectives,
+      ...(b.objectives || {})
+    },
+
+    events:Array.isArray(b.events) ? b.events : []
+  };
+}
+
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(state));
+  }catch{}
+}
+
+/* =========================================================
+   UTILITÁRIOS
+   ========================================================= */
+
+function q(id){
+  return document.getElementById(id);
+}
+
+function fmt(sec){
+  return [
+    Math.floor(sec / 3600),
+    Math.floor(sec / 60) % 60,
+    sec % 60
+  ]
+  .map(x => String(x).padStart(2,'0'))
+  .join(':');
+}
+
+function toast(text){
+  const x = document.createElement('div');
+
+  x.className = 'app-toast';
+  x.textContent = text;
+
+  x.style.cssText = `
+    position:fixed;
+    left:50%;
+    bottom:18px;
+    transform:translateX(-50%);
+    z-index:9999;
+    padding:10px 14px;
+    background:#222;
+    border:1px solid #555;
+    color:#fff;
+    font-size:10px;
+  `;
+
+  document.body.appendChild(x);
+
+  setTimeout(() => x.remove(), 2200);
+}
+
+/* =========================================================
+   NAVEGAÇÃO — CADA ABERTURA É UMA TELA
+   ========================================================= */
+
+function showScreen(screen){
+
+  document.querySelectorAll('.app-screen').forEach(s => {
+    s.classList.remove('active');
+  });
+
+  const target = q(`screen-${screen}`);
+
+  if(target){
+    target.classList.add('active');
+    state.screen = screen;
+    save();
+  }
+
+  render();
+}
+
+function goBack(screen='tactical'){
+  showScreen(screen);
+}
+
+/* =========================================================
+   TIMER
+   ========================================================= */
+
+function startTimer(){
+
+  clearInterval(timer);
+
+  timer = setInterval(() => {
+
+    if(state.match.status !== 'andamento'){
+      return;
+    }
+
+    state.match.seconds++;
+
+    if(q('gameClock')){
+      q('gameClock').textContent = fmt(state.match.seconds);
+    }
+
+    save();
+
+  },1000);
+}
+
+/* =========================================================
+   BLOQUEIO DO PAINEL
+   ========================================================= */
+
+function lockPanel(){
+
+  state.player.locked = true;
+
+  q('touchGuard')?.classList.add('visible');
+  q('manualLock')?.classList.remove('hidden');
+
+  save();
+  resetInactivity();
+}
+
+function unlockPanel(){
+
+  state.player.locked = false;
+
+  q('touchGuard')?.classList.remove('visible');
+  q('manualLock')?.classList.remove('hidden');
+
+  save();
+  resetInactivity();
+}
+
+function resetInactivity(){
+
+  clearTimeout(inactivityTimer);
+
+  if(
+    state.match.status !== 'andamento' ||
+    state.player.locked
+  ){
+    return;
+  }
+
+  inactivityTimer = setTimeout(() => {
+    lockPanel();
+  },30000);
+}
+
+function initTouchGuard(){
+
+  const guard = q('touchGuard');
+
+  if(!guard) return;
+
+  const begin = e => {
+
+    if(state.match.status !== 'andamento'){
+      return;
+    }
+
+    e.preventDefault();
+
+    unlockStart = performance.now();
+
+    const bar = guard.querySelector('.unlock-track i');
+
+    clearInterval(unlockTimer);
+
+    unlockTimer = setInterval(() => {
+
+      const progress =
+        Math.min(
+          100,
+          ((performance.now() - unlockStart) / 1200) * 100
+        );
+
+      if(bar){
+        bar.style.width = `${progress}%`;
+      }
+
+      if(progress >= 100){
+
+        clearInterval(unlockTimer);
+
+        unlockPanel();
+
+        navigator.vibrate?.(25);
+      }
+
+    },25);
+  };
+
+  const cancel = () => {
+
+    clearInterval(unlockTimer);
+
+    const bar = guard.querySelector('.unlock-track i');
+
+    if(bar){
+      bar.style.width = '0';
+    }
+  };
+
+  guard.addEventListener('pointerdown',begin);
+
+  ['pointerup','pointercancel','pointerleave']
+    .forEach(event => {
+      guard.addEventListener(event,cancel);
+    });
+}
+
+function manualLock(){
+
+  if(state.match.status === 'andamento'){
+    lockPanel();
+  }
+}
+
+/* =========================================================
+   GPS
+   ========================================================= */
+
+function startGps(){
+
+  if(!navigator.geolocation){
+    return;
+  }
+
+  clearWatch();
+
+  watchId = navigator.geolocation.watchPosition(
+
+    pos => {
+
+      state.gps = {
+        lat:pos.coords.latitude,
+        lng:pos.coords.longitude,
+        accuracy:pos.coords.accuracy,
+        ready:true
+      };
+
+      save();
+
+      renderGps();
+      positionPlayerOnFictionalMap();
+    },
+
+    () => {
+
+      state.gps.ready = false;
+
+      renderGps();
+    },
+
+    {
+      enableHighAccuracy:true,
+      maximumAge:5000,
+      timeout:10000
+    }
+  );
+}
+
+function clearWatch(){
+
+  if(watchId !== null){
+
+    navigator.geolocation.clearWatch(watchId);
+
+    watchId = null;
+  }
+}
+
+function renderGps(){
+
+  const s = q('gpsStatus');
+  const c = q('gpsCoords');
+  const a = q('gpsAccuracy');
+
+  if(!s || !c || !a){
+    return;
+  }
+
+  if(state.gps.ready){
+
+    s.textContent = '● GPS ATIVO';
+
+    c.textContent =
+      `${state.gps.lat.toFixed(6)}, ${state.gps.lng.toFixed(6)}`;
+
+    a.textContent =
+      `PRECISÃO ±${Math.round(state.gps.accuracy)} M`;
+
+  }else{
+
+    s.textContent = '● GPS AGUARDANDO';
+    c.textContent = 'LOCALIZAÇÃO DEMO';
+    a.textContent = 'PRECISÃO —';
+  }
+}
+
+function positionPlayerOnFictionalMap(){
+
+  const marker = q('playerMapMarker');
+
+  if(!marker) return;
+
+  const lat =
+    state.gps.ready
+      ? state.gps.lat
+      : DEMO_CENTER.lat;
+
+  const lng =
+    state.gps.ready
+      ? state.gps.lng
+      : DEMO_CENTER.lng;
+
+  const dx = Math.max(
+    -1,
+    Math.min(
+      1,
+      (lng - DEMO_CENTER.lng) * 700
+    )
+  );
+
+  const dy = Math.max(
+    -1,
+    Math.min(
+      1,
+      (lat - DEMO_CENTER.lat) * 700
+    )
+  );
+
+  marker.style.left = `${50 + dx * 24}%`;
+  marker.style.top = `${52 - dy * 24}%`;
+}
+
+function centerMap(){
+
+  positionPlayerOnFictionalMap();
+
+  const marker = q('playerMapMarker');
+
+  marker?.animate(
+    [
+      {
+        transform:'translate(-50%,-50%) scale(1)'
+      },
+      {
+        transform:'translate(-50%,-50%) scale(1.25)'
+      },
+      {
+        transform:'translate(-50%,-50%) scale(1)'
+      }
+    ],
+    {
+      duration:450
+    }
+  );
+}
+
+/* =========================================================
+   BRIEFING / PARTICIPAÇÃO
+   ========================================================= */
+
+function renderBriefing(){
+
+  const title = q('briefingTitle');
+  const body = q('briefingBody');
+
+  if(title){
+    title.textContent = state.organizer.briefingTitle;
+  }
+
+  if(body){
+
+    body.innerHTML = `
+      <p>
+        <strong>${state.match.name}</strong>
+      </p>
+
+      <p>
+        ${state.organizer.briefingText}
+      </p>
+
+      <p>
+        MAPA: ${state.match.map}
+      </p>
+
+      <p>
+        MODELO: ${state.match.mode}
+      </p>
+    `;
+  }
+}
+
+function briefingChanged(){
+
+  state.player.briefingAck =
+    !!q('briefingAck')?.checked;
+
+  save();
+
+  updateParticipationButton();
+}
+
+function updateParticipationButton(){
+
+  const button = q('confirmParticipation');
+
+  if(!button) return;
+
+  button.disabled = !(
+    state.player.briefingAck &&
+    state.player.selfie
+  );
+}
+
+/* =========================================================
+   SELFIE
+   ========================================================= */
+
+async function captureSelfie(){
+
+  const preview = q('selfiePreview');
+
+  try{
+
+    if(!navigator.mediaDevices?.getUserMedia){
+      throw new Error();
+    }
+
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        video:{
+          facingMode:'user'
+        },
+        audio:false
+      });
+
+    const video = document.createElement('video');
+
+    video.autoplay = true;
+    video.playsInline = true;
+    video.srcObject = stream;
+
+    preview.classList.remove('hidden');
+    preview.innerHTML = '';
+    preview.appendChild(video);
+
+    const snap = document.createElement('button');
+
+    snap.className = 'detail-primary';
+    snap.textContent = 'CAPTURAR';
+
+    preview.appendChild(snap);
+
+    snap.onclick = () => {
+
+      const canvas =
+        document.createElement('canvas');
+
+      canvas.width = 600;
+      canvas.height = 600;
+
+      const ctx = canvas.getContext('2d');
+
+      const s = Math.min(
+        video.videoWidth,
+        video.videoHeight
+      );
+
+      ctx.drawImage(
+        video,
+        (video.videoWidth - s) / 2,
+        (video.videoHeight - s) / 2,
+        s,
+        s,
+        0,
+        0,
+        600,
+        600
+      );
+
+      const now = new Date();
+
+      state.player.selfie = {
+        data:canvas.toDataURL('image/jpeg',.78),
+        timestamp:now.toISOString(),
+        lat:state.gps.lat,
+        lng:state.gps.lng
+      };
+
+      stream.getTracks().forEach(
+        t => t.stop()
+      );
+
+      preview.innerHTML = `
+        <img src="${state.player.selfie.data}" alt="Registro de presença">
+        <span>
+          REGISTRO CAPTURADO ·
+          ${now.toLocaleTimeString('pt-BR',{hour12:false})}
+        </span>
+      `;
+
+      save();
+
+      updateParticipationButton();
+    };
+
+  }catch{
+
+    toast('Câmera indisponível ou permissão negada.');
+  }
+}
+
+function confirmParticipation(){
+
+  if(!(
+    state.player.briefingAck &&
+    state.player.selfie
+  )){
+
+    toast(
+      'Leia o briefing e registre a selfie antes de confirmar.'
+    );
+
+    return;
+  }
+
+  state.player.participation = true;
+  state.player.status = 'aguardando';
+
+  save();
+
+  startGps();
+
+  showScreen('waiting');
+}
+
+/* =========================================================
+   PARTIDA
+   ========================================================= */
+
+function startMatch(){
+
+  state.match.status = 'andamento';
+  state.match.seconds = 0;
+
+  state.player.status =
+    state.player.participation
+      ? 'ativo'
+      : 'aguardando';
+
+  save();
+
+  if(state.player.participation){
+
+    state.screen = 'tactical';
+
+    state.player.locked = true;
+
+    startGps();
+    lockPanel();
+
+    showScreen('tactical');
+
+  }else{
+
+    toast('Nenhum jogador confirmou participação.');
+  }
+}
+
+/* =========================================================
+   ORGANIZADOR
+   ========================================================= */
+
+function saveOrganizer(){
+
+  const name =
+    q('orgMatchName')?.value.trim();
+
+  const map =
+    q('orgMap')?.value;
+
+  const mode =
+    q('orgMode')?.value;
+
+  const title =
+    q('orgBriefingTitle')?.value.trim();
+
+  const text =
+    q('orgBriefingText')?.value.trim();
+
+  if(name){
+    state.match.name = name;
+  }
+
+  if(map){
+    state.match.map = map;
+  }
+
+  if(mode){
+    state.match.mode = mode;
+  }
+
+  if(title){
+    state.organizer.briefingTitle = title;
+  }
+
+  if(text){
+    state.organizer.briefingText = text;
+  }
+
+  save();
+
+  render();
+
+  toast('Configuração salva.');
+}
+
+/* =========================================================
+   RÁDIO
+   ========================================================= */
+
+function toggleRadio(){
+
+  state.player.radio =
+    !state.player.radio;
+
+  save();
+
+  render();
+}
+
+function setChannel(value){
+
+  state.player.channel = value;
+
+  save();
+
+  render();
+}
+
+function setVolume(value){
+
+  state.player.radioVolume = Number(value);
+
+  save();
+}
+
+async function startPtt(){
+
+  if(!state.player.radio){
+
+    toast('Rádio desligado.');
+
+    return;
+  }
+
+  if(pttDown){
+    return;
+  }
+
+  pttDown = true;
+
+  q('radioPtt')
+    ?.classList.add('transmitting');
+
+  if(q('radioPtt')){
+    q('radioPtt').innerHTML =
+      '<span class="ptt-icon">●</span><strong>TRANSMITINDO…</strong>';
+  }
+
+  if(q('radioTx')){
+    q('radioTx').textContent =
+      'TRANSMITINDO';
+  }
+
+  try{
+
+    if(
+      navigator.mediaDevices?.getUserMedia &&
+      window.MediaRecorder
+    ){
+
+      radioStream =
+        await navigator.mediaDevices.getUserMedia({
+          audio:true
+        });
+
+      radioChunks = [];
+
+      radioRecorder =
+        new MediaRecorder(radioStream);
+
+      radioRecorder.ondataavailable =
+        event => {
+
+          if(event.data.size){
+            radioChunks.push(event.data);
+          }
+        };
+
+      radioRecorder.start();
+    }
+
+  }catch{}
+}
+
+function stopPtt(){
+
+  if(!pttDown){
+    return;
+  }
+
+  pttDown = false;
+
+  if(
+    radioRecorder &&
+    radioRecorder.state === 'recording'
+  ){
+    radioRecorder.stop();
+  }
+
+  radioStream?.getTracks().forEach(
+    track => track.stop()
+  );
+
+  radioStream = null;
+  radioRecorder = null;
+
+  q('radioPtt')
+    ?.classList.remove('transmitting');
+
+  if(q('radioPtt')){
+    q('radioPtt').innerHTML =
+      '<span class="ptt-icon">●</span><strong>SEGURE PARA FALAR</strong>';
+  }
+
+  if(q('radioTx')){
+    q('radioTx').textContent =
+      'PRONTO';
+  }
+}
+
+/* =========================================================
+   INSTRUÇÕES
+   ========================================================= */
+
+function openInstructions(){
+
+  showScreen('instructions');
+
+  const title = q('instructionsTitle');
+  const body = q('instructionsBody');
+
+  if(title){
+    title.textContent =
+      state.organizer.briefingTitle;
+  }
+
+  if(body){
+
+    body.innerHTML = `
+      <p>
+        <strong>${state.match.name}</strong>
+      </p>
+
+      <p>
+        ${state.organizer.briefingText}
+      </p>
+
+      <p>
+        <strong>MAPA:</strong>
+        ${state.match.map}
+      </p>
+
+      <p>
+        <strong>MODELO:</strong>
+        ${state.match.mode}
+      </p>
+    `;
+  }
+}
+
+/* =========================================================
+   DEV
+   ========================================================= */
+
+function openDev(){
+
+  showScreen('dev');
+}
+
+function toggleDev(){
+
+  state.dev.enabled =
+    !state.dev.enabled;
+
+  save();
+
+  render();
+}
+
+function setDevRole(role){
+
+  state.role = role;
+
+  save();
+
+  render();
+
+  if(role === 'organizer'){
+    showScreen('organizer');
+  }else{
+    showScreen('tactical');
+  }
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+
+function render(){
+
+  q('headerRole').textContent =
+    state.role === 'organizer'
+      ? 'ORGANIZADOR'
+      : 'JOGADOR';
+
+  q('headerSubtitle').textContent =
+    state.role === 'organizer'
+      ? 'COMMAND CENTER'
+      : 'PLAYER TERMINAL';
+
+  q('headerMatch').textContent =
+    state.match.status === 'andamento'
+      ? 'EM ANDAMENTO'
+      : state.player.participation
+        ? 'AGUARDANDO'
+        : 'PREPARAÇÃO';
+
+  q('devOpen').textContent =
+    state.dev.enabled
+      ? 'DEV ATIVO'
+      : 'MODO DEV';
+
+  q('tacticalMatch').textContent =
+    state.match.name.toUpperCase();
+
+  q('gameClock').textContent =
+    fmt(state.match.seconds);
+
+  q('homePlayerName').textContent =
+    state.player.name;
+
+  q('homeIdentity').textContent =
+    `${state.player.id} · ${state.player.team.toUpperCase()} · ${state.player.class.toUpperCase()}`;
+
+  q('profileName').textContent =
+    state.player.name;
+
+  q('profileMeta').textContent =
+    `${state.player.id} · ${state.player.team.toUpperCase()}`;
+
+  q('profileClass').textContent =
+    state.player.class.toUpperCase();
+
+  q('profileStatus').textContent =
+    state.player.status.toUpperCase();
+
+  q('profileRadio').textContent =
+    state.player.radio
+      ? `CH ${state.player.channel}`
+      : 'DESLIGADO';
+
+  q('tacticalState').textContent =
+    state.player.status === 'ativo'
+      ? 'ATIVO'
+      : 'AGUARDANDO';
+
+  q('playerStateTitle').textContent =
+    state.player.status === 'ativo'
+      ? 'ATIVO'
+      : 'AGUARDANDO';
+
+  q('playerStateDesc').textContent =
+    state.match.status === 'andamento'
+      ? 'Partida em andamento.'
+      : 'Aguardando início.';
+
+  q('radioStatus').textContent =
+    state.player.radio
+      ? `LIGADO · CH ${state.player.channel}`
+      : 'DESLIGADO';
+
+  q('radioPower').textContent =
+    state.player.radio
+      ? 'DESLIGAR'
+      : 'LIGAR';
+
+  q('radioChannel').value =
+    state.player.channel;
+
+  q('radioVolume').value =
+    state.player.radioVolume;
+
+  if(q('briefingAck')){
+    q('briefingAck').checked =
+      !!state.player.briefingAck;
+  }
+
+  updateParticipationButton();
+
+  renderGps();
+  renderBriefing();
+  renderDev();
+  renderOrganizer();
+
+  const controlled =
+    Object.values(state.objectives)
+      .filter(o => o.control === 'azul')
+      .length;
+
+  q('missionProgress').style.width =
+    `${controlled / 2 * 100}%`;
+
+  q('missionText').textContent =
+    `${Object.values(state.objectives).filter(o => o.control !== 'neutro').length} de 2 setores registrados`;
+
+  positionPlayerOnFictionalMap();
+
+  /* Tela atual */
+  document.querySelectorAll('.app-screen')
+    .forEach(screen => {
+      screen.classList.toggle(
+        'active',
+        screen.id === `screen-${state.screen}`
+      );
+    });
+
+  /* Modo DEV */
+  q('devOpen').style.display =
+    state.role === 'organizer'
+      ? 'none'
+      : 'block';
+
+  /* Trava */
+  if(state.match.status === 'andamento'){
+    if(state.player.locked){
+      q('touchGuard')
+        ?.classList.add('visible');
+    }
+  }
+}
+
+function renderDev(){
+
+  const enabled =
+    state.dev.enabled;
+
+  q('devStateText').textContent =
+    enabled
+      ? 'HABILITADO'
+      : 'DESABILITADO';
+
+  q('devStateDot')
+    ?.classList.toggle('enabled',enabled);
+
+  q('devToggle').textContent =
+    enabled
+      ? 'DESABILITAR DEV'
+      : 'HABILITAR DEV';
+
+  document.querySelectorAll('.role-option')
+    .forEach(button => {
+      button.classList.toggle(
+        'active',
+        button.dataset.role === state.role
+      );
+    });
+}
+
+function renderOrganizer(){
+
+  if(!q('orgMatchName')){
+    return;
+  }
+
+  q('orgMatchName').value =
+    state.match.name;
+
+  q('orgMap').value =
+    state.match.map;
+
+  q('orgMode').value =
+    state.match.mode;
+
+  q('orgBriefingTitle').value =
+    state.organizer.briefingTitle;
+
+  q('orgBriefingText').value =
+    state.organizer.briefingText;
+
+  q('orgAttendance').textContent =
+    state.player.participation
+      ? 'CONFIRMADO'
+      : 'AGUARDANDO';
+
+  q('orgReadyCount').textContent =
+    state.player.participation
+      ? '1/1'
+      : '0/1';
+}
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+function resetDemo(){
+
+  clearWatch();
+  stopPtt();
+  clearInterval(timer);
+
+  state = initial();
+
+  save();
+
+  startTimer();
+  render();
+
+  toast('Demonstração resetada.');
+}
+
+/* =========================================================
+   EVENTOS
+   ========================================================= */
+
+function bind(){
+
+  /* DEV */
+  q('devOpen')
+    ?.addEventListener('click',openDev);
+
+  q('devToggle')
+    ?.addEventListener('click',toggleDev);
+
+  document.querySelectorAll('.role-option')
+    .forEach(button => {
+
+      button.addEventListener(
+        'click',
+        () => {
+
+          if(!state.dev.enabled){
+
+            toast('Habilite o modo DEV primeiro.');
+
+            return;
+          }
+
+          setDevRole(button.dataset.role);
+        }
+      );
+    });
+
+  /* Voltar */
+  document.querySelectorAll('[data-back]')
+    .forEach(button => {
+
+      button.addEventListener(
+        'click',
+        () => {
+          goBack(button.dataset.back);
+        }
+      );
+    });
+
+  /* Detalhes */
+  document.querySelectorAll('.detail-tab')
+    .forEach(button => {
+
+      button.addEventListener(
+        'click',
+        () => {
+
+          const detail =
+            button.dataset.detail;
+
+          document.querySelectorAll('.detail-tab')
+            .forEach(tab => {
+              tab.classList.toggle(
+                'active',
+                tab === button
+              );
+            });
+
+          document.querySelectorAll('.detail-pane')
+            .forEach(pane => {
+              pane.classList.toggle(
+                'active',
+                pane.id === `detail-${detail}`
+              );
+            });
+        }
+      );
+    });
+
+  document.querySelectorAll('[data-detail]:not(.detail-tab)')
+    .forEach(button => {
+
+      button.addEventListener(
+        'click',
+        () => {
+
+          showScreen('details');
+
+          const detail =
+            button.dataset.detail;
+
+          const tab =
+            document.querySelector(
+              `.detail-tab[data-detail="${detail}"]`
+            );
+
+          tab?.click();
+        }
+      );
+    });
+
+  /* Briefing / presença */
+  q('briefingAck')
+    ?.addEventListener(
+      'change',
+      briefingChanged
+    );
+
+  q('selfieButton')
+    ?.addEventListener(
+      'click',
+      captureSelfie
+    );
+
+  q('confirmParticipation')
+    ?.addEventListener(
+      'click',
+      confirmParticipation
+    );
+
+  /* Rádio */
+  q('radioPower')
+    ?.addEventListener(
+      'click',
+      toggleRadio
+    );
+
+  q('radioChannel')
+    ?.addEventListener(
+      'change',
+      e => setChannel(e.target.value)
+    );
+
+  q('radioVolume')
+    ?.addEventListener(
+      'input',
+      e => setVolume(e.target.value)
+    );
+
+  q('radioPtt')
+    ?.addEventListener(
+      'pointerdown',
+      startPtt
+    );
+
+  ['pointerup','pointercancel','pointerleave']
+    .forEach(event => {
+
+      q('radioPtt')
+        ?.addEventListener(
+          event,
+          stopPtt
+        );
+    });
+
+  /* Mapa */
+  q('mapCenter')
+    ?.addEventListener(
+      'click',
+      centerMap
+    );
+
+  /* Ações */
+  q('instructionsButton')
+    ?.addEventListener(
+      'click',
+      openInstructions
+    );
+
+  q('hitButton')
+    ?.addEventListener(
+      'click',
+      () => toast('Evento de demonstração lançado.')
+    );
+
+  /* Trava */
+  q('manualLock')
+    ?.addEventListener(
+      'click',
+      manualLock
+    );
+
+  /* Organizador */
+  q('saveBriefing')
+    ?.addEventListener(
+      'click',
+      saveOrganizer
+    );
+
+  q('startMatchButton')
+    ?.addEventListener(
+      'click',
+      startMatch
+    );
+
+  q('resetDemoButton')
+    ?.addEventListener(
+      'click',
+      resetDemo
+    );
+
+  initTouchGuard();
+
+  document.addEventListener(
+    'pointerdown',
+    () => {
+
+      if(
+        state.screen === 'tactical' &&
+        !state.player.locked
+      ){
+        resetInactivity();
+      }
+
+    },
+    {
+      passive:true
+    }
+  );
+}
+
+/* =========================================================
+   START
+   ========================================================= */
+
+document.addEventListener(
+  'DOMContentLoaded',
+  () => {
+
+    bind();
+    startTimer();
+    render();
+
+    if(state.player.participation){
+      startGps();
+    }
+  }
+);
