@@ -2,7 +2,6 @@ const KEY = "df_terminal_v10";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-/* ── State ── */
 function initial() {
   return {
     role: "player",
@@ -97,7 +96,6 @@ function teamName(t) {
   return t === "azul" ? (state.org.blueName || "Equipe Azul") : (state.org.redName || "Equipe Vermelha");
 }
 
-/* ── Screen ── */
 function show(name, remember = true) {
   const target = $(`[data-screen="${name}"]`);
   if (!target) return;
@@ -122,7 +120,6 @@ function show(name, remember = true) {
   render();
 }
 
-/* ── Render ── */
 function render() {
   renderHeader();
   renderPlayer();
@@ -250,7 +247,6 @@ function renderDetails() {
   setText("#dChannel", String(p.channel).padStart(2, "0"));
 }
 
-/* ── Lock ── */
 function updateLock() {
   const lock = $("#tacLock");
   if (!lock) return;
@@ -289,7 +285,6 @@ function cancelUnlock() {
   if (bar) bar.style.width = "0%";
 }
 
-/* ── Map & GPS ── */
 function startGps() {
   if (!navigator.geolocation) {
     setText("#mapStatus", "GPS OFF");
@@ -298,10 +293,8 @@ function startGps() {
   setText("#mapStatus", "GPS…");
   gpsWatch = navigator.geolocation.watchPosition(
     (pos) => {
-      // normalize relative movement for demo map
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
-      // simple relative: use fractional part for demo
       state.map.playerPos.x = 0.3 + (Math.abs(lng) % 1) * 0.4;
       state.map.playerPos.y = 0.3 + (Math.abs(lat) % 1) * 0.4;
       setText("#mapStatus", "GPS OK");
@@ -319,7 +312,6 @@ function stopGps() {
 
 function spawnEnemiesIfNeeded() {
   if (state.map.enemies.length > 0) return;
-  // simulated enemies around the map
   for (let i = 0; i < 8; i++) {
     state.map.enemies.push({
       id: i,
@@ -329,7 +321,6 @@ function spawnEnemiesIfNeeded() {
       alive: true
     });
   }
-  // a couple of simulated friends
   state.map.friends = [
     { x: 0.45, y: 0.55 },
     { x: 0.55, y: 0.4 }
@@ -345,7 +336,6 @@ function drawMap() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // grid
   ctx.strokeStyle = "#1a221c";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 8; i++) {
@@ -355,7 +345,6 @@ function drawMap() {
     ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
   }
 
-  // mines
   state.map.mines.forEach(m => {
     if (!m.active) return;
     const mx = m.x * w, my = m.y * h;
@@ -365,7 +354,6 @@ function drawMap() {
     ctx.strokeRect(mx - 5, my - 5, 10, 10);
   });
 
-  // friends
   state.map.friends.forEach(f => {
     ctx.beginPath();
     ctx.arc(f.x * w, f.y * h, 6, 0, Math.PI * 2);
@@ -373,7 +361,6 @@ function drawMap() {
     ctx.fill();
   });
 
-  // enemies (only visible ones or after drone)
   state.map.enemies.forEach(e => {
     if (!e.alive) return;
     if (!e.visible && !state.map.revealed) return;
@@ -386,7 +373,6 @@ function drawMap() {
     ctx.stroke();
   });
 
-  // player
   const px = state.map.playerPos.x * w;
   const py = state.map.playerPos.y * h;
   ctx.beginPath();
@@ -396,7 +382,6 @@ function drawMap() {
   ctx.strokeStyle = "#a0b070";
   ctx.lineWidth = 2;
   ctx.stroke();
-  // direction cone
   ctx.beginPath();
   ctx.moveTo(px, py);
   ctx.lineTo(px + 14, py - 6);
@@ -409,7 +394,6 @@ function drawMap() {
 function startMapLoop() {
   stopMapLoop();
   mapAnim = setInterval(() => {
-    // slight enemy drift for life
     state.map.enemies.forEach(e => {
       if (!e.alive) return;
       e.x += (Math.random() - 0.5) * 0.004;
@@ -441,7 +425,6 @@ function checkMines() {
   });
 }
 
-/* ── Combat ── */
 function takeHit(reason = "HIT") {
   if (!state.player.alive) return;
   state.player.alive = false;
@@ -450,14 +433,12 @@ function takeHit(reason = "HIT") {
   updateVu(false);
   save();
   render();
-  toast(`${reason} — você está fora. Dead rag.`);
-  // auto lock again
+  toast(reason + " — você está fora. Dead rag.");
 }
 
 function registerKill() {
   if (!state.player.alive || state.match.status !== "live") return toast("Não disponível.");
   state.player.kills = Math.min(3, state.player.kills + 1);
-  // reveal one random enemy
   const hidden = state.map.enemies.filter(e => e.alive && !e.visible);
   if (hidden.length) {
     const pick = hidden[Math.floor(Math.random() * hidden.length)];
@@ -469,14 +450,13 @@ function registerKill() {
     state.map.enemies.forEach(e => { if (e.alive) e.visible = true; });
     toast("DRONE: posições inimigas atualizadas.");
   } else {
-    toast(`Eliminação registrada (${state.player.kills}/3).`);
+    toast("Eliminação registrada (" + state.player.kills + "/3).");
   }
   save();
   render();
   drawMap();
 }
 
-/* ── VU ── */
 function updateVu(on) {
   const meter = $("#vuMeter");
   if (!meter) return;
@@ -498,7 +478,6 @@ function randomizeVu() {
   setTimeout(randomizeVu, 90 + Math.random() * 70);
 }
 
-/* ── Timer ── */
 function startTimer() {
   stopTimer();
   if (state.match.status !== "live") return;
@@ -513,7 +492,6 @@ function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null; }
 }
 
-/* ── Actions ── */
 function selectRole(role) {
   state.role = role;
   save();
@@ -647,13 +625,11 @@ function changeCh(d) {
   setText("#chDisplay", "CH " + String(state.player.channel).padStart(2, "0"));
 }
 
-/* ── Helpers ── */
 function setText(s, t) { const el = $(s); if (el) el.textContent = t ?? "—"; }
 function setVal(s, v) { const el = $(s); if (el) el.value = v ?? ""; }
 function val(s) { return $(s)?.value?.trim() || ""; }
 function toggle(s, show) { const el = $(s); if (el) el.classList.toggle("hidden", !show); }
 
-/* ── Events ── */
 document.addEventListener("click", (e) => {
   const role = e.target.closest("[data-role]");
   if (role) { selectRole(role.dataset.role); return; }
@@ -735,7 +711,6 @@ document.addEventListener("click", (e) => {
 
 $("#prepAck")?.addEventListener("change", ackBrief);
 
-/* Unlock hold */
 const unlockBtn = $("#unlockBtn");
 if (unlockBtn) {
   unlockBtn.addEventListener("pointerdown", startUnlock);
@@ -744,7 +719,6 @@ if (unlockBtn) {
   unlockBtn.addEventListener("pointerleave", cancelUnlock);
 }
 
-/* PTT */
 const ptt = $("#pttBtn");
 if (ptt) {
   const startTx = (e) => {
@@ -765,7 +739,6 @@ if (ptt) {
   ptt.addEventListener("pointerleave", endTx);
 }
 
-/* Map click to place mine (organizer) or just interact */
 $("#tacMap")?.addEventListener("click", (e) => {
   if (state.locked || state.role !== "organizer") return;
   const canvas = $("#tacMap");
@@ -779,7 +752,6 @@ $("#tacMap")?.addEventListener("click", (e) => {
   toast("Mina posicionada.");
 });
 
-/* Boot */
 function boot() {
   if (localStorage.getItem(KEY)) {
     show(state.role === "organizer" ? "organizer" : "player", false);
