@@ -203,7 +203,7 @@ function renderTactical() {
     rt.textContent = state.player.radio ? "ON" : "OFF";
     rt.className = "radio-toggle" + (state.player.radio ? " on" : "");
   }
-  updateVu(state.player.radio && current === "tactical" && !state.locked);
+  if (!window._pttActive) updateVu(false);
 
   setText("#killCount", `ELIMINAÇÕES: ${state.player.kills}/3`);
   const ds = $("#droneStatus");
@@ -366,58 +366,118 @@ function drawMap() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  ctx.strokeStyle = "#1a221c";
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 8; i++) {
-    const x = (i / 8) * w;
-    const y = (i / 8) * h;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
+  // base ground
+  ctx.fillStyle = "#161812";
+  ctx.fillRect(0, 0, w, h);
 
+  // streets (horizontal + vertical grid roads)
+  ctx.strokeStyle = "#2a2c26";
+  ctx.lineWidth = 10;
+  // main roads
+  ctx.beginPath(); ctx.moveTo(0, h * 0.35); ctx.lineTo(w, h * 0.35); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, h * 0.68); ctx.lineTo(w, h * 0.68); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.28, 0); ctx.lineTo(w * 0.28, h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.62, 0); ctx.lineTo(w * 0.62, h); ctx.stroke();
+  // road edge lines
+  ctx.strokeStyle = "#3a3c34";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(0, h * 0.35); ctx.lineTo(w, h * 0.35); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, h * 0.68); ctx.lineTo(w, h * 0.68); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.28, 0); ctx.lineTo(w * 0.28, h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w * 0.62, 0); ctx.lineTo(w * 0.62, h); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // buildings / obstacles blocks
+  const buildings = [
+    { x: 0.04, y: 0.06, w: 0.18, h: 0.22, label: "SETOR A" },
+    { x: 0.36, y: 0.05, w: 0.20, h: 0.24, label: "" },
+    { x: 0.70, y: 0.08, w: 0.24, h: 0.20, label: "SETOR B" },
+    { x: 0.05, y: 0.42, w: 0.16, h: 0.18, label: "" },
+    { x: 0.36, y: 0.42, w: 0.18, h: 0.16, label: "" },
+    { x: 0.70, y: 0.44, w: 0.22, h: 0.16, label: "" },
+    { x: 0.08, y: 0.76, w: 0.14, h: 0.18, label: "" },
+    { x: 0.38, y: 0.78, w: 0.16, h: 0.16, label: "" },
+    { x: 0.72, y: 0.74, w: 0.20, h: 0.20, label: "" }
+  ];
+  buildings.forEach(b => {
+    const bx = b.x * w, by = b.y * h, bw = b.w * w, bh = b.h * h;
+    ctx.fillStyle = "#1c1e18";
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = "#3a3c34";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(bx, by, bw, bh);
+    // inner detail
+    ctx.strokeStyle = "#2a2c26";
+    ctx.strokeRect(bx + 4, by + 4, bw - 8, bh - 8);
+    if (b.label) {
+      ctx.fillStyle = "#5a584e";
+      ctx.font = "9px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(b.label, bx + bw / 2, by + bh / 2 + 3);
+    }
+  });
+
+  // sector markers alfa / bravo
+  ctx.fillStyle = "rgba(196,184,150,0.15)";
+  ctx.strokeStyle = "rgba(196,184,150,0.4)";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(w * 0.15, h * 0.18, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(w * 0.82, h * 0.18, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#8a7e62";
+  ctx.font = "bold 8px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("A", w * 0.15, h * 0.18 + 3);
+  ctx.fillText("B", w * 0.82, h * 0.18 + 3);
+
+  // mines
   state.map.mines.forEach(m => {
     if (!m.active) return;
     const mx = m.x * w, my = m.y * h;
-    ctx.fillStyle = "#b89a5e";
-    ctx.fillRect(mx - 5, my - 5, 10, 10);
-    ctx.strokeStyle = "#8a7348";
-    ctx.strokeRect(mx - 5, my - 5, 10, 10);
+    ctx.fillStyle = "#8a7e62";
+    ctx.fillRect(mx - 4, my - 4, 8, 8);
+    ctx.strokeStyle = "#c4b896";
+    ctx.strokeRect(mx - 4, my - 4, 8, 8);
   });
 
+  // friends
   state.map.friends.forEach(f => {
     ctx.beginPath();
-    ctx.arc(f.x * w, f.y * h, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#4a6a8b";
+    ctx.arc(f.x * w, f.y * h, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "#5a7a9a";
     ctx.fill();
   });
 
+  // enemies
   state.map.enemies.forEach(e => {
     if (!e.alive) return;
     if (!e.visible && !state.map.revealed) return;
     ctx.beginPath();
-    ctx.arc(e.x * w, e.y * h, 7, 0, Math.PI * 2);
-    ctx.fillStyle = "#a05050";
+    ctx.arc(e.x * w, e.y * h, 6, 0, Math.PI * 2);
+    ctx.fillStyle = "#9a5050";
     ctx.fill();
     ctx.strokeStyle = "#c07070";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     ctx.stroke();
   });
 
+  // player
   const px = state.map.playerPos.x * w;
   const py = state.map.playerPos.y * h;
   ctx.beginPath();
-  ctx.arc(px, py, 9, 0, Math.PI * 2);
-  ctx.fillStyle = "#7a8b5c";
+  ctx.arc(px, py, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#c4b896";
   ctx.fill();
-  ctx.strokeStyle = "#a0b070";
+  ctx.strokeStyle = "#e6e4dc";
   ctx.lineWidth = 2;
   ctx.stroke();
+  // direction
   ctx.beginPath();
   ctx.moveTo(px, py);
-  ctx.lineTo(px + 14, py - 6);
-  ctx.lineTo(px + 14, py + 6);
+  ctx.lineTo(px + 12, py - 5);
+  ctx.lineTo(px + 12, py + 5);
   ctx.closePath();
-  ctx.fillStyle = "rgba(122,139,92,0.4)";
+  ctx.fillStyle = "rgba(196,184,150,0.35)";
   ctx.fill();
 }
 
@@ -656,7 +716,7 @@ function toggleRadio() {
   state.player.radio = !state.player.radio;
   save();
   render();
-  updateVu(state.player.radio && current === "tactical" && !state.locked);
+  if (!window._pttActive) updateVu(false);
 }
 
 function changeCh(d) {
@@ -766,14 +826,18 @@ if (ptt) {
   const startTx = (e) => {
     e.preventDefault();
     if (state.locked || !state.player.radio) return toast(state.locked ? "Desbloqueie o painel." : "Rádio desligado.");
+    window._pttActive = true;
     ptt.classList.add("transmitting");
     setText("#radioStatus", "TRANSMITINDO");
     $("#radioStatus")?.classList.add("tx");
+    updateVu(true); // barras só enquanto segura PTT
   };
   const endTx = () => {
+    window._pttActive = false;
     ptt.classList.remove("transmitting");
     setText("#radioStatus", "PRONTO");
     $("#radioStatus")?.classList.remove("tx");
+    updateVu(false);
   };
   ptt.addEventListener("pointerdown", startTx);
   ptt.addEventListener("pointerup", endTx);
