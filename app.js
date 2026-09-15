@@ -1,150 +1,87 @@
-/* ================================================================
-   DESERT FALCONS — APP PRINCIPAL
-   Estado compartilhado + DEV + jogador + organizador.
-   Persistência: localStorage.
-================================================================ */
+/* ============================================================
+   DESERT FALCONS — APP.JS
+   Estado, navegação, jogador, organizador e DEV.
 
-const STORAGE_KEY = "desert-falcons-terminal-v7";
+   REGRA CENTRAL:
+   - localStorage é a memória persistente do aplicativo.
+   - jogador e organizador trabalham sobre o MESMO estado.
+   - trocar de função não apaga dados.
+   - somente RESET no DEV limpa o estado.
+   - iniciar/encerrar partida é responsabilidade do organizador.
+============================================================ */
 
-/* ================================================================
-   UTILITÁRIOS
-================================================================ */
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+/* ============================================================
+   CONFIGURAÇÃO
+============================================================ */
 
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+const STORAGE_KEY = "desert_falcons_terminal_v8";
 
-function nowTime() {
-  const d = new Date();
-  return d.toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
+const DEMO_CENTER = {
+  lat: -19.9167,
+  lng: -43.9345
+};
 
-function formatDateBr(date) {
-  if (!date) return "—";
-  const parts = date.split("-");
-  if (parts.length !== 3) return date;
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-}
+let previousScreen = "player-home";
+let currentScreen = "role-select";
+let unlockTimer = null;
+let unlockStarted = false;
+let radioPushTimer = null;
 
-function formatTimer(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
 
-  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-}
-
-function toast(message) {
-  const el = $("#toast");
-
-  if (!el) return;
-
-  el.textContent = message;
-  el.classList.add("show");
-
-  clearTimeout(toast.timer);
-
-  toast.timer = setTimeout(() => {
-    el.classList.remove("show");
-  }, 2600);
-}
-
-/* ================================================================
+/* ============================================================
    ESTADO INICIAL
-================================================================ */
+============================================================ */
 
-function initialState() {
+function createInitialState() {
   return {
-    version: 7,
+    version: 8,
 
-    firstRun: true,
-
-    currentRole: "player",
-
-    currentScreen: "role",
-
-    previousScreen: "playerLobby",
-
-    detailTab: "inicio",
-
-    organizerSection: "general",
+    role: "player",
 
     match: {
       exists: false,
-      saved: false,
-
-      name: "Operação Red Sand",
+      name: "",
+      status: "none",
       date: "",
       time: "",
-      location: "A definir",
-
+      location: "",
       map: "Complexo Industrial",
       mode: "Simulação",
+      duration: 60,
+      checkInTime: "",
+      startedAt: null,
+      elapsedSeconds: 0
+    },
 
-      objective: "Capturar e manter os setores Alfa e Bravo.",
-
+    organizer: {
       briefingTitle: "Briefing da Operação",
       briefingText:
         "Objetivo, regras da partida, condições de participação e orientações gerais.",
+      objective: "",
 
-      teamA: "AZUL",
-      teamB: "VERMELHA",
+      teamBlueName: "Equipe Azul",
+      teamBlueLimit: 20,
 
-      teamAColor: "#4f9be8",
-      teamBColor: "#df5f66",
+      teamRedName: "Equipe Vermelha",
+      teamRedLimit: 20,
 
-      duration: 120,
-      checkInTime: "",
-
-      status: "scheduled",
-      seconds: 0,
-
-      organizerParticipates: true,
-
-      modules: {
-        medical: true,
-        zones: true,
-        score: false,
-        tracking: false,
-        objectives: true,
-        events: false
-      }
+      participates: false
     },
 
     player: {
       id: "DF-001",
-      name: "DANIEL",
-
-      team: "AZUL",
-
-      roleClass: "Assalto",
+      name: "DANI",
+      team: "azul",
+      class: "Assalto",
 
       participation: false,
-
-      entryRequest: "none",
-
+      entryRequested: false,
       briefingAck: false,
 
-      locked: true,
-
       radio: true,
-      channel: "01",
+      channel: 1,
       radioVolume: 70
-    },
-
-    simulated: {
-      playersPerTeam: 10,
-      players: []
-    },
-
-    dev: {
-      role: "player",
-      status: "scheduled"
     },
 
     gps: {
@@ -152,53 +89,84 @@ function initialState() {
       lng: null,
       accuracy: null,
       ready: false
+    },
+
+    objectives: {
+      alfa: {
+        name: "Setor Alfa",
+        control: "neutro"
+      },
+
+      bravo: {
+        name: "Setor Bravo",
+        control: "neutro"
+      }
+    },
+
+    modules: {
+      medical: true,
+      zone: true,
+      score: false,
+      tracking: false,
+      objectives: true,
+      events: false
+    },
+
+    simulatedPlayers: {
+      perTeam: 0,
+      blue: [],
+      red: []
+    },
+
+    events: [],
+
+    dev: {
+      lastRole: "player"
     }
   };
 }
 
-/* ================================================================
-   PERSISTÊNCIA
-================================================================ */
+
+/* ============================================================
+   CARREGAMENTO / PERSISTÊNCIA
+============================================================ */
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
-      return initialState();
+      return createInitialState();
     }
 
     const saved = JSON.parse(raw);
 
-    return normalizeState(saved);
+    return mergeState(createInitialState(), saved);
+
   } catch (error) {
-    console.warn("Não foi possível carregar o estado persistente.", error);
-    return initialState();
+    console.warn("Falha ao carregar estado:", error);
+    return createInitialState();
   }
 }
 
-function saveState() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    console.warn("Não foi possível salvar o estado persistente.", error);
+
+function mergeState(base, saved) {
+  if (!saved || typeof saved !== "object") {
+    return base;
   }
-}
 
-function normalizeState(saved) {
-  const base = initialState();
-
-  const merged = {
+  return {
     ...base,
     ...saved,
 
     match: {
       ...base.match,
-      ...(saved.match || {}),
-      modules: {
-        ...base.match.modules,
-        ...(saved.match?.modules || {})
-      }
+      ...(saved.match || {})
+    },
+
+    organizer: {
+      ...base.organizer,
+      ...(saved.organizer || {})
     },
 
     player: {
@@ -206,9 +174,24 @@ function normalizeState(saved) {
       ...(saved.player || {})
     },
 
-    simulated: {
-      ...base.simulated,
-      ...(saved.simulated || {})
+    gps: {
+      ...base.gps,
+      ...(saved.gps || {})
+    },
+
+    objectives: {
+      ...base.objectives,
+      ...(saved.objectives || {})
+    },
+
+    modules: {
+      ...base.modules,
+      ...(saved.modules || {})
+    },
+
+    simulatedPlayers: {
+      ...base.simulatedPlayers,
+      ...(saved.simulatedPlayers || {})
     },
 
     dev: {
@@ -216,1894 +199,2722 @@ function normalizeState(saved) {
       ...(saved.dev || {})
     },
 
-    gps: {
-      ...base.gps,
-      ...(saved.gps || {})
-    }
+    events: Array.isArray(saved.events)
+      ? saved.events
+      : base.events
   };
-
-  if (!merged.match.exists && merged.firstRun === false) {
-    merged.currentScreen =
-      merged.currentScreen === "role" ? "playerLobby" : merged.currentScreen;
-  }
-
-  return merged;
 }
+
 
 let state = loadState();
 
-/* ================================================================
-   NAVEGAÇÃO
-================================================================ */
 
-function showScreen(screenId) {
+function persist() {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(state)
+    );
+  } catch (error) {
+    console.warn("Não foi possível persistir o estado:", error);
+  }
+}
+
+
+/* ============================================================
+   DOM
+============================================================ */
+
+const $ = (selector) => document.querySelector(selector);
+
+const $$ = (selector) => [
+  ...document.querySelectorAll(selector)
+];
+
+
+/* ============================================================
+   UTILITÁRIOS
+============================================================ */
+
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+
+function formatDate(date) {
+  if (!date) return "—";
+
+  const parts = date.split("-");
+
+  if (parts.length !== 3) {
+    return date;
+  }
+
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+
+function formatDuration(minutes) {
+  if (!minutes) return "—";
+
+  const value = Number(minutes);
+
+  if (value < 60) {
+    return `${value} min`;
+  }
+
+  const hours = Math.floor(value / 60);
+  const rest = value % 60;
+
+  return rest
+    ? `${hours}h ${rest}min`
+    : `${hours}h`;
+}
+
+
+function formatTimer(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+
+  return (
+    String(minutes).padStart(2, "0") +
+    ":" +
+    String(secs).padStart(2, "0")
+  );
+}
+
+
+function getStatusLabel(status) {
+  const labels = {
+    none: "SEM PARTIDA",
+    scheduled: "AGENDADA",
+    live: "AO VIVO",
+    ended: "ENCERRADA"
+  };
+
+  return labels[status] || "SEM PARTIDA";
+}
+
+
+function showToast(message) {
+  const toast = $("#toast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.classList.add("show");
+
+  clearTimeout(showToast.timer);
+
+  showToast.timer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2800);
+}
+
+
+/* ============================================================
+   NAVEGAÇÃO
+============================================================ */
+
+function showScreen(screenName, remember = true) {
+  const target = $(`[data-screen="${screenName}"]`);
+
+  if (!target) {
+    console.warn("Tela inexistente:", screenName);
+    return;
+  }
+
+  if (remember && currentScreen !== screenName) {
+    previousScreen = currentScreen;
+  }
+
+  currentScreen = screenName;
+
   $$(".screen").forEach((screen) => {
     screen.classList.remove("active");
   });
 
-  const target = $(`#screen${capitalize(screenId)}`);
-
-  if (!target) {
-    console.warn(`Tela não encontrada: ${screenId}`);
-    return;
-  }
-
   target.classList.add("active");
 
-  if (state.currentScreen !== screenId) {
-    state.previousScreen = state.currentScreen;
-  }
+  window.scrollTo({
+    top: 0,
+    behavior: "instant"
+  });
 
-  state.currentScreen = screenId;
-
-  saveState();
   render();
 }
 
-function capitalize(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
 
-function goBack(target) {
-  if (target === "previous") {
-    const fallback = state.previousScreen || "playerLobby";
-    showScreen(fallback);
+function goBack() {
+  if (previousScreen === "previous") {
+    showScreen(
+      state.role === "organizer"
+        ? "organizer"
+        : "player-home",
+      false
+    );
+
     return;
   }
 
-  showScreen(target);
+  showScreen(previousScreen, false);
 }
 
-/* ================================================================
-   ROLE
-================================================================ */
 
-function chooseRole(role) {
-  state.firstRun = false;
-  state.currentRole = role;
+/* ============================================================
+   ROLE / ENTRADA
+============================================================ */
 
-  if (role === "organizer") {
-    showScreen("organizer");
+function selectRole(role) {
+  if (role !== "player" && role !== "organizer") {
+    return;
+  }
+
+  state.role = role;
+  state.dev.lastRole = role;
+
+  persist();
+
+  if (role === "player") {
+    showScreen("player-home", false);
   } else {
-    showScreen("playerLobby");
+    showScreen("organizer", false);
   }
 
-  saveState();
   render();
 }
 
-function setDevRole(role) {
-  state.dev.role = role;
-  state.currentRole = role;
 
-  if (role === "organizer") {
-    showScreen("organizer");
+/* ============================================================
+   HEADER GLOBAL
+============================================================ */
+
+function renderGlobalHeader() {
+  const status = $("#globalMatchStatus");
+
+  if (!status) return;
+
+  status.textContent = getStatusLabel(
+    state.match.exists
+      ? state.match.status
+      : "none"
+  );
+
+  status.className = "match-status";
+
+  if (state.match.status === "live") {
+    status.classList.add("live");
+  } else if (state.match.status === "scheduled") {
+    status.classList.add("scheduled");
+  } else if (state.match.status === "ended") {
+    status.classList.add("ended");
   } else {
-    showScreen("playerLobby");
+    status.classList.add("neutral");
   }
-
-  saveState();
-  render();
 }
 
-/* ================================================================
-   PARTIDA
-================================================================ */
 
-function hasMatch() {
-  return Boolean(state.match.exists);
+/* ============================================================
+   RENDER PRINCIPAL
+============================================================ */
+
+function render() {
+  renderGlobalHeader();
+  renderPlayer();
+  renderPlayerDetails();
+  renderOrganizer();
+  renderDev();
+  renderTactical();
+  renderWaiting();
 }
 
-function createDefaultMatch() {
-  state.match.exists = true;
-  state.match.saved = true;
 
-  if (!state.match.date) {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-
-    state.match.date = `${yyyy}-${mm}-${dd}`;
-  }
-
-  if (!state.match.time) {
-    state.match.time = "09:00";
-  }
-
-  if (!state.match.checkInTime) {
-    state.match.checkInTime = "08:30";
-  }
-
-  state.match.status = state.dev.status;
-
-  saveState();
-  render();
-  toast("Partida de teste criada.");
-}
-
-function startMatch(origin = "organizer") {
-  if (!state.match.exists) {
-    toast("Salve ou gere uma partida antes de iniciar.");
-    return;
-  }
-
-  /*
-    Regra principal:
-    jogador NÃO inicia partida.
-    DEV pode iniciar para testes.
-  */
-  if (origin !== "dev" && state.currentRole !== "organizer") {
-    toast("Somente o organizador pode iniciar a partida.");
-    return;
-  }
-
-  state.match.status = "live";
-  state.match.saved = true;
-  state.match.seconds = 0;
-
-  /*
-    Se o organizador participa, ele entra como participante.
-  */
-  if (state.match.organizerParticipates) {
-    ensureOrganizerPlayerSimulation();
-  }
-
-  saveState();
-
-  if (state.currentRole === "organizer") {
-    showScreen("tactical");
-  } else {
-    state.player.entryRequest = "accepted";
-    state.player.locked = true;
-    showScreen("tactical");
-  }
-
-  toast("Partida iniciada.");
-}
-
-function endMatch(origin = "organizer") {
-  if (!state.match.exists) return;
-
-  if (origin !== "dev" && state.currentRole !== "organizer") {
-    toast("Somente o organizador pode encerrar a partida.");
-    return;
-  }
-
-  state.match.status = "ended";
-  state.player.locked = true;
-
-  saveState();
-  render();
-
-  toast("Partida encerrada.");
-}
-
-function abandonMatch() {
-  if (state.match.status !== "live") {
-    toast("Não há partida ao vivo para abandonar.");
-    return;
-  }
-
-  state.player.entryRequest = "none";
-  state.player.participation = false;
-  state.player.locked = true;
-
-  saveState();
-
-  showScreen("playerLobby");
-
-  toast("Você saiu da partida.");
-}
-
-/* ================================================================
+/* ============================================================
    JOGADOR
-================================================================ */
+============================================================ */
+
+function renderPlayer() {
+  const hasMatch =
+    state.match.exists &&
+    state.match.status !== "ended";
+
+  const name = $("#playerMatchName");
+  const stateLabel = $("#playerMatchState");
+
+  if (!name || !stateLabel) {
+    return;
+  }
+
+  if (!state.match.exists) {
+    name.textContent = "Nenhuma partida cadastrada";
+    stateLabel.textContent = "SEM PARTIDA";
+  } else {
+    name.textContent =
+      state.match.name || "Partida sem nome";
+
+    stateLabel.textContent =
+      getStatusLabel(state.match.status);
+  }
+
+  setText(
+    "#playerMatchDate",
+    formatDate(state.match.date)
+  );
+
+  setText(
+    "#playerMatchTime",
+    state.match.time || "—"
+  );
+
+  setText(
+    "#playerMatchLocation",
+    state.match.location || "—"
+  );
+
+  setText(
+    "#playerMatchMap",
+    state.match.map || "—"
+  );
+
+  setText(
+    "#playerMatchMode",
+    state.match.mode || "—"
+  );
+
+  setText(
+    "#playerMatchDuration",
+    formatDuration(state.match.duration)
+  );
+
+  setText(
+    "#playerDisplayName",
+    state.player.name
+  );
+
+  setText(
+    "#playerDisplayTeam",
+    getTeamName(state.player.team)
+  );
+
+
+  const scheduledActions = $("#playerScheduledActions");
+  const liveActions = $("#playerLiveActions");
+  const enterActions = $("#playerEnterActions");
+
+  if (scheduledActions) {
+    scheduledActions.classList.toggle(
+      "hidden",
+      !(
+        hasMatch &&
+        state.match.status === "scheduled"
+      )
+    );
+  }
+
+  if (liveActions) {
+    liveActions.classList.toggle(
+      "hidden",
+      !(
+        hasMatch &&
+        state.match.status === "live" &&
+        !state.player.entryRequested &&
+        !state.player.participation
+      )
+    );
+  }
+
+  if (enterActions) {
+    enterActions.classList.toggle(
+      "hidden",
+      !(
+        hasMatch &&
+        state.match.status === "live" &&
+        (
+          state.player.entryRequested ||
+          state.player.participation
+        )
+      )
+    );
+  }
+
+
+  let participationText = "Aguardando confirmação";
+  let participationBadge = "AGUARDANDO";
+
+  if (state.player.participation) {
+    participationText = "Participação confirmada";
+    participationBadge = "CONFIRMADO";
+  } else if (state.player.entryRequested) {
+    participationText = "Entrada solicitada";
+    participationBadge = "SOLICITADA";
+  }
+
+  setText(
+    "#playerParticipationStatus",
+    participationText
+  );
+
+  setText(
+    "#playerParticipationBadge",
+    participationBadge
+  );
+}
+
+
+/* ============================================================
+   CONFIRMAR PRESENÇA
+============================================================ */
 
 function confirmPresence() {
-  if (!hasMatch()) {
-    toast("Nenhuma partida disponível.");
+  if (!state.match.exists) {
+    showToast("Não há partida cadastrada.");
     return;
   }
 
   if (state.match.status !== "scheduled") {
-    toast("A partida não está em fase de confirmação.");
+    showToast("A partida não está em estado agendado.");
     return;
   }
 
   state.player.participation = true;
-  state.player.entryRequest = "confirmed";
+  state.player.entryRequested = false;
 
-  saveState();
+  addEvent(
+    "player",
+    "Presença confirmada"
+  );
+
+  persist();
+
+  showScreen("player-preparation");
+
   render();
 
-  toast("Presença confirmada.");
+  showToast("Presença confirmada.");
 }
 
+
+/* ============================================================
+   SOLICITAR ENTRADA
+============================================================ */
+
 function requestEntry() {
-  if (!hasMatch()) {
-    toast("Nenhuma partida disponível.");
+  if (!state.match.exists) {
+    showToast("Não há partida disponível.");
     return;
   }
 
   if (state.match.status !== "live") {
-    toast("A partida ainda não está ao vivo.");
+    showToast("A partida ainda não está ao vivo.");
     return;
   }
 
-  /*
-    Sem backend, o ambiente DEV trata a solicitação como aceita
-    para permitir testar o fluxo inteiro no celular.
-  */
-  state.player.entryRequest = "accepted";
-  state.player.participation = true;
-  state.player.locked = true;
+  state.player.entryRequested = true;
 
-  saveState();
+  addEvent(
+    "player",
+    "Entrada solicitada"
+  );
+
+  persist();
+
+  showScreen("waiting");
+
   render();
+
+  showToast("Solicitação enviada.");
+}
+
+
+/* ============================================================
+   ENTRAR NO JOGO
+============================================================ */
+
+function enterMatch() {
+  if (!state.match.exists) {
+    showToast("Nenhuma partida disponível.");
+    return;
+  }
+
+  if (state.match.status !== "live") {
+    showToast("A partida ainda não foi iniciada.");
+    return;
+  }
+
+  state.player.participation = true;
+  state.player.entryRequested = false;
+
+  addEvent(
+    "player",
+    "Jogador entrou na partida"
+  );
+
+  persist();
 
   showScreen("tactical");
+
+  render();
+
+  showToast("Entrada autorizada.");
 }
 
-function enterScheduledMatch() {
-  if (!state.player.participation) {
-    toast("Confirme sua presença primeiro.");
-    return;
+
+/* ============================================================
+   PREPARAÇÃO
+============================================================ */
+
+function renderPreparation() {
+  setText(
+    "#preparationMatchName",
+    state.match.name || "—"
+  );
+
+  setText(
+    "#preparationStatus",
+    getStatusLabel(state.match.status)
+  );
+
+  setText(
+    "#preparationBriefingTitle",
+    state.organizer.briefingTitle || "Briefing"
+  );
+
+  setText(
+    "#preparationBriefingText",
+    state.organizer.briefingText || "—"
+  );
+
+  const checkbox = $("#playerBriefingAck");
+
+  if (checkbox) {
+    checkbox.checked = !!state.player.briefingAck;
   }
-
-  if (state.match.status === "live") {
-    state.player.entryRequest = "accepted";
-    state.player.locked = true;
-
-    saveState();
-    showScreen("tactical");
-
-    return;
-  }
-
-  toast("A partida ainda está agendada.");
 }
 
-/* ================================================================
-   BRIEFING
-================================================================ */
 
 function acknowledgeBriefing() {
-  state.player.briefingAck = !state.player.briefingAck;
-  saveState();
+  const checkbox = $("#playerBriefingAck");
+
+  if (!checkbox) return;
+
+  state.player.briefingAck = checkbox.checked;
+
+  persist();
+
   render();
 }
 
-/* ================================================================
-   ORGANIZADOR — FORMULÁRIO
-================================================================ */
 
-const ORGANIZER_FIELDS = {
-  matchName: "match-name",
-  date: "match-date",
-  time: "match-time",
-  location: "match-location",
-  map: "match-map",
-  mode: "match-mode",
-  objective: "match-objective",
-  briefingTitle: "briefing-title",
-  briefingText: "briefing-text",
-  teamA: "team-a",
-  teamB: "team-b",
-  teamAColor: "team-a-color",
-  teamBColor: "team-b-color",
-  duration: "match-duration",
-  checkIn: "match-checkin"
-};
-
-function fieldValue(id) {
-  const el = document.getElementById(id);
-  return el ? el.value : "";
-}
-
-function saveOrganizerFormToState() {
-  state.match.name = fieldValue(ORGANIZER_FIELDS.matchName) || "Partida sem nome";
-  state.match.date = fieldValue(ORGANIZER_FIELDS.date);
-  state.match.time = fieldValue(ORGANIZER_FIELDS.time);
-  state.match.location = fieldValue(ORGANIZER_FIELDS.location) || "A definir";
-
-  state.match.map = fieldValue(ORGANIZER_FIELDS.map) || "Área de Operação";
-  state.match.mode = fieldValue(ORGANIZER_FIELDS.mode) || "Simulação";
-
-  state.match.objective =
-    fieldValue(ORGANIZER_FIELDS.objective) ||
-    "Objetivo definido pelo organizador.";
-
-  state.match.briefingTitle =
-    fieldValue(ORGANIZER_FIELDS.briefingTitle) ||
-    "Briefing da Operação";
-
-  state.match.briefingText =
-    fieldValue(ORGANIZER_FIELDS.briefingText) ||
-    "Briefing ainda não preenchido.";
-
-  state.match.teamA = fieldValue(ORGANIZER_FIELDS.teamA) || "AZUL";
-  state.match.teamB = fieldValue(ORGANIZER_FIELDS.teamB) || "VERMELHA";
-
-  state.match.teamAColor =
-    fieldValue(ORGANIZER_FIELDS.teamAColor) || "#4f9be8";
-
-  state.match.teamBColor =
-    fieldValue(ORGANIZER_FIELDS.teamBColor) || "#df5f66";
-
-  state.match.duration =
-    Number(fieldValue(ORGANIZER_FIELDS.duration)) || 120;
-
-  state.match.checkInTime =
-    fieldValue(ORGANIZER_FIELDS.checkIn) || "";
-}
-
-function renderOrganizerForm() {
-  const root = $("#organizerForm");
-
-  if (!root) return;
-
-  const section = state.organizerSection;
-
-  const headerData = {
-    general: {
-      title: "DADOS PRINCIPAIS",
-      text: "Defina quando, onde e qual partida será apresentada aos jogadores."
-    },
-
-    briefing: {
-      title: "BRIEFING E OBJETIVO",
-      text: "Tudo que o jogador precisa saber antes de confirmar e entrar."
-    },
-
-    teams: {
-      title: "EQUIPES",
-      text: "Identificação visual das equipes e configuração de participação."
-    },
-
-    modules: {
-      title: "MÓDULOS DA PARTIDA",
-      text: "Ative somente os recursos que realmente serão utilizados."
-    },
-
-    presence: {
-      title: "PRESENÇA DO ORGANIZADOR",
-      text: "O organizador pode participar da partida ou permanecer apenas no comando."
-    }
-  };
-
-  const meta = headerData[section];
-
-  let html = `
-    <div class="organizer-form-scroll">
-
-      <div class="form-section-title">
-        <div>
-          <div class="eyebrow">CONFIGURAÇÃO</div>
-          <h3>${meta.title}</h3>
-        </div>
-        <small>${meta.text}</small>
-      </div>
-  `;
-
-  if (section === "general") {
-    html += `
-      <div class="form-section">
-        <div class="form-grid">
-          <div class="form-field full">
-            <label class="field-label" for="match-name">NOME DA PARTIDA</label>
-            <input id="match-name" type="text" value="${escapeHtml(state.match.name)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-date">DATA</label>
-            <input id="match-date" type="date" value="${escapeHtml(state.match.date)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-time">HORÁRIO DE INÍCIO</label>
-            <input id="match-time" type="time" value="${escapeHtml(state.match.time)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-checkin">HORÁRIO DE CHECK-IN</label>
-            <input id="match-checkin" type="time" value="${escapeHtml(state.match.checkInTime)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-duration">DURAÇÃO ESTIMADA (MIN)</label>
-            <input id="match-duration" type="number" min="1" max="1440"
-              value="${state.match.duration}">
-          </div>
-
-          <div class="form-field full">
-            <label class="field-label" for="match-location">LOCAL DA PARTIDA</label>
-            <input id="match-location" type="text" value="${escapeHtml(state.match.location)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-map">MAPA / ÁREA</label>
-            <input id="match-map" type="text" value="${escapeHtml(state.match.map)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="match-mode">MODO DE PARTIDA</label>
-            <select id="match-mode">
-              ${selectOption("Simulação", state.match.mode)}
-              ${selectOption("Conquista", state.match.mode)}
-              ${selectOption("Objetivos", state.match.mode)}
-              ${selectOption("Livre", state.match.mode)}
-              ${selectOption("Outro", state.match.mode)}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="info-card">
-        <div class="eyebrow">FLUXO</div>
-        <h3 style="margin-top:6px;">Como o jogador verá isso</h3>
-        <p class="field-help">
-          A partida salva aparecerá no painel do jogador como agendada. Quando o organizador
-          iniciar, ela passa automaticamente para AO VIVO.
-        </p>
-      </div>
-    `;
-  }
-
-  if (section === "briefing") {
-    html += `
-      <div class="form-section">
-        <div class="form-grid">
-          <div class="form-field full">
-            <label class="field-label" for="briefing-title">TÍTULO DO BRIEFING</label>
-            <input id="briefing-title" type="text"
-              value="${escapeHtml(state.match.briefingTitle)}">
-          </div>
-
-          <div class="form-field full">
-            <label class="field-label" for="match-objective">OBJETIVO PRINCIPAL</label>
-            <textarea id="match-objective">${escapeHtml(state.match.objective)}</textarea>
-          </div>
-
-          <div class="form-field full">
-            <label class="field-label" for="briefing-text">BRIEFING COMPLETO</label>
-            <textarea id="briefing-text" style="min-height:230px;">${escapeHtml(state.match.briefingText)}</textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="info-card">
-        <div class="eyebrow">VISIBILIDADE</div>
-        <h3 style="margin-top:6px;">O jogador verá exatamente este conteúdo</h3>
-        <p class="field-help">
-          O briefing é exibido no modo jogador antes da confirmação. A confirmação serve
-          apenas para registrar que o jogador leu as informações.
-        </p>
-      </div>
-    `;
-  }
-
-  if (section === "teams") {
-    html += `
-      <div class="form-section">
-        <div class="form-grid">
-          <div class="form-field">
-            <label class="field-label" for="team-a">EQUIPE 1</label>
-            <input id="team-a" type="text" value="${escapeHtml(state.match.teamA)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="team-b">EQUIPE 2</label>
-            <input id="team-b" type="text" value="${escapeHtml(state.match.teamB)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="team-a-color">COR EQUIPE 1</label>
-            <input id="team-a-color" type="color" value="${escapeHtml(state.match.teamAColor)}">
-          </div>
-
-          <div class="form-field">
-            <label class="field-label" for="team-b-color">COR EQUIPE 2</label>
-            <input id="team-b-color" type="color" value="${escapeHtml(state.match.teamBColor)}">
-          </div>
-        </div>
-      </div>
-
-      <div class="summary-card" style="padding:18px;">
-        <div class="eyebrow">IDENTIFICAÇÃO</div>
-        <h3 style="margin-top:6px;">Equipes definidas para a partida</h3>
-
-        <div class="match-meta">
-          <div class="meta-box">
-            <span>EQUIPE 1</span>
-            <strong>${escapeHtml(state.match.teamA)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>EQUIPE 2</span>
-            <strong>${escapeHtml(state.match.teamB)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>SIMULAÇÃO DEV</span>
-            <strong>${state.simulated.playersPerTeam} POR EQUIPE</strong>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (section === "modules") {
-    html += `
-      <div class="form-section">
-        <div class="toggle-list">
-
-          ${moduleToggle("medical", "MÓDULO MÉDICO", state.match.modules.medical)}
-          ${moduleToggle("zones", "ZONAS / SETORES", state.match.modules.zones)}
-          ${moduleToggle("score", "PLACAR", state.match.modules.score)}
-          ${moduleToggle("tracking", "RASTREAMENTO", state.match.modules.tracking)}
-          ${moduleToggle("objectives", "OBJETIVOS", state.match.modules.objectives)}
-          ${moduleToggle("events", "EVENTOS", state.match.modules.events)}
-
-        </div>
-      </div>
-
-      <div class="info-card">
-        <div class="eyebrow">CONTROLE</div>
-        <h3 style="margin-top:6px;">Módulos opcionais</h3>
-        <p class="field-help">
-          Esses interruptores apenas definem o que o painel apresenta durante o teste.
-          Eles não alteram a lógica de início e encerramento da partida.
-        </p>
-      </div>
-    `;
-  }
-
-  if (section === "presence") {
-    html += `
-      <div class="form-section">
-        <div class="participation-card">
-          <div>
-            <div class="participation-title">
-              ORGANIZADOR PARTICIPA DA PARTIDA
-            </div>
-
-            <div class="participation-sub">
-              ${state.match.organizerParticipates
-                ? "O organizador será considerado participante da partida."
-                : "O organizador permanecerá somente no comando."}
-            </div>
-          </div>
-
-          <label class="switch">
-            <input id="organizer-participates"
-              type="checkbox"
-              ${state.match.organizerParticipates ? "checked" : ""}>
-            <span class="switch-track"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="info-card">
-        <div class="eyebrow">AUTORIDADE DA PARTIDA</div>
-        <h3 style="margin-top:6px;">Somente o organizador inicia e encerra</h3>
-        <p class="field-help">
-          O jogador poderá confirmar presença, solicitar entrada e abandonar a partida,
-          mas não terá o comando de iniciar ou encerrar a operação.
-        </p>
-      </div>
-    `;
-  }
-
-  html += `
-      <div style="height:30px;"></div>
-    </div>
-  `;
-
-  root.innerHTML = html;
-
-  bindOrganizerFormInputs();
-}
-
-function bindOrganizerFormInputs() {
-  const all = [
-    ...Object.values(ORGANIZER_FIELDS),
-    "organizer-participates"
-  ];
-
-  all.forEach((id) => {
-    const element = document.getElementById(id);
-
-    if (!element) return;
-
-    element.addEventListener("change", () => {
-      saveOrganizerFormToState();
-
-      const participation = document.getElementById("organizer-participates");
-
-      if (participation) {
-        state.match.organizerParticipates = participation.checked;
-      }
-
-      saveState();
-      render();
-    });
-
-    element.addEventListener("input", () => {
-      saveOrganizerFormToState();
-
-      const participation = document.getElementById("organizer-participates");
-
-      if (participation) {
-        state.match.organizerParticipates = participation.checked;
-      }
-
-      saveState();
-    });
-  });
-
-  $$("[data-module]").forEach((checkbox) => {
-    checkbox.addEventListener("change", () => {
-      const moduleName = checkbox.dataset.module;
-
-      if (moduleName in state.match.modules) {
-        state.match.modules[moduleName] = checkbox.checked;
-        saveState();
-      }
-    });
-  });
-}
-
-function saveMatchFromOrganizer() {
-  saveOrganizerFormToState();
-
-  const participation = document.getElementById("organizer-participates");
-
-  if (participation) {
-    state.match.organizerParticipates = participation.checked;
-  }
-
-  state.match.exists = true;
-  state.match.saved = true;
-
-  if (state.match.status === "ended") {
-    state.match.status = "scheduled";
-    state.match.seconds = 0;
-  }
-
-  saveState();
-  render();
-
-  openSaveModal();
-}
-
-function openSaveModal() {
-  const modal = $("#modalRoot");
-  const text = $("#saveModalText");
-
-  if (!modal) return;
-
-  text.textContent =
-    `A partida "${state.match.name}" foi salva. ` +
-    `Ela já está disponível no painel do jogador.`;
-
-  modal.classList.remove("hidden");
-}
-
-function closeSaveModal() {
-  $("#modalRoot")?.classList.add("hidden");
-}
-
-function enterGameFromModal() {
-  closeSaveModal();
-
-  state.currentRole = "organizer";
-
-  if (state.match.status === "live") {
-    state.player.locked = true;
-    showScreen("tactical");
+function enterFromPreparation() {
+  if (!state.player.briefingAck) {
+    showToast("Confirme a leitura do briefing.");
     return;
   }
 
-  showScreen("organizer");
-}
-
-/* ================================================================
-   DEV
-================================================================ */
-
-function updateDevPreview() {
-  const field = $("#devPlayersPerTeam");
-
-  if (!field) return;
-
-  let amount = Number(field.value);
-
-  if (!Number.isFinite(amount) || amount < 0) {
-    amount = 0;
-  }
-
-  amount = Math.floor(amount);
-
-  $("#devBluePreview").textContent = amount;
-  $("#devRedPreview").textContent = amount;
-  $("#devTotalPreview").textContent = amount * 2;
-}
-
-function applyDevSimulation() {
-  const field = $("#devPlayersPerTeam");
-
-  let amount = Number(field?.value);
-
-  if (!Number.isFinite(amount) || amount < 0) {
-    amount = 0;
-  }
-
-  amount = Math.floor(amount);
-
-  state.simulated.playersPerTeam = amount;
-
-  state.simulated.players = [];
-
-  for (let i = 1; i <= amount; i++) {
-    state.simulated.players.push({
-      id: `AZ-${String(i).padStart(3, "0")}`,
-      name: `AZUL ${i}`,
-      team: state.match.teamA
-    });
-  }
-
-  for (let i = 1; i <= amount; i++) {
-    state.simulated.players.push({
-      id: `VM-${String(i).padStart(3, "0")}`,
-      name: `VERMELHA ${i}`,
-      team: state.match.teamB
-    });
-  }
-
-  /*
-    Ao aplicar a simulação, o estado atual da partida também é atualizado.
-    Isso permite que o jogador veja os efeitos da configuração sem resetar.
-  */
-
-  saveState();
-  render();
-
-  toast(`${amount} jogador(es) simulados por equipe.`);
-}
-
-function devSetStatus(status) {
-  state.dev.status = status;
-
-  if (status === "scheduled") {
-    state.match.status = "scheduled";
-  }
-
-  if (status === "live") {
-    state.match.status = "live";
-  }
-
-  if (status === "ended") {
-    state.match.status = "ended";
-  }
-
-  saveState();
-  render();
-}
-
-function devGenerateMatch() {
-  state.match.exists = true;
-  state.match.saved = true;
-
-  state.match.name = "Operação Red Sand";
-  state.match.date = tomorrowDate();
-  state.match.time = "09:00";
-  state.match.location = "Área de Treinamento";
-  state.match.map = "Complexo Industrial";
-  state.match.mode = "Simulação";
-  state.match.objective =
-    "Capturar e manter os setores Alfa e Bravo.";
-  state.match.briefingTitle =
-    "Briefing da Operação";
-  state.match.briefingText =
-    "Partida de teste criada pelo modo DEV.\n\n" +
-    "Leia o briefing, confirme presença e utilize o painel tático para validar o fluxo.";
-
-  state.match.status = state.dev.status;
-
-  saveState();
-  render();
-
-  toast("Partida DEV configurada.");
-}
-
-function tomorrowDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function ensureOrganizerPlayerSimulation() {
-  /*
-    O organizador pode participar como participante único.
-    Não depende da quantidade simulada no DEV.
-  */
-
-  const already = state.simulated.players.some(
-    (player) => player.id === "ORG-001"
-  );
-
-  if (!already && state.match.organizerParticipates) {
-    state.simulated.players.push({
-      id: "ORG-001",
-      name: "ORGANIZADOR",
-      team: state.match.teamA
-    });
-  }
-}
-
-function resetEverything() {
-  const confirmed = window.confirm(
-    "Isso apagará a partida, simulações, configurações e estado persistente deste aparelho. Continuar?"
-  );
-
-  if (!confirmed) return;
-
-  state = initialState();
-
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.warn(error);
-  }
-
-  showScreen("role");
-
-  toast("Ambiente resetado.");
-}
-
-/* ================================================================
-   TÁTICO
-================================================================ */
-
-let inactivityTimer = null;
-
-function unlockPanel() {
-  state.player.locked = false;
-
-  const guard = $("#touchGuard");
-
-  if (guard) {
-    guard.classList.remove("visible");
-  }
-
-  $("#tacticalLockButton")?.classList.remove("hidden");
-
-  saveState();
-  resetInactivity();
-  render();
-
-  toast("Painel desbloqueado.");
-}
-
-function lockPanel() {
-  state.player.locked = true;
-
-  const guard = $("#touchGuard");
-
-  if (guard) {
-    guard.classList.add("visible");
-  }
-
-  $("#tacticalLockButton")?.classList.add("hidden");
-
-  saveState();
-  render();
-}
-
-function resetInactivity() {
-  clearTimeout(inactivityTimer);
-
-  if (!state.player.locked && state.match.status === "live") {
-    inactivityTimer = setTimeout(() => {
-      lockPanel();
-    }, 45000);
-  }
-}
-
-function setupUnlockHold() {
-  const button = $("#unlockButton");
-
-  if (!button) return;
-
-  let timer = null;
-
-  const start = (event) => {
-    event.preventDefault();
-
-    clearTimeout(timer);
-
-    timer = setTimeout(() => {
-      unlockPanel();
-    }, 900);
-  };
-
-  const cancel = () => {
-    clearTimeout(timer);
-  };
-
-  button.addEventListener("pointerdown", start);
-  button.addEventListener("pointerup", cancel);
-  button.addEventListener("pointerleave", cancel);
-  button.addEventListener("pointercancel", cancel);
-}
-
-function manualLock() {
-  lockPanel();
-}
-
-function cycleChannel(direction) {
-  let channel = Number(state.player.channel);
-
-  channel += direction;
-
-  if (channel < 1) channel = 16;
-  if (channel > 16) channel = 1;
-
-  state.player.channel = String(channel).padStart(2, "0");
-
-  saveState();
-  render();
-}
-
-function toggleRadio() {
-  state.player.radio = !state.player.radio;
-
-  saveState();
-  render();
-}
-
-function pttStart() {
-  if (state.player.locked) return;
-
-  if (!state.player.radio) {
-    toast("Rádio desligado.");
+  if (state.match.status !== "live") {
+    showToast("A partida ainda não foi iniciada.");
     return;
   }
 
-  const button = $("#pttButton");
-
-  button?.classList.add("pressed");
-
-  const feedback = $("#radioFeedback");
-
-  if (feedback) {
-    feedback.textContent = "TRANSMITINDO...";
-  }
+  enterMatch();
 }
 
-function pttStop() {
-  const button = $("#pttButton");
-  button?.classList.remove("pressed");
 
-  const feedback = $("#radioFeedback");
+/* ============================================================
+   DETALHES DO JOGADOR
+============================================================ */
 
-  if (feedback) {
-    feedback.textContent = "RÁDIO PRONTO";
-  }
+function openPlayerDetails() {
+  showScreen("player-details");
 }
 
-function showInstructions() {
-  /*
-    O pedido anterior exigia telas completas para conteúdo.
-    Aqui abrimos o conteúdo em uma tela dedicada usando o player prep
-    sem transformar a página em modal.
-  */
-
-  state.previousScreen = state.currentScreen;
-
-  showScreen("playerPrep");
-  renderInstructionsInsteadOfPrep = true;
-  render();
-}
-
-let renderInstructionsInsteadOfPrep = false;
-
-/* ================================================================
-   GPS
-================================================================ */
-
-function startGps() {
-  if (!navigator.geolocation) {
-    state.gps.ready = false;
-    saveState();
-    return;
-  }
-
-  navigator.geolocation.watchPosition(
-    (position) => {
-      state.gps.lat = position.coords.latitude;
-      state.gps.lng = position.coords.longitude;
-      state.gps.accuracy = position.coords.accuracy;
-      state.gps.ready = true;
-
-      saveState();
-      render();
-    },
-    () => {
-      state.gps.ready = false;
-      saveState();
-      render();
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 5000,
-      timeout: 10000
-    }
-  );
-}
-
-/* ================================================================
-   RENDER PLAYER
-================================================================ */
-
-function renderPlayerLobby() {
-  const root = $("#playerLobbyContent");
-
-  if (!root) return;
-
-  if (!hasMatch()) {
-    root.innerHTML = `
-      <div class="empty-panel">
-        <div>
-          <div class="eyebrow">SEM PARTIDA DISPONÍVEL</div>
-          <h2 style="margin-top:8px;">Nenhuma partida cadastrada</h2>
-          <p>
-            Quando o organizador salvar uma partida, ela aparecerá aqui automaticamente.
-          </p>
-        </div>
-      </div>
-    `;
-
-    return;
-  }
-
-  const status = state.match.status;
-
-  const badge =
-    status === "live"
-      ? `<span class="status-badge live">AO VIVO</span>`
-      : status === "ended"
-      ? `<span class="status-badge ended">ENCERRADA</span>`
-      : `<span class="status-badge scheduled">AGENDADA</span>`;
-
-  let mainAction = "";
-
-  if (status === "scheduled") {
-    if (state.player.participation) {
-      mainAction = `
-        <button id="playerOpenMatch" class="primary-action big-action" type="button">
-          VER PREPARAÇÃO
-        </button>
-      `;
-    } else {
-      mainAction = `
-        <button id="playerConfirmPresence" class="primary-action big-action" type="button">
-          CONFIRMAR PRESENÇA
-        </button>
-      `;
-    }
-  }
-
-  if (status === "live") {
-    if (state.player.entryRequest === "accepted") {
-      mainAction = `
-        <button id="playerEnterLive" class="primary-action big-action" type="button">
-          ENTRAR NA PARTIDA
-        </button>
-      `;
-    } else {
-      mainAction = `
-        <button id="playerRequestEntry" class="primary-action big-action" type="button">
-          SOLICITAR ENTRADA
-        </button>
-      `;
-    }
-  }
-
-  if (status === "ended") {
-    mainAction = `
-      <button class="secondary-action big-action" type="button" disabled>
-        PARTIDA ENCERRADA
-      </button>
-    `;
-  }
-
-  root.innerHTML = `
-    <div class="player-hero">
-
-      <div class="match-card ${status}-card">
-        <div class="eyebrow">OPERAÇÃO DISPONÍVEL</div>
-
-        <h2 style="margin-top:7px;">
-          ${escapeHtml(state.match.name)}
-        </h2>
-
-        <p style="margin-bottom:0;">
-          ${escapeHtml(state.match.objective)}
-        </p>
-
-        <div class="match-meta">
-          <div class="meta-box">
-            <span>STATUS</span>
-            <strong>${status === "live" ? "AO VIVO" : status === "ended" ? "ENCERRADA" : "AGENDADA"}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>DATA</span>
-            <strong>${formatDateBr(state.match.date)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>HORÁRIO</span>
-            <strong>${escapeHtml(state.match.time || "—")}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>LOCAL</span>
-            <strong>${escapeHtml(state.match.location)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>MAPA</span>
-            <strong>${escapeHtml(state.match.map)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>MODO</span>
-            <strong>${escapeHtml(state.match.mode)}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div class="player-side-grid">
-        <div class="info-card">
-          <div class="eyebrow">SEU STATUS</div>
-
-          <div class="info-row">
-            <span>JOGADOR</span>
-            <strong>${escapeHtml(state.player.name)}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>EQUIPE</span>
-            <strong>${escapeHtml(state.player.team)}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>PRESENÇA</span>
-            <strong>${state.player.participation ? "CONFIRMADA" : "NÃO CONFIRMADA"}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>BRIEFING</span>
-            <strong>${state.player.briefingAck ? "LIDO" : "PENDENTE"}</strong>
-          </div>
-        </div>
-
-        <div class="player-actions-grid">
-          ${mainAction}
-
-          <button id="playerOpenDetails" class="secondary-action big-action" type="button">
-            DETALHES
-          </button>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="summary-card" style="padding:18px;">
-      <div class="eyebrow">BRIEFING</div>
-      <h3 style="margin-top:7px;">${escapeHtml(state.match.briefingTitle)}</h3>
-      <p style="white-space:pre-line;margin-bottom:0;">
-        ${escapeHtml(state.match.briefingText)}
-      </p>
-    </div>
-  `;
-
-  $("#playerConfirmPresence")?.addEventListener("click", () => {
-    confirmPresence();
-  });
-
-  $("#playerOpenMatch")?.addEventListener("click", () => {
-    state.currentScreen = "playerPrep";
-    renderInstructionsInsteadOfPrep = false;
-    showScreen("playerPrep");
-  });
-
-  $("#playerRequestEntry")?.addEventListener("click", () => {
-    requestEntry();
-  });
-
-  $("#playerEnterLive")?.addEventListener("click", () => {
-    requestEntry();
-  });
-
-  $("#playerOpenDetails")?.addEventListener("click", () => {
-    showScreen("playerDetails");
-  });
-}
-
-/* ================================================================
-   PREP / BRIEFING
-================================================================ */
-
-function renderPlayerPrep() {
-  const root = $("#playerPrepContent");
-
-  if (!root) return;
-
-  if (renderInstructionsInsteadOfPrep) {
-    root.innerHTML = `
-      <div class="prep-card panel-card" style="max-width:900px;margin:0 auto;">
-        <div class="eyebrow">INSTRUÇÕES</div>
-        <h2 style="margin-top:7px;">ORIENTAÇÕES DO PAINEL</h2>
-
-        <div class="briefing-box" style="margin-top:18px;">
-          <strong>1. PAINEL BLOQUEADO</strong><br>
-          O painel tático começa protegido contra toques acidentais.
-          Segure o botão central para liberar os comandos.
-          <br><br>
-
-          <strong>2. RÁDIO</strong><br>
-          O botão PTT permite testar a transmissão no ambiente simulado.
-          O canal e o volume ficam disponíveis no próprio painel.
-          <br><br>
-
-          <strong>3. OBJETIVOS</strong><br>
-          Os setores mostrados no mapa são elementos de visualização da partida.
-          <br><br>
-
-          <strong>4. SAÍDA</strong><br>
-          No modo jogador, o comando disponível é ABANDONAR PARTIDA.
-          Início e encerramento pertencem ao organizador.
-        </div>
-      </div>
-    `;
-
-    return;
-  }
-
-  root.innerHTML = `
-    <div class="prep-grid">
-
-      <div class="prep-card panel-card">
-        <div class="eyebrow">BRIEFING</div>
-        <h2 style="margin-top:7px;">
-          ${escapeHtml(state.match.briefingTitle)}
-        </h2>
-
-        <div class="briefing-box" style="margin-top:16px;">
-          ${escapeHtml(state.match.briefingText)}
-        </div>
-
-        <label class="check-row">
-          <input id="briefingAckInput" type="checkbox"
-            ${state.player.briefingAck ? "checked" : ""}>
-          <span>Confirmo que li o briefing da partida.</span>
-        </label>
-      </div>
-
-      <div class="prep-card panel-card">
-        <div class="eyebrow">PARTIDA</div>
-        <h3 style="margin-top:7px;">
-          ${escapeHtml(state.match.name)}
-        </h3>
-
-        <div class="info-row">
-          <span>OBJETIVO</span>
-          <strong>${escapeHtml(state.match.objective)}</strong>
-        </div>
-
-        <div class="info-row">
-          <span>LOCAL</span>
-          <strong>${escapeHtml(state.match.location)}</strong>
-        </div>
-
-        <div class="info-row">
-          <span>DATA / HORA</span>
-          <strong>${formatDateBr(state.match.date)} — ${escapeHtml(state.match.time)}</strong>
-        </div>
-
-        <button id="prepConfirmButton"
-          class="primary-action big-action"
-          style="width:100%;margin-top:16px;"
-          type="button">
-          ${state.player.participation ? "PRESENÇA CONFIRMADA" : "CONFIRMAR PRESENÇA"}
-        </button>
-      </div>
-
-    </div>
-  `;
-
-  $("#briefingAckInput")?.addEventListener("change", () => {
-    state.player.briefingAck = $("#briefingAckInput").checked;
-
-    saveState();
-    render();
-  });
-
-  $("#prepConfirmButton")?.addEventListener("click", () => {
-    confirmPresence();
-  });
-}
-
-/* ================================================================
-   DETALHES
-================================================================ */
 
 function renderPlayerDetails() {
-  const root = $("#playerDetailsContent");
-
-  if (!root) return;
-
-  if (state.detailTab === "inicio") {
-    root.innerHTML = `
-      <div class="info-card" style="max-width:900px;">
-        <div class="eyebrow">VISÃO GERAL</div>
-        <h2 style="margin-top:7px;">${escapeHtml(state.player.name)}</h2>
-
-        <div class="match-meta">
-          <div class="meta-box">
-            <span>ID</span>
-            <strong>${escapeHtml(state.player.id)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>EQUIPE</span>
-            <strong>${escapeHtml(state.player.team)}</strong>
-          </div>
-
-          <div class="meta-box">
-            <span>CLASSE</span>
-            <strong>${escapeHtml(state.player.roleClass)}</strong>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (state.detailTab === "briefing") {
-    root.innerHTML = `
-      <div class="info-card" style="max-width:900px;">
-        <div class="eyebrow">BRIEFING</div>
-        <h2 style="margin-top:7px;">
-          ${escapeHtml(state.match.briefingTitle)}
-        </h2>
-
-        <div class="briefing-box" style="margin-top:17px;">
-          ${escapeHtml(state.match.briefingText)}
-        </div>
-
-        <div style="margin-top:15px;">
-          <strong>
-            ${state.player.briefingAck
-              ? "BRIEFING LIDO"
-              : "BRIEFING AINDA NÃO CONFIRMADO"}
-          </strong>
-        </div>
-      </div>
-    `;
-  }
-
-  if (state.detailTab === "perfil") {
-    root.innerHTML = `
-      <div class="info-card" style="max-width:680px;">
-        <div class="eyebrow">PERFIL</div>
-
-        <div class="profile-list" style="margin-top:14px;">
-          <div class="info-row">
-            <span>NOME</span>
-            <strong>${escapeHtml(state.player.name)}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>ID</span>
-            <strong>${escapeHtml(state.player.id)}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>EQUIPE</span>
-            <strong>${escapeHtml(state.player.team)}</strong>
-          </div>
-
-          <div class="info-row">
-            <span>CLASSE</span>
-            <strong>${escapeHtml(state.player.roleClass)}</strong>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-}
-
-/* ================================================================
-   TÁTICO
-================================================================ */
-
-function renderTactical() {
-  $("#tacticalMatchName").textContent =
-    state.match.exists ? state.match.name : "SEM PARTIDA";
-
-  $("#mapName").textContent =
-    state.match.map || "Complexo Industrial";
-
-  $("#objectiveText").textContent =
-    state.match.objective || "Aguardando briefing.";
-
-  $("#tacticalStatus").textContent =
-    state.match.status === "live"
-      ? "AO VIVO"
-      : state.match.status === "ended"
-      ? "ENCERRADA"
-      : "AGUARDANDO";
-
-  $("#tacticalTimer").textContent =
-    formatTimer(state.match.seconds || 0);
-
-  const totalSimulated =
-    state.simulated.players?.length || 0;
-
-  const organizerCount =
-    state.match.organizerParticipates ? 1 : 0;
-
-  $("#tacticalPlayers").textContent =
-    totalSimulated + organizerCount;
-
-  $("#radioChannel").textContent = state.player.channel;
-
-  const radioToggle = $("#radioToggle");
-
-  if (radioToggle) {
-    radioToggle.textContent = state.player.radio ? "ON" : "OFF";
-    radioToggle.style.opacity = state.player.radio ? "1" : ".55";
-  }
-
-  const radioVolume = $("#radioVolume");
-
-  if (radioVolume) {
-    radioVolume.value = state.player.radioVolume;
-  }
-
-  const gpsStatus = $("#gpsStatus");
-
-  if (gpsStatus) {
-    gpsStatus.textContent =
-      state.gps.ready
-        ? "GPS ONLINE"
-        : "GPS OFFLINE";
-  }
-
-  const organizerTop = $("#organizerEndMatchTop");
-  const playerTop = $("#playerLeaveMatchTop");
-
-  organizerTop?.classList.toggle(
-    "hidden",
-    state.currentRole !== "organizer" ||
-    state.match.status !== "live"
-  );
-
-  playerTop?.classList.toggle(
-    "hidden",
-    state.currentRole !== "player" ||
-    state.match.status !== "live"
-  );
-
-  $("#tacticalLockButton")?.classList.toggle(
-    "hidden",
-    state.player.locked
-  );
-
-  const guard = $("#touchGuard");
-
-  if (guard) {
-    const locked =
-      state.match.status === "live" &&
-      state.player.locked;
-
-    guard.classList.toggle("visible", locked);
-  }
-
-  resetInactivity();
-}
-
-/* ================================================================
-   ORGANIZADOR HEADER / DEV
-================================================================ */
-
-function renderOrganizerSummary() {
-  const status = state.match.exists
-    ? state.match.status.toUpperCase()
-    : "SEM PARTIDA";
-
-  $("#organizerHeaderState").textContent =
+  setText(
+    "#detailInicioStatus",
     state.match.exists
-      ? `${status} · ${state.match.name}`
-      : "Configure e salve uma partida.";
+      ? getStatusLabel(state.match.status)
+      : "Aguardando partida"
+  );
 
-  $("#organizerSidebarStatus").textContent = status;
+  setText(
+    "#detailInicioText",
+    state.match.exists
+      ? (
+        state.match.status === "live"
+          ? "A partida está ao vivo."
+          : "A partida está programada."
+      )
+      : "As informações da partida aparecerão aqui assim que o organizador salvar uma programação."
+  );
 
-  const total =
-    state.simulated.players.length +
-    (state.match.organizerParticipates ? 1 : 0);
+  setText(
+    "#detailPlayerName",
+    state.player.name
+  );
 
-  $("#organizerPlayerCount").textContent =
-    `${total} jogador${total === 1 ? "" : "es"}`;
+  setText(
+    "#detailPlayerId",
+    state.player.id
+  );
 
-  const startButton = $("#organizerStartTop");
+  setText(
+    "#detailPlayerTeam",
+    getTeamName(state.player.team)
+  );
 
-  if (startButton) {
-    startButton.disabled =
-      !state.match.exists ||
-      state.match.status === "live";
+  setText(
+    "#detailPlayerClass",
+    state.player.class
+  );
 
-    startButton.textContent =
-      state.match.status === "live"
-        ? "PARTIDA EM ANDAMENTO"
-        : "INICIAR PARTIDA";
+  setText(
+    "#detailBriefingTitle",
+    state.organizer.briefingTitle || "Nenhum briefing disponível"
+  );
+
+  setText(
+    "#detailBriefingText",
+    state.organizer.briefingText || "O organizador ainda não cadastrou o briefing."
+  );
+
+  setText(
+    "#profileName",
+    state.player.name
+  );
+
+  setText(
+    "#profileId",
+    state.player.id
+  );
+
+  setText(
+    "#profileTeam",
+    getTeamName(state.player.team)
+  );
+
+  setText(
+    "#profileClass",
+    state.player.class
+  );
+
+  setText(
+    "#profileRadioStatus",
+    state.player.radio
+      ? "ATIVO"
+      : "DESATIVADO"
+  );
+
+  const ack = $("#detailBriefingAck");
+
+  if (ack) {
+    ack.checked = !!state.player.briefingAck;
   }
 }
 
-function renderDev() {
-  const playerField = $("#devPlayersPerTeam");
 
-  if (playerField) {
-    playerField.value = state.simulated.playersPerTeam;
-  }
+function switchDetailTab(tab) {
+  const validTabs = [
+    "inicio",
+    "briefing",
+    "perfil"
+  ];
 
-  $$(".segment-button").forEach((button) => {
-    button.classList.remove("active");
-  });
-
-  $(`[data-dev-role="${state.dev.role}"]`)?.classList.add("active");
-
-  $(`[data-dev-status="${state.dev.status}"]`)?.classList.add("active");
-
-  updateDevPreview();
-}
-
-/* ================================================================
-   GLOBAL RENDER
-================================================================ */
-
-function updateTopbar() {
-  const badge = $("#matchStatusBadge");
-
-  if (!badge) return;
-
-  badge.className = "status-badge neutral";
-
-  if (!state.match.exists) {
-    badge.textContent = "SEM PARTIDA";
+  if (!validTabs.includes(tab)) {
     return;
-  }
-
-  if (state.match.status === "scheduled") {
-    badge.classList.add("scheduled");
-    badge.textContent = "AGENDADA";
-    return;
-  }
-
-  if (state.match.status === "live") {
-    badge.classList.add("live");
-    badge.textContent = "AO VIVO";
-    return;
-  }
-
-  badge.classList.add("ended");
-  badge.textContent = "ENCERRADA";
-}
-
-function render() {
-  updateTopbar();
-
-  renderPlayerLobby();
-  renderPlayerPrep();
-  renderPlayerDetails();
-  renderOrganizerForm();
-  renderOrganizerSummary();
-  renderDev();
-  renderTactical();
-
-  $$(".screen").forEach((screen) => {
-    screen.classList.remove("active");
-  });
-
-  const current = $(`#screen${capitalize(state.currentScreen)}`);
-
-  if (current) {
-    current.classList.add("active");
   }
 
   $$(".detail-tab").forEach((button) => {
     button.classList.toggle(
       "active",
-      button.dataset.detailTab === state.detailTab
+      button.dataset.detailTab === tab
     );
   });
 
-  $$(".side-nav").forEach((button) => {
-    button.classList.toggle(
+  $$("[data-detail-content]").forEach((content) => {
+    content.classList.toggle(
       "active",
-      button.dataset.orgSection === state.organizerSection
+      content.dataset.detailContent === tab
     );
   });
 }
 
-/* ================================================================
-   HTML ESCAPE
-================================================================ */
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+/* ============================================================
+   ORGANIZADOR
+============================================================ */
+
+function readOrganizerForm() {
+  state.match.name =
+    valueOf("#orgMatchName");
+
+  state.match.date =
+    valueOf("#orgMatchDate");
+
+  state.match.time =
+    valueOf("#orgMatchTime");
+
+  state.match.location =
+    valueOf("#orgMatchLocation");
+
+  state.match.map =
+    valueOf("#orgMatchMap") ||
+    "Complexo Industrial";
+
+  state.match.mode =
+    valueOf("#orgMatchMode") ||
+    "Simulação";
+
+  state.match.duration =
+    numberValue(
+      "#orgMatchDuration",
+      60
+    );
+
+  state.match.checkInTime =
+    valueOf("#orgCheckInTime");
+
+
+  state.organizer.briefingTitle =
+    valueOf("#orgBriefingTitle") ||
+    "Briefing da Operação";
+
+  state.organizer.briefingText =
+    valueOf("#orgBriefingText") ||
+    "";
+
+  state.organizer.objective =
+    valueOf("#orgObjective") ||
+    "";
+
+
+  state.organizer.teamBlueName =
+    valueOf("#orgTeamBlueName") ||
+    "Equipe Azul";
+
+  state.organizer.teamBlueLimit =
+    numberValue(
+      "#orgTeamBlueLimit",
+      20
+    );
+
+
+  state.organizer.teamRedName =
+    valueOf("#orgTeamRedName") ||
+    "Equipe Vermelha";
+
+  state.organizer.teamRedLimit =
+    numberValue(
+      "#orgTeamRedLimit",
+      20
+    );
+
+
+  state.organizer.participates =
+    checkedOf("#orgOrganizerParticipates");
+
+
+  state.modules.medical =
+    checkedOf("#moduleMedical");
+
+  state.modules.zone =
+    checkedOf("#moduleZone");
+
+  state.modules.score =
+    checkedOf("#moduleScore");
+
+  state.modules.tracking =
+    checkedOf("#moduleTracking");
+
+  state.modules.objectives =
+    checkedOf("#moduleObjectives");
+
+  state.modules.events =
+    checkedOf("#moduleEvents");
 }
 
-function selectOption(value, selected) {
-  return `
-    <option value="${escapeHtml(value)}"
-      ${value === selected ? "selected" : ""}>
-      ${escapeHtml(value)}
-    </option>
-  `;
+
+function writeOrganizerForm() {
+  setValue(
+    "#orgMatchName",
+    state.match.name
+  );
+
+  setValue(
+    "#orgMatchDate",
+    state.match.date
+  );
+
+  setValue(
+    "#orgMatchTime",
+    state.match.time
+  );
+
+  setValue(
+    "#orgMatchLocation",
+    state.match.location
+  );
+
+  setValue(
+    "#orgMatchMap",
+    state.match.map
+  );
+
+  setValue(
+    "#orgMatchMode",
+    state.match.mode
+  );
+
+  setValue(
+    "#orgMatchDuration",
+    state.match.duration
+  );
+
+  setValue(
+    "#orgCheckInTime",
+    state.match.checkInTime
+  );
+
+
+  setValue(
+    "#orgBriefingTitle",
+    state.organizer.briefingTitle
+  );
+
+  setValue(
+    "#orgBriefingText",
+    state.organizer.briefingText
+  );
+
+  setValue(
+    "#orgObjective",
+    state.organizer.objective
+  );
+
+
+  setValue(
+    "#orgTeamBlueName",
+    state.organizer.teamBlueName
+  );
+
+  setValue(
+    "#orgTeamBlueLimit",
+    state.organizer.teamBlueLimit
+  );
+
+  setValue(
+    "#orgTeamRedName",
+    state.organizer.teamRedName
+  );
+
+  setValue(
+    "#orgTeamRedLimit",
+    state.organizer.teamRedLimit
+  );
+
+
+  setChecked(
+    "#orgOrganizerParticipates",
+    state.organizer.participates
+  );
+
+
+  setChecked(
+    "#moduleMedical",
+    state.modules.medical
+  );
+
+  setChecked(
+    "#moduleZone",
+    state.modules.zone
+  );
+
+  setChecked(
+    "#moduleScore",
+    state.modules.score
+  );
+
+  setChecked(
+    "#moduleTracking",
+    state.modules.tracking
+  );
+
+  setChecked(
+    "#moduleObjectives",
+    state.modules.objectives
+  );
+
+  setChecked(
+    "#moduleEvents",
+    state.modules.events
+  );
 }
 
-function moduleToggle(key, label, checked) {
-  return `
-    <div class="toggle-item">
-      <label>
-        <input
-          type="checkbox"
-          data-module="${key}"
-          ${checked ? "checked" : ""}
-        >
-        <span>${escapeHtml(label)}</span>
-      </label>
-    </div>
-  `;
-}
 
-/* ================================================================
-   EVENTOS
-================================================================ */
+function renderOrganizer() {
+  writeOrganizerForm();
 
-function bindStaticEvents() {
-  /* Escolha inicial */
-  $$("[data-role-choice]").forEach((button) => {
-    button.addEventListener("click", () => {
-      chooseRole(button.dataset.roleChoice);
-    });
-  });
+  setText(
+    "#organizerMatchStateText",
+    state.match.exists
+      ? `STATUS: ${getStatusLabel(state.match.status)}`
+      : "Nenhuma partida salva."
+  );
 
-  /* DEV */
-  $("#devButton")?.addEventListener("click", () => {
-    state.previousScreen = state.currentScreen;
-    showScreen("dev");
-  });
+  const startButton =
+    $("#organizerStartButton");
 
-  /* Jogador */
-  $("#playerDetailsButton")?.addEventListener("click", () => {
-    showScreen("playerDetails");
-  });
+  const endButton =
+    $("#organizerEndButton");
 
-  /* Organizador */
-  $("#organizerStartTop")?.addEventListener("click", () => {
-    startMatch("organizer");
-  });
+  const startTop =
+    $("#organizerStartButton");
 
-  $("#saveMatchButton")?.addEventListener("click", () => {
-    saveMatchFromOrganizer();
-  });
-
-  $("#organizerEndMatchTop")?.addEventListener("click", () => {
-    endMatch("organizer");
-  });
-
-  $("#playerLeaveMatchTop")?.addEventListener("click", () => {
-    abandonMatch();
-  });
-
-  /* DEV */
-  $("#devPlayersPerTeam")?.addEventListener("input", updateDevPreview);
-
-  $("#applyDevSimulation")?.addEventListener("click", () => {
-    applyDevSimulation();
-  });
-
-  $("#devCreateMatch")?.addEventListener("click", () => {
-    devGenerateMatch();
-  });
-
-  $("#devStartMatch")?.addEventListener("click", () => {
-    startMatch("dev");
-  });
-
-  $("#devEndMatch")?.addEventListener("click", () => {
-    endMatch("dev");
-  });
-
-  $("#devReset")?.addEventListener("click", resetEverything);
-
-  $$("[data-dev-role]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setDevRole(button.dataset.devRole);
-    });
-  });
-
-  $$("[data-dev-status]").forEach((button) => {
-    button.addEventListener("click", () => {
-      devSetStatus(button.dataset.devStatus);
-    });
-  });
-
-  /* Tabs do jogador */
-  $$("[data-detail-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.detailTab = button.dataset.detailTab;
-      saveState();
-      render();
-    });
-  });
-
-  /* Seções do organizador */
-  $$("[data-org-section]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.organizerSection = button.dataset.orgSection;
-      saveState();
-      render();
-    });
-  });
-
-  /* Voltar */
-  $$("[data-back]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const target = button.dataset.back;
-      goBack(target);
-    });
-  });
-
-  /* Modal */
-  $("#modalCloseButton")?.addEventListener("click", closeSaveModal);
-
-  $("#modalEnterButton")?.addEventListener("click", enterGameFromModal);
-
-  /* Tático */
-  $("#unlockButton")?.addEventListener("pointerdown", (event) => {
-    /*
-      setupUnlockHold também registra o gesto.
-      Este listener apenas impede alguns comportamentos indesejados.
-    */
-    event.preventDefault();
-  });
-
-  $("#tacticalLockButton")?.addEventListener("click", manualLock);
-
-  $("#radioToggle")?.addEventListener("click", toggleRadio);
-
-  $("#channelDown")?.addEventListener("click", () => {
-    cycleChannel(-1);
-  });
-
-  $("#channelUp")?.addEventListener("click", () => {
-    cycleChannel(1);
-  });
-
-  $("#radioVolume")?.addEventListener("input", (event) => {
-    state.player.radioVolume = Number(event.target.value);
-    saveState();
-  });
-
-  const ptt = $("#pttButton");
-
-  if (ptt) {
-    ptt.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-
-      if (!state.player.locked) {
-        pttStart();
-      }
-    });
-
-    ptt.addEventListener("pointerup", pttStop);
-    ptt.addEventListener("pointercancel", pttStop);
-    ptt.addEventListener("pointerleave", pttStop);
+  if (startButton) {
+    startButton.classList.toggle(
+      "hidden",
+      !(
+        state.match.exists &&
+        state.match.status === "scheduled"
+      )
+    );
   }
 
-  $("#instructionsButton")?.addEventListener("click", () => {
-    showInstructions();
-  });
+  if (endButton) {
+    endButton.classList.toggle(
+      "hidden",
+      state.match.status !== "live"
+    );
+  }
 
-  $("#objectiveButton")?.addEventListener("click", () => {
-    state.previousScreen = state.currentScreen;
-    renderInstructionsInsteadOfPrep = true;
-
-    showScreen("playerPrep");
-  });
-
-  /*
-    Botão de desbloqueio é refeito depois do DOM inicial.
-  */
-  setupUnlockHold();
+  setText(
+    "#organizerPresence",
+    buildPresenceText()
+  );
 }
 
-/* ================================================================
-   CRONÔMETRO DA PARTIDA
-================================================================ */
 
-setInterval(() => {
-  if (state.match.status !== "live") {
+function saveMatch() {
+  if (state.role !== "organizer") {
+    showToast("Somente o organizador pode salvar a partida.");
     return;
   }
 
-  state.match.seconds += 1;
+  readOrganizerForm();
+
+  if (!state.match.name.trim()) {
+    showToast("Informe o nome da partida.");
+    return;
+  }
+
+  if (!state.match.date) {
+    showToast("Informe a data da partida.");
+    return;
+  }
+
+  if (!state.match.time) {
+    showToast("Informe o horário da partida.");
+    return;
+  }
+
+  if (!state.match.location.trim()) {
+    showToast("Informe o local da partida.");
+    return;
+  }
+
+
+  const wasLive =
+    state.match.status === "live";
+
+  state.match.exists = true;
 
   /*
-    Salvamos frequentemente para manter o estado persistente.
+    Salvar não inicia a partida.
+    Uma partida nova/alterada fica agendada,
+    salvo quando ela já estiver ao vivo.
   */
-  saveState();
+  if (!wasLive) {
+    state.match.status = "scheduled";
+  }
 
-  renderTactical();
-}, 1000);
+  addEvent(
+    "organizer",
+    "Partida salva"
+  );
 
-/* ================================================================
-   INICIALIZAÇÃO
-================================================================ */
+  persist();
 
-bindStaticEvents();
-startGps();
-render();
+  render();
 
-/*
-  Quando o app já foi usado anteriormente, ele não volta para a tela
-  de escolha de persona automaticamente.
-*/
-if (!state.firstRun && state.currentScreen === "role") {
-  state.currentScreen =
-    state.currentRole === "organizer"
-      ? "organizer"
-      : "playerLobby";
+  openSaveConfirmation();
+}
 
-  saveState();
+
+function openSaveConfirmation() {
+  const modal = $("#saveConfirmModal");
+
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+
+  setText(
+    "#saveConfirmText",
+    `${state.match.name} foi salva e já está disponível no painel do jogador.`
+  );
+}
+
+
+function closeSaveConfirmation() {
+  const modal = $("#saveConfirmModal");
+
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+
+function enterAfterSave() {
+  closeSaveConfirmation();
+
+  state.role = "organizer";
+
+  persist();
+
+  showScreen("organizer");
+}
+
+
+/* ============================================================
+   ORGANIZADOR — INICIAR
+============================================================ */
+
+function startMatch(source = "organizer") {
+  /*
+    A regra de autoridade é explícita:
+    somente o organizador pode iniciar.
+  */
+
+  if (state.role !== "organizer" && source !== "dev") {
+    showToast("Somente o organizador pode iniciar a partida.");
+    return;
+  }
+
+  if (!state.match.exists) {
+    showToast("Salve uma partida antes de iniciar.");
+    return;
+  }
+
+  if (
+    state.match.status !== "scheduled" &&
+    source !== "dev"
+  ) {
+    showToast("A partida não está agendada.");
+    return;
+  }
+
+  state.match.status = "live";
+  state.match.startedAt = Date.now();
+  state.match.elapsedSeconds = 0;
+
+  state.player.entryRequested = false;
+
+  addEvent(
+    "organizer",
+    "Partida iniciada"
+  );
+
+  persist();
+
+  /*
+    O organizador permanece organizador.
+    Nunca mudamos automaticamente para jogador.
+  */
+  if (state.role === "organizer") {
+    showScreen("organizer");
+  }
+
+  render();
+
+  showToast("Partida iniciada.");
+}
+
+
+/* ============================================================
+   ORGANIZADOR — ENCERRAR
+============================================================ */
+
+function endMatch(source = "organizer") {
+  if (
+    state.role !== "organizer" &&
+    source !== "dev"
+  ) {
+    showToast("Somente o organizador pode encerrar a partida.");
+    return;
+  }
+
+  if (!state.match.exists) {
+    showToast("Não existe partida ativa.");
+    return;
+  }
+
+  if (state.match.status !== "live") {
+    showToast("A partida não está ao vivo.");
+    return;
+  }
+
+  state.match.status = "ended";
+
+  updateElapsedTime();
+
+  addEvent(
+    "organizer",
+    "Partida encerrada"
+  );
+
+  persist();
+
+  render();
+
+  showToast("Partida encerrada.");
+}
+
+
+/* ============================================================
+   DEV
+============================================================ */
+
+function renderDev() {
+  const playersInput =
+    $("#devPlayersPerTeam");
+
+  if (
+    playersInput &&
+    document.activeElement !== playersInput
+  ) {
+    playersInput.value =
+      state.simulatedPlayers.perTeam;
+  }
+
+  updateDevPreview();
+
+  $$(".dev-segment[data-dev-role]").forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.devRole === state.role
+    );
+  });
+
+  $$(".dev-segment[data-dev-status]").forEach((button) => {
+    button.classList.toggle(
+      "active",
+      button.dataset.devStatus === state.match.status
+    );
+  });
+}
+
+
+function switchDevRole(role) {
+  if (
+    role !== "player" &&
+    role !== "organizer"
+  ) {
+    return;
+  }
+
+  state.role = role;
+  state.dev.lastRole = role;
+
+  persist();
+
+  render();
+
+  showToast(
+    role === "player"
+      ? "DEV: jogador"
+      : "DEV: organizador"
+  );
+}
+
+
+function setDevStatus(status) {
+  const valid = [
+    "scheduled",
+    "live",
+    "ended"
+  ];
+
+  if (!valid.includes(status)) {
+    return;
+  }
+
+  if (!state.match.exists) {
+    generateDevMatch(false);
+  }
+
+  state.match.status = status;
+
+  if (status === "live") {
+    if (!state.match.startedAt) {
+      state.match.startedAt = Date.now();
+    }
+  }
+
+  if (status !== "live") {
+    state.match.startedAt = null;
+  }
+
+  if (status === "ended") {
+    state.match.elapsedSeconds = 0;
+  }
+
+  persist();
+
+  render();
+
+  showToast(
+    `DEV: ${getStatusLabel(status)}`
+  );
+}
+
+
+function updateDevPreview() {
+  const input =
+    $("#devPlayersPerTeam");
+
+  const value = input
+    ? Math.max(
+        0,
+        Math.floor(Number(input.value) || 0)
+      )
+    : state.simulatedPlayers.perTeam;
+
+  setText(
+    "#devBlueCount",
+    value
+  );
+
+  setText(
+    "#devRedCount",
+    value
+  );
+
+  setText(
+    "#devTotalCount",
+    value * 2
+  );
+}
+
+
+function applyDevPlayers() {
+  const input =
+    $("#devPlayersPerTeam");
+
+  if (!input) return;
+
+  const amount = Math.max(
+    0,
+    Math.min(
+      500,
+      Math.floor(Number(input.value) || 0)
+    )
+  );
+
+  state.simulatedPlayers.perTeam =
+    amount;
+
+  state.simulatedPlayers.blue =
+    createSimulatedTeam(
+      "AZ",
+      amount
+    );
+
+  state.simulatedPlayers.red =
+    createSimulatedTeam(
+      "VM",
+      amount
+    );
+
+  addEvent(
+    "dev",
+    `${amount} jogadores simulados por equipe`
+  );
+
+  persist();
+
+  render();
+
+  showToast(
+    `${amount} por equipe aplicados.`
+  );
+}
+
+
+function createSimulatedTeam(prefix, amount) {
+  const players = [];
+
+  for (let i = 1; i <= amount; i++) {
+    players.push({
+      id: `${prefix}-${String(i).padStart(3, "0")}`,
+      name: `${prefix} ${String(i).padStart(3, "0")}`
+    });
+  }
+
+  return players;
+}
+
+
+function generateDevMatch(showMessage = true) {
+  state.match.exists = true;
+
+  state.match.name =
+    "Operação Red Sand";
+
+  state.match.status =
+    "scheduled";
+
+  state.match.date =
+    getTodayISO();
+
+  state.match.time =
+    "19:00";
+
+  state.match.location =
+    "Complexo Industrial";
+
+  state.match.map =
+    "Complexo Industrial";
+
+  state.match.mode =
+    "Simulação";
+
+  state.match.duration =
+    60;
+
+  state.match.checkInTime =
+    "18:30";
+
+  state.match.startedAt =
+    null;
+
+  state.match.elapsedSeconds =
+    0;
+
+
+  state.organizer.briefingTitle =
+    "Briefing da Operação";
+
+  state.organizer.briefingText =
+    "Objetivo, regras da partida, condições de participação e orientações gerais.";
+
+  state.organizer.objective =
+    "Acompanhar os objetivos definidos pelo organizador.";
+
+
+  state.organizer.teamBlueName =
+    "Equipe Azul";
+
+  state.organizer.teamRedName =
+    "Equipe Vermelha";
+
+
+  addEvent(
+    "dev",
+    "Partida de teste gerada"
+  );
+
+  persist();
+
+  render();
+
+  if (showMessage) {
+    showToast("Partida de teste criada.");
+  }
+}
+
+
+function devStartMatch() {
+  state.role = "organizer";
+
+  if (!state.match.exists) {
+    generateDevMatch(false);
+  }
+
+  startMatch("dev");
+}
+
+
+function devEndMatch() {
+  endMatch("dev");
+}
+
+
+function resetAllState() {
+  const confirmed =
+    window.confirm(
+      "Resetar todos os dados persistentes da partida?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  state = createInitialState();
+
+  persist();
+
+  currentScreen = "role-select";
+  previousScreen = "player-home";
+
+  showScreen(
+    "role-select",
+    false
+  );
+
+  render();
+
+  showToast("Dados resetados.");
+}
+
+
+/* ============================================================
+   PRESENÇA
+============================================================ */
+
+function buildPresenceText() {
+  const blue =
+    state.simulatedPlayers.blue || [];
+
+  const red =
+    state.simulatedPlayers.red || [];
+
+  const blueName =
+    state.organizer.teamBlueName ||
+    "Equipe Azul";
+
+  const redName =
+    state.organizer.teamRedName ||
+    "Equipe Vermelha";
+
+  const playerStatus =
+    state.player.participation
+      ? "confirmado"
+      : state.player.entryRequested
+        ? "solicitação enviada"
+        : "aguardando";
+
+
+  return `
+    ${escapeHTML(blueName)}:
+    ${blue.length} jogadores simulados
+
+    • ${escapeHTML(redName)}:
+    ${red.length} jogadores simulados
+
+    • ${escapeHTML(state.player.name)}:
+    ${playerStatus}
+  `.replace(/\s+/g, " ").trim();
+}
+
+
+/* ============================================================
+   PAINEL TÁTICO
+============================================================ */
+
+function renderTactical() {
+  setText(
+    "#tacticalMatchName",
+    state.match.name || "SEM PARTIDA"
+  );
+
+  setText(
+    "#tacticalMapName",
+    state.match.map || "Complexo Industrial"
+  );
+
+  setText(
+    "#tacticalObjective",
+    state.organizer.objective ||
+      "Aguardando briefing."
+  );
+
+  setText(
+    "#tacticalStatus",
+    getStatusLabel(
+      state.match.status
+    )
+  );
+
+  setText(
+    "#tacticalTimer",
+    formatTimer(
+      state.match.elapsedSeconds
+    )
+  );
+
+  setText(
+    "#tacticalPlayerCount",
+    getTotalPlayerCount()
+  );
+
+
+  setText(
+    "#radioChannel",
+    String(
+      state.player.channel
+    ).padStart(2, "0")
+  );
+
+
+  const radioToggle =
+    $("#radioToggle");
+
+  if (radioToggle) {
+    radioToggle.textContent =
+      state.player.radio
+        ? "ON"
+        : "OFF";
+
+    radioToggle.classList.toggle(
+      "active",
+      state.player.radio
+    );
+  }
+
+
+  const volume =
+    $("#radioVolume");
+
+  if (volume) {
+    volume.value =
+      state.player.radioVolume;
+  }
+
+
+  const organizerStart =
+    $("#tacticalOrganizerStart");
+
+  const organizerEnd =
+    $("#tacticalOrganizerEnd");
+
+  const playerLeave =
+    $("#tacticalPlayerLeave");
+
+
+  if (organizerStart) {
+    organizerStart.classList.toggle(
+      "hidden",
+      !(
+        state.role === "organizer" &&
+        state.match.exists &&
+        state.match.status === "scheduled"
+      )
+    );
+  }
+
+
+  if (organizerEnd) {
+    organizerEnd.classList.toggle(
+      "hidden",
+      !(
+        state.role === "organizer" &&
+        state.match.status === "live"
+      )
+    );
+  }
+
+
+  if (playerLeave) {
+    playerLeave.classList.toggle(
+      "hidden",
+      !(
+        state.role === "player" &&
+        state.match.status === "live"
+      )
+    );
+  }
+
+
+  const lockButton =
+    $("#tacticalLockButton");
+
+  if (lockButton) {
+    lockButton.textContent =
+      "BLOQUEAR";
+  }
+}
+
+
+function getTotalPlayerCount() {
+  const simulated =
+    Number(
+      state.simulatedPlayers.perTeam || 0
+    ) * 2;
+
+  const ownPlayer =
+    state.player.participation
+      ? 1
+      : 0;
+
+  return simulated + ownPlayer;
+}
+
+
+/* ============================================================
+   TRAVA DO PAINEL
+============================================================ */
+
+function unlockStart() {
+  if (unlockStarted) return;
+
+  unlockStarted = true;
+
+  const guard =
+    $("#touchGuard");
+
+  if (!guard) return;
+
+  unlockTimer = setTimeout(() => {
+
+    guard.classList.add(
+      "hidden"
+    );
+
+    unlockStarted = false;
+
+    showToast(
+      "Painel desbloqueado."
+    );
+
+  }, 900);
+}
+
+
+function unlockCancel() {
+  clearTimeout(
+    unlockTimer
+  );
+
+  unlockStarted = false;
+}
+
+
+function lockTacticalPanel() {
+  const guard =
+    $("#touchGuard");
+
+  if (!guard) return;
+
+  guard.classList.remove(
+    "hidden"
+  );
+
+  showToast(
+    "Painel bloqueado."
+  );
+}
+
+
+/* ============================================================
+   RÁDIO
+============================================================ */
+
+function toggleRadio() {
+  state.player.radio =
+    !state.player.radio;
+
+  persist();
+
+  render();
+
+  showToast(
+    state.player.radio
+      ? "Rádio ativado."
+      : "Rádio desativado."
+  );
+}
+
+
+function changeChannel(delta) {
+  let channel =
+    Number(state.player.channel) || 1;
+
+  channel += delta;
+
+  if (channel < 1) {
+    channel = 1;
+  }
+
+  if (channel > 99) {
+    channel = 99;
+  }
+
+  state.player.channel =
+    channel;
+
+  persist();
+
   render();
 }
+
+
+function changeVolume(value) {
+  const volume =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(value) || 0
+      )
+    );
+
+  state.player.radioVolume =
+    volume;
+
+  persist();
+}
+
+
+function radioPushStart() {
+  if (!state.player.radio) {
+    showToast("Rádio desligado.");
+    return;
+  }
+
+  clearTimeout(
+    radioPushTimer
+  );
+
+  setText(
+    "#radioFeedback",
+    "TRANSMITINDO..."
+  );
+
+  $("#pttButton")?.classList.add(
+    "transmitting"
+  );
+}
+
+
+function radioPushEnd() {
+  clearTimeout(
+    radioPushTimer
+  );
+
+  setText(
+    "#radioFeedback",
+    "RÁDIO PRONTO"
+  );
+
+  $("#pttButton")?.classList.remove(
+    "transmitting"
+  );
+}
+
+
+/* ============================================================
+   GPS
+============================================================ */
+
+function requestGPS() {
+  if (!navigator.geolocation) {
+    setGPSStatus(
+      "GPS INDISPONÍVEL"
+    );
+
+    return;
+  }
+
+  setGPSStatus(
+    "LOCALIZANDO..."
+  );
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+
+      state.gps.lat =
+        position.coords.latitude;
+
+      state.gps.lng =
+        position.coords.longitude;
+
+      state.gps.accuracy =
+        position.coords.accuracy;
+
+      state.gps.ready =
+        true;
+
+      persist();
+
+      setGPSStatus(
+        `GPS ±${Math.round(
+          position.coords.accuracy
+        )}m`
+      );
+    },
+
+    () => {
+
+      /*
+        O mapa continua sendo o mapa fictício
+        da partida. A ausência do GPS não quebra
+        o restante do aplicativo.
+      */
+
+      state.gps.lat =
+        DEMO_CENTER.lat;
+
+      state.gps.lng =
+        DEMO_CENTER.lng;
+
+      state.gps.ready =
+        false;
+
+      persist();
+
+      setGPSStatus(
+        "GPS INDISPONÍVEL"
+      );
+    },
+
+    {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 30000
+    }
+  );
+}
+
+
+function setGPSStatus(text) {
+  setText(
+    "#tacticalGpsStatus",
+    text
+  );
+}
+
+
+/* ============================================================
+   OBJETIVOS / INSTRUÇÕES
+============================================================ */
+
+function openObjectives() {
+  const body = `
+    <div class="modal-info-list">
+      <p><strong>SETOR ALFA</strong> — ${escapeHTML(
+        state.objectives.alfa.control
+      )}</p>
+
+      <p><strong>SETOR BRAVO</strong> — ${escapeHTML(
+        state.objectives.bravo.control
+      )}</p>
+    </div>
+  `;
+
+  openAppModal(
+    "OBJETIVOS",
+    "OBJETIVOS DA PARTIDA",
+    body
+  );
+}
+
+
+function openInstructions() {
+  const body = `
+    <p>
+      Consulte o briefing cadastrado pelo organizador
+      para as regras e orientações da partida.
+    </p>
+
+    <p>
+      <strong>Briefing:</strong>
+      ${escapeHTML(
+        state.organizer.briefingTitle ||
+        "Não definido"
+      )}
+    </p>
+
+    <p>
+      ${escapeHTML(
+        state.organizer.briefingText ||
+        "Nenhuma orientação cadastrada."
+      )}
+    </p>
+  `;
+
+  openAppModal(
+    "INSTRUÇÕES",
+    "ORIENTAÇÕES DA PARTIDA",
+    body
+  );
+}
+
+
+/* ============================================================
+   ABANDONAR PARTIDA
+============================================================ */
+
+function leaveMatch() {
+  if (state.role !== "player") {
+    return;
+  }
+
+  if (state.match.status !== "live") {
+    showToast(
+      "Não há partida ao vivo para abandonar."
+    );
+
+    return;
+  }
+
+  const confirmed =
+    window.confirm(
+      "Abandonar a partida atual?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  state.player.participation =
+    false;
+
+  state.player.entryRequested =
+    false;
+
+  addEvent(
+    "player",
+    "Jogador abandonou a partida"
+  );
+
+  persist();
+
+  showScreen(
+    "player-home"
+  );
+
+  render();
+
+  showToast(
+    "Você saiu da partida."
+  );
+}
+
+
+/* ============================================================
+   MODAL GENÉRICO
+============================================================ */
+
+function openAppModal(
+  kicker,
+  title,
+  body
+) {
+  const modal =
+    $("#appModal");
+
+  if (!modal) return;
+
+  setText(
+    "#appModalKicker",
+    kicker
+  );
+
+  setText(
+    "#appModalTitle",
+    title
+  );
+
+  const content =
+    $("#appModalBody");
+
+  if (content) {
+    content.innerHTML = body;
+  }
+
+  modal.classList.remove(
+    "hidden"
+  );
+
+  modal.setAttribute(
+    "aria-hidden",
+    "false"
+  );
+}
+
+
+function closeAppModal() {
+  const modal =
+    $("#appModal");
+
+  if (!modal) return;
+
+  modal.classList.add(
+    "hidden"
+  );
+
+  modal.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+}
+
+
+/* ============================================================
+   TEMPO DA PARTIDA
+============================================================ */
+
+function updateElapsedTime() {
+  if (
+    state.match.status !== "live" ||
+    !state.match.startedAt
+  ) {
+    return;
+  }
+
+  const elapsed =
+    Math.floor(
+      (
+        Date.now() -
+        state.match.startedAt
+      ) / 1000
+    );
+
+  state.match.elapsedSeconds =
+    Math.max(
+      0,
+      elapsed
+    );
+}
+
+
+setInterval(() => {
+
+  if (
+    state.match.status === "live" &&
+    state.match.startedAt
+  ) {
+
+    updateElapsedTime();
+
+    setText(
+      "#tacticalTimer",
+      formatTimer(
+        state.match.elapsedSeconds
+      )
+    );
+  }
+
+}, 1000);
+
+
+/* ============================================================
+   EVENTOS / HISTÓRICO
+============================================================ */
+
+function addEvent(
+  source,
+  description
+) {
+  state.events.push({
+    source,
+    description,
+    timestamp: Date.now()
+  });
+
+  /*
+    Mantém somente uma quantidade razoável
+    de eventos persistentes.
+  */
+  if (state.events.length > 200) {
+    state.events =
+      state.events.slice(-200);
+  }
+}
+
+
+/* ============================================================
+   HELPERS DE FORMULÁRIO
+============================================================ */
+
+function valueOf(selector) {
+  const element =
+    $(selector);
+
+  return element
+    ? element.value
+    : "";
+}
+
+
+function setValue(
+  selector,
+  value
+) {
+  const element =
+    $(selector);
+
+  if (!element) return;
+
+  element.value =
+    value ?? "";
+}
+
+
+function checkedOf(selector) {
+  const element =
+    $(selector);
+
+  return !!(
+    element &&
+    element.checked
+  );
+}
+
+
+function setChecked(
+  selector,
+  value
+) {
+  const element =
+    $(selector);
+
+  if (!element) return;
+
+  element.checked =
+    !!value;
+}
+
+
+function numberValue(
+  selector,
+  fallback
+) {
+  const value =
+    Number(
+      valueOf(selector)
+    );
+
+  return Number.isFinite(value)
+    ? value
+    : fallback;
+}
+
+
+function setText(
+  selector,
+  text
+) {
+  const element =
+    $(selector);
+
+  if (!element) return;
+
+  element.textContent =
+    text ?? "";
+}
+
+
+/* ============================================================
+   EQUIPE
+============================================================ */
+
+function getTeamName(team) {
+  if (team === "azul") {
+    return (
+      state.organizer.teamBlueName ||
+      "Equipe Azul"
+    );
+  }
+
+  if (team === "vermelha") {
+    return (
+      state.organizer.teamRedName ||
+      "Equipe Vermelha"
+    );
+  }
+
+  return "—";
+}
+
+
+/* ============================================================
+   DATA
+============================================================ */
+
+function getTodayISO() {
+  const now =
+    new Date();
+
+  const year =
+    now.getFullYear();
+
+  const month =
+    String(
+      now.getMonth() + 1
+    ).padStart(2, "0");
+
+  const day =
+    String(
+      now.getDate()
+    ).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+
+/* ============================================================
+   EVENT DELEGAÇÃO
+   Um único ponto de entrada para os elementos dinâmicos.
+============================================================ */
+
+document.addEventListener(
+  "click",
+  (event) => {
+
+    const roleChoice =
+      event.target.closest(
+        "[data-role-choice]"
+      );
+
+    if (roleChoice) {
+      selectRole(
+        roleChoice.dataset.roleChoice
+      );
+
+      return;
+    }
+
+
+    const backButton =
+      event.target.closest(
+        "[data-back-screen]"
+      );
+
+    if (backButton) {
+
+      const target =
+        backButton.dataset.backScreen;
+
+      if (target === "previous") {
+        goBack();
+      } else {
+        showScreen(target);
+      }
+
+      return;
+    }
+
+
+    const detailTab =
+      event.target.closest(
+        "[data-detail-tab]"
+      );
+
+    if (detailTab) {
+      switchDetailTab(
+        detailTab.dataset.detailTab
+      );
+
+      return;
+    }
+
+
+    const devRole =
+      event.target.closest(
+        "[data-dev-role]"
+      );
+
+    if (devRole) {
+      switchDevRole(
+        devRole.dataset.devRole
+      );
+
+      return;
+    }
+
+
+    const devStatus =
+      event.target.closest(
+        "[data-dev-status]"
+      );
+
+    if (devStatus) {
+      setDevStatus(
+        devStatus.dataset.devStatus
+      );
+
+      return;
+    }
+
+
+    const orgSection =
+      event.target.closest(
+        "[data-org-section]"
+      );
+
+    if (orgSection) {
+      /*
+        As seções do organizador ficam na mesma tela.
+        O clique posiciona a tela na seção correspondente
+        sem trocar o modo ou perder os dados.
+      */
+
+      const section =
+        orgSection.dataset.orgSection;
+
+      const sectionMap = {
+        general: ".organizer-section:nth-of-type(1)",
+        briefing: ".organizer-section:nth-of-type(2)",
+        teams: ".organizer-section:nth-of-type(3)",
+        modules: ".organizer-section:nth-of-type(4)",
+        presence: ".organizer-section:nth-of-type(5)"
+      };
+
+      const target =
+        document.querySelector(
+          sectionMap[section]
+        );
+
+      if (target) {
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }
+
+      $$(".side-nav").forEach(
+        (button) => {
+          button.classList.toggle(
+            "active",
+            button === orgSection
+          );
+        }
+      );
+
+      return;
+    }
+
+  }
+);
+
+
+/* ============================================================
+   BOTÃO DEV
+============================================================ */
+
+$("#devButton")?.addEventListener(
+  "click",
+  () => {
+    showScreen("dev");
+  }
+);
+
+
+/* ============================================================
+   JOGADOR
+============================================================ */
+
+$("#playerConfirmPresence")
+  ?.addEventListener(
+    "click",
+    confirmPresence
+  );
+
+
+$("#playerRequestEntry")
+  ?.addEventListener(
+    "click",
+    requestEntry
+  );
+
+
+$("#playerEnterMatch")
+  ?.addEventListener(
+    "click",
+    enterMatch
+  );
+
+
+$("#playerDetailsButton")
+  ?.addEventListener(
+    "click",
+    openPlayerDetails
+  );
+
+
+$("#playerPreparationEnter")
+  ?.addEventListener(
+    "click",
+    enterFromPreparation
+  );
+
+
+$("#playerBriefingAck")
+  ?.addEventListener(
+    "change",
+    acknowledgeBriefing
+  );
+
+
+$("#detailBriefingAck")
+  ?.addEventListener(
+    "change",
+    (event) => {
+
+      state.player.briefingAck =
+        event.target.checked;
+
+      persist();
+    }
+  );
+
+
+/* ============================================================
+   ORGANIZADOR
+============================================================ */
+
+$("#organizerSaveButton")
+  ?.addEventListener(
+    "click",
+    saveMatch
+  );
+
+
+$("#organizerStartButton")
+  ?.addEventListener(
+    "click",
+    () => startMatch("organizer")
+  );
+
+
+$("#organizerEndButton")
+  ?.addEventListener(
+    "click",
+    () => endMatch("organizer")
+  );
+
+
+$("#saveConfirmContinue")
+  ?.addEventListener(
+    "click",
+    closeSaveConfirmation
+  );
+
+
+$("#saveConfirmEnter")
+  ?.addEventListener(
+    "click",
+    enterAfterSave
+  );
+
+
+/* ============================================================
+   TÁTICO
+============================================================ */
+
+$("#tacticalOrganizerStart")
+  ?.addEventListener(
+    "click",
+    () => startMatch("organizer")
+  );
+
+
+$("#tacticalOrganizerEnd")
+  ?.addEventListener(
+    "click",
+    () => endMatch("organizer")
+  );
+
+
+$("#tacticalPlayerLeave")
+  ?.addEventListener(
+    "click",
+    leaveMatch
+  );
+
+
+$("#tacticalLockButton")
+  ?.addEventListener(
+    "click",
+    lockTacticalPanel
+  );
+
+
+$("#tacticalObjectivesButton")
+  ?.addEventListener(
+    "click",
+    openObjectives
+  );
+
+
+$("#tacticalInstructionsButton")
+  ?.addEventListener(
+    "click",
+    openInstructions
+  );
+
+
+/* ============================================================
+   TRAVA / DESBLOQUEIO
+============================================================ */
+
+const unlockButton =
+  $("#unlockButton");
+
+if (unlockButton) {
+
+  unlockButton.addEventListener(
+    "pointerdown",
+    (event) => {
+      event.preventDefault();
+      unlockStart();
+    }
+  );
+
+  unlockButton.addEventListener(
+    "pointerup",
+    unlockCancel
+  );
+
+  unlockButton.addEventListener(
+    "pointercancel",
+    unlockCancel
+  );
+
+  unlockButton.addEventListener(
+    "pointerleave",
+    unlockCancel
+  );
+}
+
+
+/* ============================================================
+   RÁDIO
+============================================================ */
+
+$("#radioToggle")
+  ?.addEventListener(
+    "click",
+    toggleRadio
+  );
+
+
+$("#channelDown")
+  ?.addEventListener(
+    "click",
+    () => changeChannel(-1)
+  );
+
+
+$("#channelUp")
+  ?.addEventListener(
+    "click",
+    () => changeChannel(1)
+  );
+
+
+$("#radioVolume")
+  ?.addEventListener(
+    "input",
+    (event) => {
+      changeVolume(
+        event.target.value
+      );
+    }
+  );
+
+
+const pttButton =
+  $("#pttButton");
+
+if (pttButton) {
+
+  pttButton.addEventListener(
+    "pointerdown",
+    (event) => {
+      event.preventDefault();
+      radioPushStart();
+    }
+  );
+
+  pttButton.addEventListener(
+    "pointerup",
+    radioPushEnd
+  );
+
+  pttButton.addEventListener(
+    "pointercancel",
+    radioPushEnd
+  );
+
+  pttButton.addEventListener(
+    "pointerleave",
+    radioPushEnd
+  );
+}
+
+
+/* ============================================================
+   ESPERA
+============================================================ */
+
+$("#waitingBackButton")
+  ?.addEventListener(
+    "click",
+    () => showScreen("player-home")
+  );
+
+
+/* ============================================================
+   DEV
+============================================================ */
+
+$("#devPlayersPerTeam")
+  ?.addEventListener(
+    "input",
+    updateDevPreview
+  );
+
+
+$("#devApplyPlayers")
+  ?.addEventListener(
+    "click",
+    applyDevPlayers
+  );
+
+
+$("#devGenerateMatch")
+  ?.addEventListener(
+    "click",
+    () => generateDevMatch(true)
+  );
+
+
+$("#devStartMatch")
+  ?.addEventListener(
+    "click",
+    devStartMatch
+  );
+
+
+$("#devEndMatch")
+  ?.addEventListener(
+    "click",
+    devEndMatch
+  );
+
+
+$("#devReset")
+  ?.addEventListener(
+    "click",
+    resetAllState
+  );
+
+
+/* ============================================================
+   MODAL GENÉRICO
+============================================================ */
+
+$("#appModalClose")
+  ?.addEventListener(
+    "click",
+    closeAppModal
+  );
+
+
+$("#appModal .modal-backdrop")
+  ?.addEventListener(
+    "click",
+    closeAppModal
+  );
+
+
+/* ============================================================
+   TECLADO / ACESSIBILIDADE
+============================================================ */
+
+document.addEventListener(
+  "keydown",
+  (event) => {
+
+    if (
+      event.key === "Escape"
+    ) {
+      closeAppModal();
+      closeSaveConfirmation();
+    }
+
+  }
+);
+
+
+/* ============================================================
+   INICIALIZAÇÃO
+============================================================ */
+
+function initialize() {
+
+  /*
+    Se já houver estado persistente, não mostramos novamente
+    a seleção inicial. O último papel utilizado é restaurado.
+  */
+
+  const hasPersistentSession =
+    localStorage.getItem(
+      STORAGE_KEY
+    );
+
+  if (hasPersistentSession) {
+
+    if (state.role === "organizer") {
+      showScreen(
+        "organizer",
+        false
+      );
+    } else {
+      showScreen(
+        "player-home",
+        false
+      );
+    }
+
+  } else {
+
+    /*
+      Primeira utilização:
+      jogador é o fluxo padrão.
+      A tela de escolha ainda permite selecionar organizador.
+    */
+
+    state.role = "player";
+
+    showScreen(
+      "role-select",
+      false
+    );
+  }
+
+
+  persist();
+
+  requestGPS();
+
+  render();
+
+}
+
+
+/* ============================================================
+   START
+============================================================ */
+
+initialize();
