@@ -4,28 +4,28 @@
 ═══════════════════════════════════════════════════ */
 
 :root {
-  --bg:          #0c0f0d;
-  --bg-elev:     #121612;
-  --surface:     #181d19;
-  --surface-2:   #1e241f;
-  --border:      #2a322c;
-  --border-soft: #222922;
-  --text:        #d4d9d0;
-  --text-dim:    #8a9286;
-  --text-mute:   #5c6458;
-  --olive:       #7a8b5c;
-  --olive-dim:   #5a6b42;
-  --sand:        #b89a5e;
-  --sand-dim:    #8a7348;
+  --bg:          #0e0b09;
+  --bg-elev:     #16120f;
+  --surface:     #1c1713;
+  --surface-2:   #241e19;
+  --border:      #3a322c;
+  --border-soft: #2a241f;
+  --text:        #e0d8d0;
+  --text-dim:    #9a8e84;
+  --text-mute:   #6a5e54;
+  --accent:      #8b6b4a;
+  --accent-dim:  #6a5238;
+  --warm:        #a07850;
+  --warm-dim:    #7a5c3c;
   --danger:      #8b4a4a;
   --danger-bg:   #2a1818;
-  --live:        #6b8b5a;
-  --live-bg:     #1a2418;
+  --live:        #6b7a5a;
+  --live-bg:     #1a2018;
   --blue-team:   #4a6a8b;
   --red-team:    #8b5a4a;
   --radius:      6px;
-  --fast:        160ms;
-  --mid:         240ms;
+  --fast:        180ms;
+  --mid:         280ms;
   --ease:        cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -35,7 +35,12 @@ html { height: 100%; }
 
 body {
   min-height: 100%;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(rgba(58, 50, 44, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(58, 50, 44, 0.35) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
   color: var(--text);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 15px;
@@ -58,7 +63,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: var(--bg-elev);
+  background: linear-gradient(180deg, #1a1510 0%, var(--bg-elev) 100%);
   border-bottom: 1px solid var(--border-soft);
   position: sticky;
   top: 0;
@@ -67,16 +72,26 @@ body {
 
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark {
-  width: 32px; height: 32px;
-  color: var(--olive);
+  width: 44px; height: 44px;
   display: grid; place-items: center;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #1a1510;
+  box-shadow: 0 0 0 1px rgba(139,107,74,0.15);
 }
-.brand-mark svg { width: 28px; height: 28px; }
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .brand-title {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--text);
 }
 .brand-sub {
@@ -105,12 +120,12 @@ body {
   background: var(--live-bg);
   animation: statusPulse 2.2s ease-in-out infinite;
 }
-.status-chip.scheduled { color: var(--sand); border-color: var(--sand-dim); }
+.status-chip.scheduled { color: var(--warm); border-color: var(--warm-dim); }
 .status-chip.ended { color: var(--text-mute); }
 
 @keyframes statusPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.65; }
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.72; filter: brightness(1.08); }
 }
 
 .dev-btn {
@@ -125,7 +140,7 @@ body {
   cursor: pointer;
   transition: all var(--fast);
 }
-.dev-btn:active { transform: scale(0.95); color: var(--sand); border-color: var(--sand-dim); }
+.dev-btn:active { transform: scale(0.95); color: var(--warm); border-color: var(--warm-dim); }
 
 /* ── Screens ── */
 #main { flex: 1; position: relative; }
@@ -138,8 +153,8 @@ body {
 .screen.active { display: block; }
 
 @keyframes screenIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .screen-head {
@@ -186,7 +201,7 @@ body {
   gap: 14px;
   width: 100%;
   padding: 16px;
-  background: var(--surface);
+  background: linear-gradient(160deg, #221c17 0%, var(--surface) 100%);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
@@ -194,12 +209,12 @@ body {
   cursor: pointer;
   transition: border-color var(--fast), background var(--fast), transform var(--fast);
 }
-.role-card:hover { border-color: var(--olive-dim); background: var(--surface-2); }
+.role-card:hover { border-color: var(--accent-dim); background: var(--surface-2); }
 .role-card:active { transform: scale(0.985); }
 .role-num {
   font-size: 13px;
   font-weight: 700;
-  color: var(--olive);
+  color: var(--accent);
   letter-spacing: 0.05em;
   min-width: 28px;
 }
@@ -207,11 +222,11 @@ body {
 .role-info strong { display: block; font-size: 15px; letter-spacing: 0.06em; }
 .role-info small { color: var(--text-dim); font-size: 12px; }
 .role-arrow { color: var(--text-mute); font-size: 18px; transition: transform var(--fast); }
-.role-card:hover .role-arrow { transform: translateX(3px); color: var(--olive); }
+.role-card:hover .role-arrow { transform: translateX(3px); color: var(--accent); }
 
 /* ── Cards ── */
 .card {
-  background: var(--surface);
+  background: linear-gradient(165deg, #221c17 0%, var(--surface) 45%, #1a1512 100%);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   padding: 16px;
@@ -241,8 +256,8 @@ body {
   white-space: nowrap;
 }
 .state-pill.live { color: var(--live); border-color: var(--live); background: var(--live-bg); animation: statusPulse 2.2s ease-in-out infinite; }
-.state-pill.scheduled { color: var(--sand); border-color: var(--sand-dim); }
-.state-pill.waiting { color: var(--sand); border-color: var(--sand-dim); }
+.state-pill.scheduled { color: var(--warm); border-color: var(--warm-dim); }
+.state-pill.waiting { color: var(--warm); border-color: var(--warm-dim); }
 .state-pill.ok { color: var(--live); border-color: var(--live); }
 
 .info-grid {
@@ -289,18 +304,18 @@ body {
 .btn:disabled { opacity: 0.4; pointer-events: none; }
 
 .btn.primary {
-  background: var(--olive-dim);
+  background: var(--accent-dim);
   color: #e8ebe0;
-  border-color: var(--olive);
+  border-color: var(--accent);
 }
-.btn.primary:hover { background: var(--olive); }
+.btn.primary:hover { background: var(--accent); }
 
 .btn.accent {
-  background: var(--sand-dim);
+  background: var(--warm-dim);
   color: #1a1810;
-  border-color: var(--sand);
+  border-color: var(--warm);
 }
-.btn.accent:hover { background: var(--sand); }
+.btn.accent:hover { background: var(--warm); }
 
 .btn.secondary {
   background: transparent;
@@ -373,7 +388,7 @@ body {
   outline: none;
   transition: border-color var(--fast);
 }
-.field input:focus, .field textarea:focus { border-color: var(--olive-dim); }
+.field input:focus, .field textarea:focus { border-color: var(--accent-dim); }
 .field textarea { resize: vertical; min-height: 80px; }
 .field:has(input[type="date"]),
 .field:has(input[type="time"]),
@@ -415,7 +430,7 @@ body {
   font-size: 14px;
   color: var(--text-dim);
 }
-.check-line input { width: 18px; height: 18px; accent-color: var(--olive); }
+.check-line input { width: 18px; height: 18px; accent-color: var(--accent); }
 
 .briefing-text {
   color: var(--text-dim);
@@ -429,7 +444,7 @@ body {
   color: var(--text-mute);
   margin-bottom: 8px;
 }
-.objective-line strong { color: var(--sand); }
+.objective-line strong { color: var(--warm); }
 
 /* ── Tactical / Radio ── */
 .tactical-top {
@@ -444,7 +459,7 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
-  color: var(--olive);
+  color: var(--accent);
 }
 
 .tac-grid {
@@ -490,7 +505,7 @@ body {
   transition: height 80ms linear, background 120ms;
 }
 .vu-meter.active span {
-  background: linear-gradient(to top, var(--olive-dim), var(--olive), var(--sand));
+  background: linear-gradient(to top, var(--accent-dim), var(--accent), var(--warm));
   animation: vuBounce 0.35s ease-in-out infinite alternate;
 }
 .vu-meter.active span:nth-child(1)  { animation-delay: 0.00s; height: 30%; }
@@ -505,8 +520,8 @@ body {
 .vu-meter.active span:nth-child(10) { animation-delay: 0.09s; height: 75%; }
 
 @keyframes vuBounce {
-  0%   { transform: scaleY(0.55); }
-  100% { transform: scaleY(1.05); }
+  0%   { transform: scaleY(0.5); opacity: 0.75; }
+  100% { transform: scaleY(1); opacity: 1; }
 }
 
 .radio-meta {
@@ -544,7 +559,7 @@ body {
   letter-spacing: 0.08em;
   color: var(--text-mute);
 }
-.radio-status.tx { color: var(--sand); }
+.radio-status.tx { color: var(--warm); }
 
 .ptt-btn {
   width: 100%;
@@ -562,8 +577,8 @@ body {
   transition: all var(--fast);
 }
 .ptt-btn.transmitting {
-  background: var(--sand-dim);
-  border-color: var(--sand);
+  background: var(--warm-dim);
+  border-color: var(--warm);
   color: #1a1810;
   box-shadow: 0 0 0 2px rgba(184, 154, 94, 0.25);
 }
@@ -606,7 +621,7 @@ body {
 .pulse-ring {
   width: 64px; height: 64px;
   margin: 0 auto 24px;
-  border: 2px solid var(--olive-dim);
+  border: 2px solid var(--accent-dim);
   border-radius: 50%;
   position: relative;
   animation: ringPulse 1.8s ease-out infinite;
@@ -615,13 +630,14 @@ body {
   content: "";
   position: absolute;
   inset: 10px;
-  border: 2px solid var(--olive);
+  border: 2px solid var(--accent);
   border-radius: 50%;
   opacity: 0.6;
 }
 @keyframes ringPulse {
-  0%   { transform: scale(0.9); opacity: 1; }
-  100% { transform: scale(1.25); opacity: 0; }
+  0%   { transform: scale(0.85); opacity: 0.9; }
+  70%  { opacity: 0.25; }
+  100% { transform: scale(1.35); opacity: 0; }
 }
 .waiting-wrap h2 { margin: 8px 0 10px; font-size: 22px; }
 
@@ -645,8 +661,8 @@ body {
   transition: all var(--fast);
 }
 .dev-seg:hover, .dev-seg.active {
-  border-color: var(--olive);
-  color: var(--olive);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ── Toast ── */
@@ -675,9 +691,237 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+
+
+/* ── Extra smooth animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slideRight {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes softGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 107, 74, 0); }
+  50% { box-shadow: 0 0 12px 1px rgba(139, 107, 74, 0.18); }
+}
+@keyframes barFill {
+  from { width: 0%; }
+}
+
+.card {
+  animation: fadeUp 0.32s var(--ease) both;
+}
+.card:nth-child(2) { animation-delay: 40ms; }
+.card:nth-child(3) { animation-delay: 80ms; }
+.card:nth-child(4) { animation-delay: 120ms; }
+
+.role-card {
+  animation: slideRight 0.3s var(--ease) both;
+}
+.role-card:nth-child(2) { animation-delay: 60ms; }
+
+.btn, .ghost-btn, .dev-btn, .ch-btn, .ptt-btn, .unlock-btn {
+  transition: transform var(--fast) var(--ease),
+              background var(--fast) var(--ease),
+              border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease),
+              box-shadow var(--fast) var(--ease),
+              opacity var(--fast) var(--ease);
+}
+.btn:active, .ghost-btn:active, .ptt-btn:active, .unlock-btn:active {
+  transform: scale(0.97);
+}
+
+.status-chip.live, .state-pill.live {
+  animation: statusPulse 2.4s ease-in-out infinite, softGlow 2.4s ease-in-out infinite;
+}
+
+.toast {
+  transition: opacity 0.32s var(--ease), transform 0.32s var(--ease);
+}
+.toast.show {
+  animation: scaleIn 0.28s var(--ease) both;
+}
+
+.tac-lock {
+  transition: opacity 0.25s var(--ease), visibility 0.25s;
+}
+.tac-lock.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  display: flex; /* keep layout, hide via opacity */
+}
+
+#unlockBar {
+  transition: width 0.05s linear;
+}
+
+.map-card, .radio-card {
+  animation: fadeUp 0.34s var(--ease) both;
+}
+
+.hit-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 0 0 3px rgba(139, 74, 74, 0.25);
+}
+
+.brand-mark {
+  transition: box-shadow var(--mid) var(--ease), border-color var(--mid) var(--ease);
+}
+.brand-mark:hover {
+  box-shadow: 0 0 0 1px rgba(139, 107, 74, 0.35);
+  border-color: var(--accent-dim);
+}
+
+.info-grid .info {
+  animation: fadeIn 0.35s var(--ease) both;
+}
+.info-grid .info:nth-child(1) { animation-delay: 30ms; }
+.info-grid .info:nth-child(2) { animation-delay: 50ms; }
+.info-grid .info:nth-child(3) { animation-delay: 70ms; }
+.info-grid .info:nth-child(4) { animation-delay: 90ms; }
+.info-grid .info:nth-child(5) { animation-delay: 110ms; }
+.info-grid .info:nth-child(6) { animation-delay: 130ms; }
+
+
 /* ── Utilities ── */
 @media (max-width: 380px) {
   .form-grid { grid-template-columns: 1fr; }
   .info-grid { grid-template-columns: 1fr 1fr; }
   .timer { font-size: 24px; }
+}
+
+/* ── Map ── */
+.map-card { padding-bottom: 12px; }
+.map-viewport {
+  position: relative;
+  background: #0e120f;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+#tacMap {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+}
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 6px 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+.leg::before {
+  content: "";
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.leg.you::before { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+.leg.friend::before { background: var(--blue-team); }
+.leg.enemy::before { background: #a05050; }
+.leg.mine::before { background: var(--warm); border-radius: 1px; }
+
+.map-intel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  padding: 0 2px;
+}
+.map-intel #droneStatus.ready { color: var(--warm); }
+
+/* ── Combat actions ── */
+.combat-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+.hit-btn {
+  font-size: 15px;
+  padding: 16px;
+  letter-spacing: 0.14em;
+}
+
+/* ── Lock overlay ── */
+.tac-lock {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 9, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 24px;
+  transition: opacity 200ms;
+}
+.tac-lock.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.lock-content {
+  text-align: center;
+  max-width: 280px;
+}
+.lock-content h3 {
+  font-size: 18px;
+  margin: 8px 0 10px;
+  letter-spacing: 0.04em;
+}
+.lock-content p {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+.unlock-btn {
+  width: 100%;
+  padding: 18px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  transition: all var(--fast);
+}
+.unlock-btn:active, .unlock-btn.holding {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: #e8ebe0;
+}
+.unlock-progress {
+  margin-top: 12px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+#unlockBar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 50ms linear;
 }
