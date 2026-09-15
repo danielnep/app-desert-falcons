@@ -1,7 +1,8 @@
-const KEY = "df_terminal_v9";
+const KEY = "df_terminal_v10";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
+/* ── State ── */
 function initial() {
   return {
     role: "player",
@@ -20,9 +21,18 @@ function initial() {
     player: {
       id: "DF-001", name: "DANI", class: "Assalto", team: "azul",
       presence: false, entry: false, briefAck: false,
-      radio: true, channel: 1
+      radio: true, channel: 1, alive: true, kills: 0
     },
-    sectors: { alfa: "neutro", bravo: "neutro" }
+    sectors: { alfa: "neutro", bravo: "neutro" },
+    map: {
+      playerPos: { x: 0.5, y: 0.5 },
+      enemies: [],
+      mines: [],
+      friends: [],
+      droneReady: false,
+      revealed: false
+    },
+    locked: true
   };
 }
 
@@ -30,11 +40,15 @@ function load() {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return initial();
-    return { ...initial(), ...JSON.parse(raw),
-      match: { ...initial().match, ...(JSON.parse(raw).match || {}) },
-      org: { ...initial().org, ...(JSON.parse(raw).org || {}) },
-      player: { ...initial().player, ...(JSON.parse(raw).player || {}) },
-      sectors: { ...initial().sectors, ...(JSON.parse(raw).sectors || {}) }
+    const s = JSON.parse(raw);
+    const base = initial();
+    return {
+      ...base, ...s,
+      match: { ...base.match, ...(s.match || {}) },
+      org: { ...base.org, ...(s.org || {}) },
+      player: { ...base.player, ...(s.player || {}) },
+      sectors: { ...base.sectors, ...(s.sectors || {}) },
+      map: { ...base.map, ...(s.map || {}) }
     };
   } catch { return initial(); }
 }
@@ -44,6 +58,10 @@ let prevScreen = "player";
 let current = "role";
 let timerId = null;
 let vuActive = false;
+let unlockTimer = null;
+let unlockProgress = 0;
+let gpsWatch = null;
+let mapAnim = null;
 
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
@@ -55,30 +73,26 @@ function toast(msg) {
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
 function statusLabel(s) {
   return { none: "SEM PARTIDA", scheduled: "AGENDADA", live: "AO VIVO", ended: "ENCERRADA" }[s] || "SEM PARTIDA";
 }
-
 function fmtDate(d) {
   if (!d) return "—";
   const p = d.split("-");
   return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
 }
-
 function fmtDur(m) {
   if (!m) return "—";
   const v = Number(m);
   return v < 60 ? `${v} min` : `${Math.floor(v / 60)}h${v % 60 ? " " + (v % 60) + "min" : ""}`;
 }
-
 function fmtTimer(sec) {
   const t = Math.max(0, Number(sec) || 0);
   return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
 }
-
 function teamName(t) {
   return t === "azul" ? (state.org.blueName || "Equipe Azul") : (state.org.redName || "Equipe Vermelha");
 }
@@ -92,6 +106,19 @@ function show(name, remember = true) {
   $$(".screen").forEach(s => s.classList.remove("active"));
   target.classList.add("active");
   window.scrollTo({ top: 0, behavior: "instant" });
+
+  if (name === "tactical") {
+    state.locked = true;
+    updateLock();
+    startGps();
+    spawnEnemiesIfNeeded();
+    drawMap();
+    startMapLoop();
+  } else {
+    stopMapLoop();
+    stopGps();
+    updateVu(false);
+  }
   render();
 }
 
@@ -128,26 +155,24 @@ function renderPlayer() {
   setText("#pMatchMap", m.map || "—");
   setText("#pMatchMode", m.mode || "—");
   setText("#pMatchDuration", fmtDur(m.duration));
-
-  const p = state.player;
-  setText("#pName", p.name);
-  setText("#pTeam", p.team ? teamName(p.team) : "—");
+  setText("#pName", state.player.name);
+  setText("#pTeam", state.player.team ? teamName(state.player.team) : "—");
 
   let status = "Aguardando", badge = "AGUARDANDO", badgeCls = "waiting";
-  if (p.presence && !p.entry) { status = "Presença confirmada"; badge = "CONFIRMADO"; badgeCls = "ok"; }
-  if (p.entry) { status = "Entrada solicitada"; badge = "AGUARDANDO"; badgeCls = "waiting"; }
-  if (m.status === "live" && p.presence) { status = "Em operação"; badge = "AO VIVO"; badgeCls = "live"; }
+  if (!state.player.alive) { status = "Eliminado"; badge = "HIT"; badgeCls = "ended"; }
+  else if (state.player.presence && !state.player.entry) { status = "Presença confirmada"; badge = "CONFIRMADO"; badgeCls = "ok"; }
+  else if (state.player.entry) { status = "Entrada solicitada"; badge = "AGUARDANDO"; badgeCls = "waiting"; }
+  else if (m.status === "live" && state.player.presence) { status = "Em operação"; badge = "AO VIVO"; badgeCls = "live"; }
   setText("#pPartStatus", status);
   const b = $("#pPartBadge");
   if (b) { b.textContent = badge; b.className = "state-pill " + badgeCls; }
 
-  // action buttons
-  const showConfirm = has && m.status === "scheduled" && !p.presence;
-  const showRequest = has && m.status === "scheduled" && p.presence && !p.entry;
-  const showEnter = has && (m.status === "live" || (m.status === "scheduled" && p.presence && p.briefAck));
+  const showConfirm = has && m.status === "scheduled" && !state.player.presence && state.player.alive;
+  const showRequest = has && m.status === "scheduled" && state.player.presence && !state.player.entry;
+  const showEnter = has && state.player.alive && (m.status === "live" || (m.status === "scheduled" && state.player.presence));
   toggle("#btnConfirm", showConfirm);
   toggle("#btnRequest", showRequest);
-  toggle("#btnEnter", showEnter || (has && m.status === "live" && p.presence));
+  toggle("#btnEnter", showEnter);
 }
 
 function renderPrep() {
@@ -175,11 +200,19 @@ function renderTactical() {
     rt.textContent = state.player.radio ? "ON" : "OFF";
     rt.className = "radio-toggle" + (state.player.radio ? " on" : "");
   }
-  updateVu(state.player.radio && current === "tactical");
+  updateVu(state.player.radio && current === "tactical" && !state.locked);
+
+  setText("#killCount", `ELIMINAÇÕES: ${state.player.kills}/3`);
+  const ds = $("#droneStatus");
+  if (ds) {
+    ds.textContent = state.map.droneReady ? "DRONE: POSIÇÕES DISPONÍVEIS" : "DRONE: STANDBY";
+    ds.className = state.map.droneReady ? "ready" : "";
+  }
 
   const isOrg = state.role === "organizer";
   toggle("#tacEnd", isOrg && state.match.status === "live");
-  toggle("#tacLeave", !isOrg || state.match.status !== "live");
+  toggle("#tacLeave", true);
+  updateLock();
 }
 
 function renderOrganizer() {
@@ -203,7 +236,6 @@ function renderOrganizer() {
   setVal("#oBlueLimit", state.org.blueLimit);
   setVal("#oRedName", state.org.redName);
   setVal("#oRedLimit", state.org.redLimit);
-
   toggle("#oStart", m.exists && m.status === "scheduled");
   toggle("#oEnd", m.status === "live");
 }
@@ -218,7 +250,233 @@ function renderDetails() {
   setText("#dChannel", String(p.channel).padStart(2, "0"));
 }
 
-/* ── VU Meter ── */
+/* ── Lock ── */
+function updateLock() {
+  const lock = $("#tacLock");
+  if (!lock) return;
+  lock.classList.toggle("hidden", !state.locked);
+}
+
+function startUnlock(e) {
+  e.preventDefault();
+  if (!state.locked) return;
+  unlockProgress = 0;
+  const btn = $("#unlockBtn");
+  const bar = $("#unlockBar");
+  btn?.classList.add("holding");
+  clearInterval(unlockTimer);
+  unlockTimer = setInterval(() => {
+    unlockProgress += 4;
+    if (bar) bar.style.width = unlockProgress + "%";
+    if (unlockProgress >= 100) {
+      clearInterval(unlockTimer);
+      state.locked = false;
+      updateLock();
+      toast("Painel liberado.");
+      if (state.player.radio) updateVu(true);
+      btn?.classList.remove("holding");
+      if (bar) bar.style.width = "0%";
+    }
+  }, 60);
+}
+
+function cancelUnlock() {
+  clearInterval(unlockTimer);
+  unlockProgress = 0;
+  const btn = $("#unlockBtn");
+  const bar = $("#unlockBar");
+  btn?.classList.remove("holding");
+  if (bar) bar.style.width = "0%";
+}
+
+/* ── Map & GPS ── */
+function startGps() {
+  if (!navigator.geolocation) {
+    setText("#mapStatus", "GPS OFF");
+    return;
+  }
+  setText("#mapStatus", "GPS…");
+  gpsWatch = navigator.geolocation.watchPosition(
+    (pos) => {
+      // normalize relative movement for demo map
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      // simple relative: use fractional part for demo
+      state.map.playerPos.x = 0.3 + (Math.abs(lng) % 1) * 0.4;
+      state.map.playerPos.y = 0.3 + (Math.abs(lat) % 1) * 0.4;
+      setText("#mapStatus", "GPS OK");
+      checkMines();
+      drawMap();
+    },
+    () => setText("#mapStatus", "GPS ERR"),
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 8000 }
+  );
+}
+
+function stopGps() {
+  if (gpsWatch) { navigator.geolocation.clearWatch(gpsWatch); gpsWatch = null; }
+}
+
+function spawnEnemiesIfNeeded() {
+  if (state.map.enemies.length > 0) return;
+  // simulated enemies around the map
+  for (let i = 0; i < 8; i++) {
+    state.map.enemies.push({
+      id: i,
+      x: 0.15 + Math.random() * 0.7,
+      y: 0.15 + Math.random() * 0.7,
+      visible: false,
+      alive: true
+    });
+  }
+  // a couple of simulated friends
+  state.map.friends = [
+    { x: 0.45, y: 0.55 },
+    { x: 0.55, y: 0.4 }
+  ];
+  save();
+}
+
+function drawMap() {
+  const canvas = $("#tacMap");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // grid
+  ctx.strokeStyle = "#1a221c";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 8; i++) {
+    const x = (i / 8) * w;
+    const y = (i / 8) * h;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // mines
+  state.map.mines.forEach(m => {
+    if (!m.active) return;
+    const mx = m.x * w, my = m.y * h;
+    ctx.fillStyle = "#b89a5e";
+    ctx.fillRect(mx - 5, my - 5, 10, 10);
+    ctx.strokeStyle = "#8a7348";
+    ctx.strokeRect(mx - 5, my - 5, 10, 10);
+  });
+
+  // friends
+  state.map.friends.forEach(f => {
+    ctx.beginPath();
+    ctx.arc(f.x * w, f.y * h, 6, 0, Math.PI * 2);
+    ctx.fillStyle = "#4a6a8b";
+    ctx.fill();
+  });
+
+  // enemies (only visible ones or after drone)
+  state.map.enemies.forEach(e => {
+    if (!e.alive) return;
+    if (!e.visible && !state.map.revealed) return;
+    ctx.beginPath();
+    ctx.arc(e.x * w, e.y * h, 7, 0, Math.PI * 2);
+    ctx.fillStyle = "#a05050";
+    ctx.fill();
+    ctx.strokeStyle = "#c07070";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // player
+  const px = state.map.playerPos.x * w;
+  const py = state.map.playerPos.y * h;
+  ctx.beginPath();
+  ctx.arc(px, py, 9, 0, Math.PI * 2);
+  ctx.fillStyle = "#7a8b5c";
+  ctx.fill();
+  ctx.strokeStyle = "#a0b070";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // direction cone
+  ctx.beginPath();
+  ctx.moveTo(px, py);
+  ctx.lineTo(px + 14, py - 6);
+  ctx.lineTo(px + 14, py + 6);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(122,139,92,0.4)";
+  ctx.fill();
+}
+
+function startMapLoop() {
+  stopMapLoop();
+  mapAnim = setInterval(() => {
+    // slight enemy drift for life
+    state.map.enemies.forEach(e => {
+      if (!e.alive) return;
+      e.x += (Math.random() - 0.5) * 0.004;
+      e.y += (Math.random() - 0.5) * 0.004;
+      e.x = Math.max(0.05, Math.min(0.95, e.x));
+      e.y = Math.max(0.05, Math.min(0.95, e.y));
+    });
+    drawMap();
+  }, 800);
+}
+
+function stopMapLoop() {
+  if (mapAnim) { clearInterval(mapAnim); mapAnim = null; }
+}
+
+function checkMines() {
+  if (!state.player.alive || state.match.status !== "live") return;
+  const p = state.map.playerPos;
+  state.map.mines.forEach(m => {
+    if (!m.active) return;
+    const dx = p.x - m.x;
+    const dy = p.y - m.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 0.06) {
+      m.active = false;
+      takeHit("MINA");
+      save();
+    }
+  });
+}
+
+/* ── Combat ── */
+function takeHit(reason = "HIT") {
+  if (!state.player.alive) return;
+  state.player.alive = false;
+  state.locked = true;
+  updateLock();
+  updateVu(false);
+  save();
+  render();
+  toast(`${reason} — você está fora. Dead rag.`);
+  // auto lock again
+}
+
+function registerKill() {
+  if (!state.player.alive || state.match.status !== "live") return toast("Não disponível.");
+  state.player.kills = Math.min(3, state.player.kills + 1);
+  // reveal one random enemy
+  const hidden = state.map.enemies.filter(e => e.alive && !e.visible);
+  if (hidden.length) {
+    const pick = hidden[Math.floor(Math.random() * hidden.length)];
+    pick.visible = true;
+  }
+  if (state.player.kills >= 3 && !state.map.droneReady) {
+    state.map.droneReady = true;
+    state.map.revealed = true;
+    state.map.enemies.forEach(e => { if (e.alive) e.visible = true; });
+    toast("DRONE: posições inimigas atualizadas.");
+  } else {
+    toast(`Eliminação registrada (${state.player.kills}/3).`);
+  }
+  save();
+  render();
+  drawMap();
+}
+
+/* ── VU ── */
 function updateVu(on) {
   const meter = $("#vuMeter");
   if (!meter) return;
@@ -232,13 +490,10 @@ function updateVu(on) {
     meter.querySelectorAll("span").forEach(s => { s.style.height = "8%"; });
   }
 }
-
 function randomizeVu() {
   if (!vuActive) return;
-  const bars = $$("#vuMeter span");
-  bars.forEach(bar => {
-    const h = 15 + Math.random() * 85;
-    bar.style.height = h + "%";
+  $$("#vuMeter span").forEach(bar => {
+    bar.style.height = (15 + Math.random() * 85) + "%";
   });
   setTimeout(randomizeVu, 90 + Math.random() * 70);
 }
@@ -251,10 +506,9 @@ function startTimer() {
   timerId = setInterval(() => {
     state.match.elapsed = Math.floor((Date.now() - state.match.startedAt) / 1000);
     setText("#tacTimer", fmtTimer(state.match.elapsed));
-    if (state.match.elapsed % 15 === 0) save();
+    if (state.match.elapsed % 20 === 0) save();
   }, 1000);
 }
-
 function stopTimer() {
   if (timerId) { clearInterval(timerId); timerId = null; }
 }
@@ -286,13 +540,12 @@ function enterMatch() {
     show("prep");
     return toast("Confirme o briefing antes.");
   }
-  if (state.match.status === "scheduled") {
-    // player can enter only if live, or go wait
+  if (state.match.status !== "live") {
     show("waiting");
     return;
   }
+  state.player.alive = true;
   show("tactical");
-  if (state.player.radio) updateVu(true);
   startTimer();
 }
 
@@ -330,10 +583,15 @@ function saveMatch() {
     state.match.elapsed = 0;
     state.match.startedAt = null;
   }
-  // reset player flags for new match
   state.player.presence = false;
   state.player.entry = false;
   state.player.briefAck = false;
+  state.player.alive = true;
+  state.player.kills = 0;
+  state.map.enemies = [];
+  state.map.mines = [];
+  state.map.droneReady = false;
+  state.map.revealed = false;
   save();
   render();
   toast("Partida salva.");
@@ -344,6 +602,12 @@ function startMatch() {
   state.match.status = "live";
   state.match.startedAt = Date.now();
   state.match.elapsed = 0;
+  state.player.alive = true;
+  state.player.kills = 0;
+  state.map.droneReady = false;
+  state.map.revealed = false;
+  state.map.enemies = [];
+  spawnEnemiesIfNeeded();
   save();
   render();
   startTimer();
@@ -355,6 +619,7 @@ function endMatch() {
   state.match.status = "ended";
   stopTimer();
   updateVu(false);
+  stopMapLoop();
   save();
   render();
   toast("Partida encerrada.");
@@ -363,16 +628,17 @@ function endMatch() {
 
 function leaveMatch() {
   updateVu(false);
-  stopTimer();
-  show("player");
-  toast("Você saiu do painel.");
+  stopMapLoop();
+  stopGps();
+  show(state.role === "organizer" ? "organizer" : "player");
+  toast(state.role === "organizer" ? "Saiu do painel." : "Você abandonou a partida.");
 }
 
 function toggleRadio() {
   state.player.radio = !state.player.radio;
   save();
   render();
-  updateVu(state.player.radio && current === "tactical");
+  updateVu(state.player.radio && current === "tactical" && !state.locked);
 }
 
 function changeCh(d) {
@@ -397,7 +663,6 @@ document.addEventListener("click", (e) => {
     const t = back.dataset.back;
     if (t === "previous") show(prevScreen || "player", false);
     else show(t, false);
-    updateVu(false);
     return;
   }
 
@@ -405,16 +670,22 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#playerDetailsBtn")) { show("details"); return; }
   if (e.target.closest("#btnConfirm")) { confirmPresence(); return; }
   if (e.target.closest("#btnRequest")) { requestEntry(); return; }
-  if (e.target.closest("#btnEnter")) { enterMatch(); return; }
-  if (e.target.closest("#btnPrepEnter")) { enterMatch(); return; }
+  if (e.target.closest("#btnEnter") || e.target.closest("#btnPrepEnter")) { enterMatch(); return; }
   if (e.target.closest("#oSave")) { saveMatch(); return; }
-  if (e.target.closest("#oStart") || e.target.closest("#devStart") || e.target.closest("#tacEnd") === null && e.target.closest("#oStart")) { /* handled below */ }
   if (e.target.closest("#oStart")) { startMatch(); return; }
   if (e.target.closest("#oEnd") || e.target.closest("#tacEnd")) { endMatch(); return; }
-  if (e.target.closest("#tacLeave")) { leaveMatch(); return; }
+  if (e.target.closest("#tacLeave") || e.target.closest("#oLeave")) { leaveMatch(); return; }
   if (e.target.closest("#radioToggle")) { toggleRadio(); return; }
   if (e.target.closest("#chDown")) { changeCh(-1); return; }
   if (e.target.closest("#chUp")) { changeCh(1); return; }
+  if (e.target.closest("#btnHit")) { takeHit("HIT"); return; }
+  if (e.target.closest("#btnKill")) { registerKill(); return; }
+  if (e.target.closest("#oClearMines")) {
+    state.map.mines = [];
+    save();
+    toast("Minas limpas.");
+    return;
+  }
 
   if (e.target.closest("#devGen")) {
     state.match = {
@@ -426,6 +697,12 @@ document.addEventListener("click", (e) => {
     state.player.presence = false;
     state.player.entry = false;
     state.player.briefAck = false;
+    state.player.alive = true;
+    state.player.kills = 0;
+    state.map.enemies = [];
+    state.map.mines = [];
+    state.map.droneReady = false;
+    state.map.revealed = false;
     save(); render(); toast("Partida gerada.");
     return;
   }
@@ -434,7 +711,7 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#devReset")) {
     localStorage.removeItem(KEY);
     state = initial();
-    stopTimer(); updateVu(false);
+    stopTimer(); stopMapLoop(); stopGps(); updateVu(false);
     show("role", false);
     render();
     toast("Dados resetados.");
@@ -448,6 +725,7 @@ document.addEventListener("click", (e) => {
       state.match.startedAt = Date.now();
       state.match.elapsed = 0;
       startTimer();
+      spawnEnemiesIfNeeded();
     } else stopTimer();
     if (!state.match.exists) state.match.exists = true;
     save(); render();
@@ -457,25 +735,29 @@ document.addEventListener("click", (e) => {
 
 $("#prepAck")?.addEventListener("change", ackBrief);
 
+/* Unlock hold */
+const unlockBtn = $("#unlockBtn");
+if (unlockBtn) {
+  unlockBtn.addEventListener("pointerdown", startUnlock);
+  unlockBtn.addEventListener("pointerup", cancelUnlock);
+  unlockBtn.addEventListener("pointercancel", cancelUnlock);
+  unlockBtn.addEventListener("pointerleave", cancelUnlock);
+}
+
+/* PTT */
 const ptt = $("#pttBtn");
 if (ptt) {
   const startTx = (e) => {
     e.preventDefault();
-    if (!state.player.radio) return toast("Rádio desligado.");
+    if (state.locked || !state.player.radio) return toast(state.locked ? "Desbloqueie o painel." : "Rádio desligado.");
     ptt.classList.add("transmitting");
     setText("#radioStatus", "TRANSMITINDO");
-    const st = $("#radioStatus");
-    if (st) st.classList.add("tx");
-    // boost VU while transmitting
-    if (vuActive) {
-      $$("#vuMeter span").forEach(s => { s.style.height = (50 + Math.random() * 50) + "%"; });
-    }
+    $("#radioStatus")?.classList.add("tx");
   };
   const endTx = () => {
     ptt.classList.remove("transmitting");
     setText("#radioStatus", "PRONTO");
-    const st = $("#radioStatus");
-    if (st) st.classList.remove("tx");
+    $("#radioStatus")?.classList.remove("tx");
   };
   ptt.addEventListener("pointerdown", startTx);
   ptt.addEventListener("pointerup", endTx);
@@ -483,7 +765,21 @@ if (ptt) {
   ptt.addEventListener("pointerleave", endTx);
 }
 
-/* ── Boot ── */
+/* Map click to place mine (organizer) or just interact */
+$("#tacMap")?.addEventListener("click", (e) => {
+  if (state.locked || state.role !== "organizer") return;
+  const canvas = $("#tacMap");
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  if (state.map.mines.length >= 6) return toast("Máximo de 6 minas.");
+  state.map.mines.push({ x, y, active: true });
+  save();
+  drawMap();
+  toast("Mina posicionada.");
+});
+
+/* Boot */
 function boot() {
   if (localStorage.getItem(KEY)) {
     show(state.role === "organizer" ? "organizer" : "player", false);
@@ -493,5 +789,4 @@ function boot() {
   if (state.match.status === "live") startTimer();
   render();
 }
-
 boot();
