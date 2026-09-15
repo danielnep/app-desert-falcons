@@ -1,347 +1,497 @@
-const STORAGE_KEY = "desert_falcons_terminal_v8";
-const DEMO_CENTER = { lat: -19.9167, lng: -43.9345 };
-
-let previousScreen = "player-home";
-let currentScreen = "role-select";
-let unlockTimer = null;
-let unlockStarted = false;
-let radioPushTimer = null;
-
-function createInitialState() {
-  return {
-    version: 8,
-    role: "player",
-    match: { exists: false, name: "", status: "none", date: "", time: "", location: "", map: "Complexo Industrial", mode: "Simulação", duration: 60, checkInTime: "", startedAt: null, elapsedSeconds: 0 },
-    organizer: { briefingTitle: "Briefing da Operação", briefingText: "Objetivo, regras da partida, condições de participação e orientações gerais.", objective: "", teamBlueName: "Equipe Azul", teamBlueLimit: 20, teamRedName: "Equipe Vermelha", teamRedLimit: 20, participates: false },
-    player: { id: "DF-001", name: "DANI", team: "azul", class: "Assalto", participation: false, entryRequested: false, briefingAck: false, radio: true, channel: 1, radioVolume: 70 },
-    gps: { lat: null, lng: null, accuracy: null, ready: false },
-    objectives: { alfa: { name: "Setor Alfa", control: "neutro" }, bravo: { name: "Setor Bravo", control: "neutro" } },
-    modules: { medical: true, zone: true, score: false, tracking: false, objectives: true, events: false },
-    simulatedPlayers: { perTeam: 0, blue: [], red: [] },
-    events: [],
-    dev: { lastRole: "player" }
-  };
-}
-
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createInitialState();
-    return mergeState(createInitialState(), JSON.parse(raw));
-  } catch (error) { return createInitialState(); }
-}
-
-function mergeState(base, saved) {
-  if (!saved || typeof saved !== "object") return base;
-  return {
-    ...base, ...saved,
-    match: { ...base.match, ...(saved.match || {}) },
-    organizer: { ...base.organizer, ...(saved.organizer || {}) },
-    player: { ...base.player, ...(saved.player || {}) },
-    gps: { ...base.gps, ...(saved.gps || {}) },
-    objectives: { ...base.objectives, ...(saved.objectives || {}) },
-    modules: { ...base.modules, ...(saved.modules || {}) },
-    simulatedPlayers: { ...base.simulatedPlayers, ...(saved.simulatedPlayers || {}) },
-    dev: { ...base.dev, ...(saved.dev || {}) },
-    events: Array.isArray(saved.events) ? saved.events : base.events
-  };
-}
-
-let state = loadState();
-
-function persist() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-}
-
+const KEY = "df_terminal_v9";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-function escapeHTML(v) { return String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
-function formatDate(d) { if (!d) return "—"; const p = d.split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d; }
-function formatDuration(m) { if (!m) return "—"; const v = Number(m); return v < 60 ? `${v} min` : `${Math.floor(v/60)}h ${v%60 ? (v%60+'min') : ''}`; }
-function formatTimer(sec) { const t = Math.max(0, Number(sec)||0); return String(Math.floor(t/60)).padStart(2,"0") + ":" + String(t%60).padStart(2,"0"); }
-function getStatusLabel(s) { return { none: "SEM PARTIDA", scheduled: "AGENDADA", live: "AO VIVO", ended: "ENCERRADA" }[s] || "SEM PARTIDA"; }
-function showToast(msg) {
-  const t = $("#toast"); if (!t) return; t.textContent = msg; t.classList.add("show");
-  clearTimeout(showToast.timer); showToast.timer = setTimeout(() => t.classList.remove("show"), 2800);
+function initial() {
+  return {
+    role: "player",
+    match: {
+      exists: false, name: "", status: "none",
+      date: "", time: "", location: "", map: "Complexo Industrial",
+      mode: "Simulação", duration: 60, startedAt: null, elapsed: 0
+    },
+    org: {
+      briefTitle: "Briefing da Operação",
+      briefText: "Objetivo, regras e orientações da partida.",
+      objective: "Dominar setores e eliminar a força adversária.",
+      blueName: "Equipe Azul", blueLimit: 20,
+      redName: "Equipe Vermelha", redLimit: 20
+    },
+    player: {
+      id: "DF-001", name: "DANI", class: "Assalto", team: "azul",
+      presence: false, entry: false, briefAck: false,
+      radio: true, channel: 1
+    },
+    sectors: { alfa: "neutro", bravo: "neutro" }
+  };
 }
 
-function showScreen(screenName, remember = true) {
-  const target = $(`[data-screen="${screenName}"]`);
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return initial();
+    return { ...initial(), ...JSON.parse(raw),
+      match: { ...initial().match, ...(JSON.parse(raw).match || {}) },
+      org: { ...initial().org, ...(JSON.parse(raw).org || {}) },
+      player: { ...initial().player, ...(JSON.parse(raw).player || {}) },
+      sectors: { ...initial().sectors, ...(JSON.parse(raw).sectors || {}) }
+    };
+  } catch { return initial(); }
+}
+
+let state = load();
+let prevScreen = "player";
+let current = "role";
+let timerId = null;
+let vuActive = false;
+
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {}
+}
+
+function toast(msg) {
+  const t = $("#toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2600);
+}
+
+function statusLabel(s) {
+  return { none: "SEM PARTIDA", scheduled: "AGENDADA", live: "AO VIVO", ended: "ENCERRADA" }[s] || "SEM PARTIDA";
+}
+
+function fmtDate(d) {
+  if (!d) return "—";
+  const p = d.split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+
+function fmtDur(m) {
+  if (!m) return "—";
+  const v = Number(m);
+  return v < 60 ? `${v} min` : `${Math.floor(v / 60)}h${v % 60 ? " " + (v % 60) + "min" : ""}`;
+}
+
+function fmtTimer(sec) {
+  const t = Math.max(0, Number(sec) || 0);
+  return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0");
+}
+
+function teamName(t) {
+  return t === "azul" ? (state.org.blueName || "Equipe Azul") : (state.org.redName || "Equipe Vermelha");
+}
+
+/* ── Screen ── */
+function show(name, remember = true) {
+  const target = $(`[data-screen="${name}"]`);
   if (!target) return;
-  if (remember && currentScreen !== screenName && screenName !== 'dev') previousScreen = currentScreen;
-  else if (remember && screenName === 'dev') previousScreen = state.role === "organizer" ? "organizer" : "player-home";
-  currentScreen = screenName;
+  if (remember && current !== name && name !== "dev") prevScreen = current;
+  current = name;
   $$(".screen").forEach(s => s.classList.remove("active"));
   target.classList.add("active");
   window.scrollTo({ top: 0, behavior: "instant" });
   render();
 }
 
-function goBack() {
-  if (previousScreen === "previous" || previousScreen === currentScreen) {
-    showScreen(state.role === "organizer" ? "organizer" : "player-home", false); return;
-  }
-  showScreen(previousScreen, false);
+/* ── Render ── */
+function render() {
+  renderHeader();
+  renderPlayer();
+  renderPrep();
+  renderTactical();
+  renderOrganizer();
+  renderDetails();
 }
 
-function selectRole(role) {
-  if (role !== "player" && role !== "organizer") return;
-  state.role = role; state.dev.lastRole = role; persist();
-  showScreen(role === "player" ? "player-home" : "organizer", false);
+function renderHeader() {
+  const el = $("#globalStatus");
+  if (!el) return;
+  const st = state.match.exists ? state.match.status : "none";
+  el.textContent = statusLabel(st);
+  el.className = "status-chip " + (st === "live" ? "live" : st === "scheduled" ? "scheduled" : st === "ended" ? "ended" : "");
 }
-
-function renderGlobalHeader() {
-  const s = $("#globalMatchStatus"); if (!s) return;
-  s.textContent = getStatusLabel(state.match.exists ? state.match.status : "none");
-  s.className = "match-status";
-  if (state.match.status === "live") s.classList.add("live");
-  else if (state.match.status === "scheduled") s.classList.add("scheduled");
-  else if (state.match.status === "ended") s.classList.add("ended");
-}
-
-function render() { renderGlobalHeader(); renderPlayer(); renderPlayerDetails(); renderOrganizer(); renderDev(); renderTactical(); }
 
 function renderPlayer() {
-  const hasMatch = state.match.exists && state.match.status !== "ended";
-  setText("#playerMatchName", state.match.exists ? (state.match.name || "Partida sem nome") : "Nenhuma partida cadastrada");
-  setText("#playerMatchState", getStatusLabel(state.match.status));
-  setText("#playerMatchDate", formatDate(state.match.date));
-  setText("#playerMatchTime", state.match.time || "—");
-  setText("#playerMatchLocation", state.match.location || "—");
-  setText("#playerMatchMap", state.match.map || "—");
-  setText("#playerMatchMode", state.match.mode || "—");
-  setText("#playerMatchDuration", formatDuration(state.match.duration));
-  setText("#playerDisplayName", state.player.name);
-  setText("#playerDisplayTeam", getTeamName(state.player.team));
+  const m = state.match;
+  const has = m.exists && m.status !== "ended";
+  setText("#pMatchName", has ? (m.name || "Partida") : "Nenhuma partida");
+  const pill = $("#pMatchState");
+  if (pill) {
+    pill.textContent = statusLabel(has ? m.status : "none");
+    pill.className = "state-pill " + (m.status === "live" ? "live" : m.status === "scheduled" ? "scheduled" : "");
+  }
+  setText("#pMatchDate", fmtDate(m.date));
+  setText("#pMatchTime", m.time || "—");
+  setText("#pMatchLocation", m.location || "—");
+  setText("#pMatchMap", m.map || "—");
+  setText("#pMatchMode", m.mode || "—");
+  setText("#pMatchDuration", fmtDur(m.duration));
 
-  $("#playerScheduledActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "scheduled"));
-  $("#playerLiveActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && !state.player.entryRequested && !state.player.participation));
-  $("#playerEnterActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && (state.player.entryRequested || state.player.participation)));
+  const p = state.player;
+  setText("#pName", p.name);
+  setText("#pTeam", p.team ? teamName(p.team) : "—");
 
-  let pText = "Aguardando confirmação", pBadge = "AGUARDANDO";
-  if (state.player.participation) { pText = "Participação confirmada"; pBadge = "CONFIRMADO"; }
-  else if (state.player.entryRequested) { pText = "Entrada solicitada"; pBadge = "SOLICITADA"; }
-  setText("#playerParticipationStatus", pText); setText("#playerParticipationBadge", pBadge);
+  let status = "Aguardando", badge = "AGUARDANDO", badgeCls = "waiting";
+  if (p.presence && !p.entry) { status = "Presença confirmada"; badge = "CONFIRMADO"; badgeCls = "ok"; }
+  if (p.entry) { status = "Entrada solicitada"; badge = "AGUARDANDO"; badgeCls = "waiting"; }
+  if (m.status === "live" && p.presence) { status = "Em operação"; badge = "AO VIVO"; badgeCls = "live"; }
+  setText("#pPartStatus", status);
+  const b = $("#pPartBadge");
+  if (b) { b.textContent = badge; b.className = "state-pill " + badgeCls; }
+
+  // action buttons
+  const showConfirm = has && m.status === "scheduled" && !p.presence;
+  const showRequest = has && m.status === "scheduled" && p.presence && !p.entry;
+  const showEnter = has && (m.status === "live" || (m.status === "scheduled" && p.presence && p.briefAck));
+  toggle("#btnConfirm", showConfirm);
+  toggle("#btnRequest", showRequest);
+  toggle("#btnEnter", showEnter || (has && m.status === "live" && p.presence));
 }
 
-function confirmPresence() {
-  if (!state.match.exists) return showToast("Não há partida cadastrada.");
-  state.player.participation = true; state.player.entryRequested = false; persist();
-  renderPreparation(); showScreen("player-preparation"); render(); showToast("Presença confirmada.");
-}
-
-function requestEntry() {
-  if (!state.match.exists) return showToast("Não há partida disponível.");
-  state.player.entryRequested = true; persist(); showScreen("waiting"); render(); showToast("Solicitação enviada.");
-}
-
-function enterMatch() {
-  if (!state.match.exists || state.match.status !== "live") return showToast("Partida indisponível ou não iniciada.");
-  state.player.participation = true; state.player.entryRequested = false; persist(); showScreen("tactical"); render(); showToast("Entrada autorizada.");
-}
-
-function renderPreparation() {
-  setText("#preparationMatchName", state.match.name || "—");
-  setText("#preparationStatus", getStatusLabel(state.match.status));
-  setText("#preparationBriefingTitle", state.organizer.briefingTitle || "Briefing");
-  setText("#preparationBriefingText", state.organizer.briefingText || "—");
-  const cb = $("#playerBriefingAck"); if (cb) cb.checked = !!state.player.briefingAck;
-}
-
-function acknowledgeBriefing() {
-  const cb = $("#playerBriefingAck"); if (!cb) return;
-  state.player.briefingAck = cb.checked; persist(); render();
-}
-
-function enterFromPreparation() {
-  if (!state.player.briefingAck) return showToast("Confirme a leitura do briefing.");
-  enterMatch();
-}
-
-function renderPlayerDetails() {
-  setText("#detailInicioStatus", state.match.exists ? getStatusLabel(state.match.status) : "Aguardando partida");
-  setText("#detailPlayerName", state.player.name); setText("#detailPlayerId", state.player.id);
-  setText("#detailPlayerTeam", getTeamName(state.player.team)); setText("#detailPlayerClass", state.player.class);
-  setText("#detailBriefingTitle", state.organizer.briefingTitle || "Nenhum briefing disponível");
-  setText("#detailBriefingText", state.organizer.briefingText || "O organizador não cadastrou briefing.");
-  setText("#profileName", state.player.name); setText("#profileId", state.player.id);
-  setText("#profileTeam", getTeamName(state.player.team)); setText("#profileClass", state.player.class);
-  setText("#profileRadioStatus", state.player.radio ? "ATIVO" : "DESATIVADO");
-  const ack = $("#detailBriefingAck"); if (ack) ack.checked = !!state.player.briefingAck;
-}
-
-function switchDetailTab(tab) {
-  $$(".detail-tab").forEach(b => b.classList.toggle("active", b.dataset.detailTab === tab));
-  $$("[data-detail-content]").forEach(c => c.classList.toggle("active", c.dataset.detailContent === tab));
-}
-
-function readOrganizerForm() {
-  state.match.name = valueOf("#orgMatchName"); state.match.date = valueOf("#orgMatchDate");
-  state.match.time = valueOf("#orgMatchTime"); state.match.location = valueOf("#orgMatchLocation");
-  state.match.map = valueOf("#orgMatchMap") || "Complexo Industrial"; state.match.mode = valueOf("#orgMatchMode") || "Simulação";
-  state.match.duration = numberValue("#orgMatchDuration", 60); state.match.checkInTime = valueOf("#orgCheckInTime");
-  state.organizer.briefingTitle = valueOf("#orgBriefingTitle") || "Briefing da Operação";
-  state.organizer.briefingText = valueOf("#orgBriefingText") || ""; state.organizer.objective = valueOf("#orgObjective") || "";
-  state.organizer.teamBlueName = valueOf("#orgTeamBlueName") || "Equipe Azul"; state.organizer.teamBlueLimit = numberValue("#orgTeamBlueLimit", 20);
-  state.organizer.teamRedName = valueOf("#orgTeamRedName") || "Equipe Vermelha"; state.organizer.teamRedLimit = numberValue("#orgTeamRedLimit", 20);
-  state.organizer.participates = checkedOf("#orgOrganizerParticipates");
-}
-
-function writeOrganizerForm() {
-  setValue("#orgMatchName", state.match.name); setValue("#orgMatchDate", state.match.date); setValue("#orgMatchTime", state.match.time);
-  setValue("#orgMatchLocation", state.match.location); setValue("#orgMatchMap", state.match.map); setValue("#orgMatchMode", state.match.mode);
-  setValue("#orgMatchDuration", state.match.duration); setValue("#orgCheckInTime", state.match.checkInTime);
-  setValue("#orgBriefingTitle", state.organizer.briefingTitle); setValue("#orgBriefingText", state.organizer.briefingText); setValue("#orgObjective", state.organizer.objective);
-  setValue("#orgTeamBlueName", state.organizer.teamBlueName); setValue("#orgTeamBlueLimit", state.organizer.teamBlueLimit);
-  setValue("#orgTeamRedName", state.organizer.teamRedName); setValue("#orgTeamRedLimit", state.organizer.teamRedLimit);
-  setChecked("#orgOrganizerParticipates", state.organizer.participates);
-}
-
-function renderOrganizer() {
-  writeOrganizerForm();
-  setText("#organizerMatchStateText", state.match.exists ? `STATUS: ${getStatusLabel(state.match.status)}` : "Nenhuma partida salva.");
-  $("#organizerStartButton")?.classList.toggle("hidden", !(state.match.exists && state.match.status === "scheduled"));
-  $("#organizerEndButton")?.classList.toggle("hidden", state.match.status !== "live");
-  setText("#organizerPresence", "Equipes configuradas e prontas.");
-}
-
-function saveMatch() {
-  if (state.role !== "organizer") return showToast("Somente o organizador.");
-  readOrganizerForm();
-  if (!state.match.name.trim()) return showToast("Informe o nome.");
-  state.match.exists = true;
-  if (state.match.status !== "live") state.match.status = "scheduled";
-  persist(); render();
-  $("#saveConfirmModal")?.classList.remove("hidden");
-}
-
-function startMatch(source = "organizer") {
-  if (state.role !== "organizer" && source !== "dev") return showToast("Apenas o organizador.");
-  if (!state.match.exists) return showToast("Salve uma partida.");
-  state.match.status = "live"; state.match.startedAt = Date.now(); state.match.elapsedSeconds = 0;
-  persist(); render(); showToast("Partida iniciada.");
-}
-
-function endMatch(source = "organizer") {
-  if (state.role !== "organizer" && source !== "dev") return showToast("Apenas o organizador.");
-  state.match.status = "ended"; persist(); render(); showToast("Partida encerrada.");
-}
-
-function renderDev() {
-  $$(".dev-segment[data-dev-role]").forEach(b => b.classList.toggle("active", b.dataset.devRole === state.role));
-  $$(".dev-segment[data-dev-status]").forEach(b => b.classList.toggle("active", b.dataset.devStatus === state.match.status));
+function renderPrep() {
+  setText("#prepTitle", state.org.briefTitle || "Briefing");
+  setText("#prepText", state.org.briefText || "—");
+  setText("#prepObjective", state.org.objective || "—");
+  const ack = $("#prepAck");
+  if (ack) ack.checked = !!state.player.briefAck;
+  const btn = $("#btnPrepEnter");
+  if (btn) btn.disabled = !state.player.briefAck;
 }
 
 function renderTactical() {
-  setText("#tacticalMatchName", state.match.name || "SEM PARTIDA");
-  setText("#tacticalMapName", state.match.map || "Complexo Industrial");
-  setText("#tacticalObjective", state.organizer.objective || "Aguardando briefing.");
-  setText("#tacticalStatus", getStatusLabel(state.match.status));
-  setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds));
-  setText("#tacticalPlayerCount", Number(state.simulatedPlayers.perTeam||0)*2 + (state.player.participation?1:0));
-  setText("#radioChannel", String(state.player.channel).padStart(2, "0"));
+  setText("#tacMatchName", state.match.name || "—");
+  setText("#tacTimer", fmtTimer(state.match.elapsed));
+  setText("#chDisplay", "CH " + String(state.player.channel).padStart(2, "0"));
+  setText("#secAlfa", (state.sectors.alfa || "neutro").toUpperCase());
+  setText("#secBravo", (state.sectors.bravo || "neutro").toUpperCase());
+  const a = $("#secAlfa"), b = $("#secBravo");
+  if (a) a.className = state.sectors.alfa || "neutro";
+  if (b) b.className = state.sectors.bravo || "neutro";
 
   const rt = $("#radioToggle");
-  if (rt) { rt.textContent = state.player.radio ? "ON" : "OFF"; rt.classList.toggle("active", state.player.radio); }
-  
-  $("#tacticalOrganizerStart")?.classList.toggle("hidden", !(state.role === "organizer" && state.match.status === "scheduled"));
-  $("#tacticalOrganizerEnd")?.classList.toggle("hidden", !(state.role === "organizer" && state.match.status === "live"));
-  $("#tacticalPlayerLeave")?.classList.toggle("hidden", !(state.role === "player" && state.match.status === "live"));
+  if (rt) {
+    rt.textContent = state.player.radio ? "ON" : "OFF";
+    rt.className = "radio-toggle" + (state.player.radio ? " on" : "");
+  }
+  updateVu(state.player.radio && current === "tactical");
+
+  const isOrg = state.role === "organizer";
+  toggle("#tacEnd", isOrg && state.match.status === "live");
+  toggle("#tacLeave", !isOrg || state.match.status !== "live");
 }
 
-function unlockStart() {
-  if (unlockStarted) return; unlockStarted = true;
-  unlockTimer = setTimeout(() => { $("#touchGuard")?.classList.add("hidden"); unlockStarted = false; showToast("Painel desbloqueado."); }, 900);
-}
-function unlockCancel() { clearTimeout(unlockTimer); unlockStarted = false; }
-function lockTacticalPanel() { $("#touchGuard")?.classList.remove("hidden"); }
+function renderOrganizer() {
+  const m = state.match;
+  const pill = $("#orgStatus");
+  if (pill) {
+    pill.textContent = statusLabel(m.exists ? m.status : "none");
+    pill.className = "state-pill " + (m.status === "live" ? "live" : m.status === "scheduled" ? "scheduled" : "");
+  }
+  setVal("#oName", m.name);
+  setVal("#oDate", m.date);
+  setVal("#oTime", m.time);
+  setVal("#oLocation", m.location);
+  setVal("#oMap", m.map);
+  setVal("#oMode", m.mode);
+  setVal("#oDuration", m.duration);
+  setVal("#oBriefTitle", state.org.briefTitle);
+  setVal("#oBriefText", state.org.briefText);
+  setVal("#oObjective", state.org.objective);
+  setVal("#oBlueName", state.org.blueName);
+  setVal("#oBlueLimit", state.org.blueLimit);
+  setVal("#oRedName", state.org.redName);
+  setVal("#oRedLimit", state.org.redLimit);
 
-function toggleRadio() { state.player.radio = !state.player.radio; persist(); render(); }
-function changeChannel(d) { state.player.channel = Math.max(1, Math.min(99, Number(state.player.channel||1) + d)); persist(); render(); }
+  toggle("#oStart", m.exists && m.status === "scheduled");
+  toggle("#oEnd", m.status === "live");
+}
+
+function renderDetails() {
+  const p = state.player;
+  setText("#dId", p.id);
+  setText("#dName", p.name);
+  setText("#dClass", p.class);
+  setText("#dTeam", p.team ? teamName(p.team) : "—");
+  setText("#dRadio", p.radio ? "ON" : "OFF");
+  setText("#dChannel", String(p.channel).padStart(2, "0"));
+}
+
+/* ── VU Meter ── */
+function updateVu(on) {
+  const meter = $("#vuMeter");
+  if (!meter) return;
+  if (on) {
+    meter.classList.add("active");
+    vuActive = true;
+    randomizeVu();
+  } else {
+    meter.classList.remove("active");
+    vuActive = false;
+    meter.querySelectorAll("span").forEach(s => { s.style.height = "8%"; });
+  }
+}
+
+function randomizeVu() {
+  if (!vuActive) return;
+  const bars = $$("#vuMeter span");
+  bars.forEach(bar => {
+    const h = 15 + Math.random() * 85;
+    bar.style.height = h + "%";
+  });
+  setTimeout(randomizeVu, 90 + Math.random() * 70);
+}
+
+/* ── Timer ── */
+function startTimer() {
+  stopTimer();
+  if (state.match.status !== "live") return;
+  if (!state.match.startedAt) state.match.startedAt = Date.now() - (state.match.elapsed || 0) * 1000;
+  timerId = setInterval(() => {
+    state.match.elapsed = Math.floor((Date.now() - state.match.startedAt) / 1000);
+    setText("#tacTimer", fmtTimer(state.match.elapsed));
+    if (state.match.elapsed % 15 === 0) save();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+}
+
+/* ── Actions ── */
+function selectRole(role) {
+  state.role = role;
+  save();
+  show(role === "player" ? "player" : "organizer", false);
+}
+
+function confirmPresence() {
+  if (!state.match.exists) return toast("Nenhuma partida.");
+  state.player.presence = true;
+  save();
+  toast("Presença confirmada.");
+  show("prep");
+}
+
+function requestEntry() {
+  state.player.entry = true;
+  save();
+  show("waiting");
+  toast("Solicitação enviada.");
+}
+
+function enterMatch() {
+  if (!state.player.briefAck && state.match.status === "scheduled") {
+    show("prep");
+    return toast("Confirme o briefing antes.");
+  }
+  if (state.match.status === "scheduled") {
+    // player can enter only if live, or go wait
+    show("waiting");
+    return;
+  }
+  show("tactical");
+  if (state.player.radio) updateVu(true);
+  startTimer();
+}
+
+function ackBrief() {
+  const cb = $("#prepAck");
+  state.player.briefAck = !!cb?.checked;
+  save();
+  const btn = $("#btnPrepEnter");
+  if (btn) btn.disabled = !state.player.briefAck;
+}
+
+function readOrg() {
+  state.match.name = val("#oName");
+  state.match.date = val("#oDate");
+  state.match.time = val("#oTime");
+  state.match.location = val("#oLocation");
+  state.match.map = val("#oMap") || "Complexo Industrial";
+  state.match.mode = val("#oMode") || "Simulação";
+  state.match.duration = Number(val("#oDuration")) || 60;
+  state.org.briefTitle = val("#oBriefTitle") || "Briefing da Operação";
+  state.org.briefText = val("#oBriefText") || "";
+  state.org.objective = val("#oObjective") || "";
+  state.org.blueName = val("#oBlueName") || "Equipe Azul";
+  state.org.blueLimit = Number(val("#oBlueLimit")) || 20;
+  state.org.redName = val("#oRedName") || "Equipe Vermelha";
+  state.org.redLimit = Number(val("#oRedLimit")) || 20;
+}
+
+function saveMatch() {
+  readOrg();
+  if (!state.match.name.trim()) return toast("Informe o nome da partida.");
+  state.match.exists = true;
+  if (state.match.status === "none" || state.match.status === "ended") {
+    state.match.status = "scheduled";
+    state.match.elapsed = 0;
+    state.match.startedAt = null;
+  }
+  // reset player flags for new match
+  state.player.presence = false;
+  state.player.entry = false;
+  state.player.briefAck = false;
+  save();
+  render();
+  toast("Partida salva.");
+}
+
+function startMatch() {
+  if (!state.match.exists) return toast("Salve a partida primeiro.");
+  state.match.status = "live";
+  state.match.startedAt = Date.now();
+  state.match.elapsed = 0;
+  save();
+  render();
+  startTimer();
+  toast("Partida iniciada.");
+  if (state.role === "organizer") show("tactical");
+}
+
+function endMatch() {
+  state.match.status = "ended";
+  stopTimer();
+  updateVu(false);
+  save();
+  render();
+  toast("Partida encerrada.");
+  show(state.role === "organizer" ? "organizer" : "player");
+}
+
 function leaveMatch() {
-  if (!window.confirm("Abandonar a partida?")) return;
-  state.player.participation = false; state.player.entryRequested = false; persist(); showScreen("player-home"); render();
+  updateVu(false);
+  stopTimer();
+  show("player");
+  toast("Você saiu do painel.");
 }
 
-setInterval(() => {
-  if (state.match.status === "live" && state.match.startedAt) {
-    state.match.elapsedSeconds = Math.floor((Date.now() - state.match.startedAt)/1000);
-    setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds));
-  }
-}, 1000);
+function toggleRadio() {
+  state.player.radio = !state.player.radio;
+  save();
+  render();
+  updateVu(state.player.radio && current === "tactical");
+}
 
-function valueOf(s) { return $(s)?.value || ""; }
-function setValue(s, v) { const el = $(s); if(el) el.value = v ?? ""; }
-function checkedOf(s) { return !!$(s)?.checked; }
-function setChecked(s, v) { const el = $(s); if(el) el.checked = !!v; }
-function numberValue(s, f) { const n = Number(valueOf(s)); return Number.isFinite(n) ? n : f; }
-function setText(s, t) { const el = $(s); if(el) el.textContent = t ?? ""; }
-function getTeamName(t) { return t === "azul" ? (state.organizer.teamBlueName || "Equipe Azul") : (state.organizer.teamRedName || "Equipe Vermelha"); }
+function changeCh(d) {
+  state.player.channel = Math.max(1, Math.min(99, (state.player.channel || 1) + d));
+  save();
+  setText("#chDisplay", "CH " + String(state.player.channel).padStart(2, "0"));
+}
 
+/* ── Helpers ── */
+function setText(s, t) { const el = $(s); if (el) el.textContent = t ?? "—"; }
+function setVal(s, v) { const el = $(s); if (el) el.value = v ?? ""; }
+function val(s) { return $(s)?.value?.trim() || ""; }
+function toggle(s, show) { const el = $(s); if (el) el.classList.toggle("hidden", !show); }
+
+/* ── Events ── */
 document.addEventListener("click", (e) => {
-  const rc = e.target.closest("[data-role-choice]"); if (rc) { selectRole(rc.dataset.roleChoice); return; }
-  const back = e.target.closest("[data-back-screen]"); if (back) { const t = back.dataset.backScreen; if (t === "previous") goBack(); else showScreen(t); return; }
-  const dt = e.target.closest("[data-detail-tab]"); if (dt) { switchDetailTab(dt.dataset.detailTab); return; }
-  const dr = e.target.closest("[data-dev-role]"); if (dr) { selectRole(dr.dataset.devRole); return; }
-  const ds = e.target.closest("[data-dev-status]"); if (ds) {
-    if(!state.match.exists) state.match.exists = true;
-    state.match.status = ds.dataset.devStatus; persist(); render(); showToast("Status alterado."); return;
+  const role = e.target.closest("[data-role]");
+  if (role) { selectRole(role.dataset.role); return; }
+
+  const back = e.target.closest("[data-back]");
+  if (back) {
+    const t = back.dataset.back;
+    if (t === "previous") show(prevScreen || "player", false);
+    else show(t, false);
+    updateVu(false);
+    return;
+  }
+
+  if (e.target.closest("#devBtn")) { show("dev"); return; }
+  if (e.target.closest("#playerDetailsBtn")) { show("details"); return; }
+  if (e.target.closest("#btnConfirm")) { confirmPresence(); return; }
+  if (e.target.closest("#btnRequest")) { requestEntry(); return; }
+  if (e.target.closest("#btnEnter")) { enterMatch(); return; }
+  if (e.target.closest("#btnPrepEnter")) { enterMatch(); return; }
+  if (e.target.closest("#oSave")) { saveMatch(); return; }
+  if (e.target.closest("#oStart") || e.target.closest("#devStart") || e.target.closest("#tacEnd") === null && e.target.closest("#oStart")) { /* handled below */ }
+  if (e.target.closest("#oStart")) { startMatch(); return; }
+  if (e.target.closest("#oEnd") || e.target.closest("#tacEnd")) { endMatch(); return; }
+  if (e.target.closest("#tacLeave")) { leaveMatch(); return; }
+  if (e.target.closest("#radioToggle")) { toggleRadio(); return; }
+  if (e.target.closest("#chDown")) { changeCh(-1); return; }
+  if (e.target.closest("#chUp")) { changeCh(1); return; }
+
+  if (e.target.closest("#devGen")) {
+    state.match = {
+      exists: true, name: "Operação Red Sand", status: "scheduled",
+      date: "2026-10-18", time: "09:00", location: "Campo Norte",
+      map: "Complexo Industrial", mode: "Simulação", duration: 90,
+      startedAt: null, elapsed: 0
+    };
+    state.player.presence = false;
+    state.player.entry = false;
+    state.player.briefAck = false;
+    save(); render(); toast("Partida gerada.");
+    return;
+  }
+  if (e.target.closest("#devStart")) { startMatch(); return; }
+  if (e.target.closest("#devEnd")) { endMatch(); return; }
+  if (e.target.closest("#devReset")) {
+    localStorage.removeItem(KEY);
+    state = initial();
+    stopTimer(); updateVu(false);
+    show("role", false);
+    render();
+    toast("Dados resetados.");
+    return;
+  }
+
+  const seg = e.target.closest("[data-status]");
+  if (seg) {
+    state.match.status = seg.dataset.status;
+    if (seg.dataset.status === "live") {
+      state.match.startedAt = Date.now();
+      state.match.elapsed = 0;
+      startTimer();
+    } else stopTimer();
+    if (!state.match.exists) state.match.exists = true;
+    save(); render();
+    toast("Status → " + statusLabel(seg.dataset.status));
   }
 });
 
-$("#devButton")?.addEventListener("click", () => showScreen("dev"));
-$("#playerConfirmPresence")?.addEventListener("click", confirmPresence);
-$("#playerRequestEntry")?.addEventListener("click", requestEntry);
-$("#playerEnterMatch")?.addEventListener("click", enterMatch);
-$("#playerDetailsButton")?.addEventListener("click", () => showScreen("player-details"));
-$("#playerPreparationEnter")?.addEventListener("click", enterFromPreparation);
-$("#playerBriefingAck")?.addEventListener("change", acknowledgeBriefing);
+$("#prepAck")?.addEventListener("change", ackBrief);
 
-$("#organizerSaveButton")?.addEventListener("click", saveMatch);
-$("#organizerStartButton")?.addEventListener("click", () => startMatch("organizer"));
-$("#organizerEndButton")?.addEventListener("click", () => endMatch("organizer"));
-$("#saveConfirmContinue")?.addEventListener("click", () => $("#saveConfirmModal").classList.add("hidden"));
-$("#saveConfirmEnter")?.addEventListener("click", () => { $("#saveConfirmModal").classList.add("hidden"); startMatch("organizer"); showScreen("tactical"); });
-
-$("#tacticalOrganizerStart")?.addEventListener("click", () => startMatch("organizer"));
-$("#tacticalOrganizerEnd")?.addEventListener("click", () => endMatch("organizer"));
-$("#tacticalPlayerLeave")?.addEventListener("click", leaveMatch);
-$("#tacticalLockButton")?.addEventListener("click", lockTacticalPanel);
-
-const unlockBtn = $("#unlockButton");
-if (unlockBtn) {
-  unlockBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); unlockStart(); });
-  unlockBtn.addEventListener("pointerup", unlockCancel);
-  unlockBtn.addEventListener("pointercancel", unlockCancel);
-}
-
-$("#radioToggle")?.addEventListener("click", toggleRadio);
-$("#channelDown")?.addEventListener("click", () => changeChannel(-1));
-$("#channelUp")?.addEventListener("click", () => changeChannel(1));
-$("#radioVolume")?.addEventListener("input", (e) => { state.player.radioVolume = e.target.value; persist(); });
-
-const ptt = $("#pttButton");
+const ptt = $("#pttBtn");
 if (ptt) {
-  ptt.addEventListener("pointerdown", (e) => { e.preventDefault(); setText("#radioFeedback", "TRANSMITINDO..."); ptt.classList.add("transmitting"); });
-  ptt.addEventListener("pointerup", () => { setText("#radioFeedback", "RÁDIO PRONTO"); ptt.classList.remove("transmitting"); });
+  const startTx = (e) => {
+    e.preventDefault();
+    if (!state.player.radio) return toast("Rádio desligado.");
+    ptt.classList.add("transmitting");
+    setText("#radioStatus", "TRANSMITINDO");
+    const st = $("#radioStatus");
+    if (st) st.classList.add("tx");
+    // boost VU while transmitting
+    if (vuActive) {
+      $$("#vuMeter span").forEach(s => { s.style.height = (50 + Math.random() * 50) + "%"; });
+    }
+  };
+  const endTx = () => {
+    ptt.classList.remove("transmitting");
+    setText("#radioStatus", "PRONTO");
+    const st = $("#radioStatus");
+    if (st) st.classList.remove("tx");
+  };
+  ptt.addEventListener("pointerdown", startTx);
+  ptt.addEventListener("pointerup", endTx);
+  ptt.addEventListener("pointercancel", endTx);
+  ptt.addEventListener("pointerleave", endTx);
 }
 
-$("#waitingBackButton")?.addEventListener("click", () => showScreen("player-home"));
-$("#devGenerateMatch")?.addEventListener("click", () => {
-  state.match = { exists: true, name: "Operação Red Sand", status: "scheduled", date: "2026-10-10", elapsedSeconds: 0 }; persist(); render(); showToast("Criada!");
-});
-$("#devStartMatch")?.addEventListener("click", () => startMatch("dev"));
-$("#devEndMatch")?.addEventListener("click", () => endMatch("dev"));
-$("#devReset")?.addEventListener("click", () => { localStorage.removeItem(STORAGE_KEY); state = createInitialState(); showScreen("role-select", false); render(); });
-
-$("#appModalClose")?.addEventListener("click", () => $("#appModal").classList.add("hidden"));
-
-function initialize() {
-  const has = localStorage.getItem(STORAGE_KEY);
-  if (has) { showScreen(state.role === "organizer" ? "organizer" : "player-home", false); }
-  else { state.role = "player"; showScreen("role-select", false); }
-  persist(); render();
+/* ── Boot ── */
+function boot() {
+  if (localStorage.getItem(KEY)) {
+    show(state.role === "organizer" ? "organizer" : "player", false);
+  } else {
+    show("role", false);
+  }
+  if (state.match.status === "live") startTimer();
+  render();
 }
 
-initialize();
+boot();
