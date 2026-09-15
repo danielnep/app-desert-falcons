@@ -1,1240 +1,409 @@
-/* ═══════════════════════════════════════════════════
-   DESERT FALCONS — Terminal
-   Preto / cinza escuro · cantos retos · tipografia militar
-═══════════════════════════════════════════════════ */
-
-:root {
-  --bg:          #0f110e;
-  --bg-elev:     #151712;
-  --surface:     #1a1c17;
-  --surface-2:   #22241e;
-  --surface-3:   #2a2c24;
-  --border:      #3a3c36;
-  --border-soft: #32342e;
-  --text:        #e6e4dc;
-  --text-dim:    #9a988e;
-  --text-mute:   #6a6860;
-  --accent:      #d4b84a;
-  --accent-dim:  #9a8a3a;
-  --beige:       #d4b84a;
-  --beige-dim:   #9a8a3a;
-  --beige-soft:  rgba(212, 184, 74, 0.22);
-  --brown:       #d4b84a;
-  --brown-dim:   #9a8a3a;
-  --brown-soft:  rgba(212, 184, 74, 0.22);
-  --danger:      #9a5050;
-  --danger-bg:   #221616;
-  --live:        #7a9a6a;
-  --live-bg:     #161c14;
-  --blue-team:   #5a7a9a;
-  --red-team:    #9a6a5a;
-  --radius:      3px;
-  --fast:        160ms;
-  --mid:         260ms;
-  --ease:        cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-html { height: 100%; }
-
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
-
-body {
-  background-color: var(--bg);
-  background-image:
-    linear-gradient(rgba(58, 60, 52, 0.35) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(58, 60, 52, 0.35) 1px, transparent 1px);
-  background-size: 20px 20px;
-  background-position: -1px -1px;
-  color: var(--text);
-  font-family: "Segoe UI", "Helvetica Neue", system-ui, -apple-system, sans-serif;
-  font-size: 14px;
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-  -webkit-font-smoothing: antialiased;
-}
-
-#app {
-  height: 100dvh;
-  max-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  max-width: 480px;
-  margin: 0 auto;
-  overflow: hidden;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: linear-gradient(180deg, #1c1e18 0%, var(--bg-elev) 100%);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  z-index: 50;
-}
-
-.brand { display: flex; align-items: center; gap: 10px; }
-
-.brand-mark {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  border-radius: var(--radius);
-  overflow: hidden;
-  border: 1px solid var(--beige-dim);
-  background: #0e0e0e;
-  box-shadow: 0 0 0 1px var(--beige-soft);
-}
-.brand-mark img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.brand-title {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text);
-}
-.brand-sub {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  color: var(--text-mute);
-  text-transform: uppercase;
-  margin-top: 1px;
-}
-
-.header-right { display: flex; align-items: center; gap: 8px; }
-
-.status-chip {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text-dim);
-  transition: all var(--fast) var(--ease);
-}
-.status-chip.live {
-  color: var(--live);
-  border-color: var(--live);
-  background: var(--live-bg);
-  animation: statusPulse 2.4s ease-in-out infinite;
-}
-.status-chip.scheduled { color: var(--brown); border-color: var(--brown-dim); }
-.status-chip.ended { color: var(--text-mute); }
-
-@keyframes statusPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-.dev-btn {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 4px 8px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-mute);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.dev-btn:active {
-  transform: scale(0.96);
-  color: var(--text);
-  border-color: var(--accent-dim);
-}
-
-#main {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.screen {
-  display: none;
-  position: absolute;
-  inset: 0;
-  padding: 12px 12px 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  animation: screenIn var(--mid) var(--ease);
-}
-.screen.active { display: block; }
-
-/* hide scrollbar but keep internal scroll if content overflows */
-.screen::-webkit-scrollbar { width: 0; height: 0; }
-.screen { scrollbar-width: none; }
-
-@keyframes screenIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.screen-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.screen-head h2 {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text);
-}
-
-.kicker {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  color: var(--text-mute);
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.intro {
-  color: var(--text-dim);
-  font-size: 13px;
-  margin-top: 6px;
-  letter-spacing: 0.03em;
-}
-
-.role-wrap { padding-top: 20px; }
-.role-wrap h1 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 8px 0 6px;
-}
-.role-list { margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
-
-.role-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px;
-  background: linear-gradient(165deg, #242620 0%, var(--surface) 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--fast), background var(--fast), transform var(--fast);
-  animation: slideRight 0.28s var(--ease) both;
-}
-.role-card:nth-child(2) { animation-delay: 50ms; }
-.role-card:hover { border-color: var(--brown-dim); background: var(--surface-2); }
-.role-card:active { transform: scale(0.985); }
-
-.role-num {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--brown);
-  letter-spacing: 0.08em;
-  min-width: 26px;
-}
-.role-info { flex: 1; }
-.role-info strong {
-  display: block;
-  font-size: 14px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.role-info small { color: var(--text-dim); font-size: 11px; letter-spacing: 0.02em; }
-.role-arrow {
-  color: var(--text-mute);
-  font-size: 16px;
-  transition: transform var(--fast), color var(--fast);
-}
-.role-card:hover .role-arrow { transform: translateX(3px); color: var(--brown); }
-
-@keyframes slideRight {
-  from { opacity: 0; transform: translateX(-6px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-
-.card {
-  background: linear-gradient(165deg, #242620 0%, var(--surface) 55%, #1a1c18 100%);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  padding: 11px;
-  margin-bottom: 8px;
-  animation: fadeUp 0.3s var(--ease) both;
-}
-.card:nth-child(2) { animation-delay: 35ms; }
-.card:nth-child(3) { animation-delay: 70ms; }
-.card:nth-child(4) { animation-delay: 105ms; }
-.card.compact { padding: 12px 14px; }
-
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.card-head h3 {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.state-pill {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 3px 7px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  white-space: nowrap;
-}
-.state-pill.live {
-  color: var(--live);
-  border-color: var(--live);
-  background: var(--live-bg);
-  animation: statusPulse 2.4s ease-in-out infinite;
-}
-.state-pill.scheduled { color: var(--brown); border-color: var(--brown-dim); }
-.state-pill.waiting { color: var(--brown); border-color: var(--brown-dim); }
-.state-pill.ok { color: var(--live); border-color: var(--live); }
-.state-pill.ended { color: var(--text-mute); }
-
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 12px;
-  margin-bottom: 12px;
-}
-.info span {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-  margin-bottom: 2px;
-}
-.info strong {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.03em;
-}
-
-.player-line {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-}
-.player-line strong { color: var(--text); }
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  padding: 10px 14px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: transform var(--fast) var(--ease),
-              background var(--fast) var(--ease),
-              border-color var(--fast) var(--ease),
-              color var(--fast) var(--ease),
-              box-shadow var(--fast) var(--ease);
-}
-.btn:active { transform: scale(0.97); }
-.btn:disabled { opacity: 0.35; pointer-events: none; }
-
-.btn.primary {
-  background: var(--surface-3);
-  color: var(--text);
-  border-color: var(--beige-dim);
-}
-.btn.primary:hover { background: #32342c; border-color: var(--beige); }
-
-.btn.accent {
-  background: #2c2e26;
-  color: var(--text);
-  border-color: var(--beige);
-}
-.btn.accent:hover { background: #36382e; border-color: var(--beige); }
-
-.btn.secondary {
-  background: transparent;
-  color: var(--text-dim);
-  border-color: var(--border);
-}
-.btn.secondary:hover { border-color: var(--accent-dim); color: var(--text); }
-
-.btn.danger {
-  background: var(--danger-bg);
-  color: #c08080;
-  border-color: var(--danger);
-}
-.btn.danger:hover { background: #2a1616; }
-
-.btn.outline-danger {
-  background: transparent;
-  color: var(--danger);
-  border-color: var(--danger);
-}
-.btn.wide { width: 100%; }
-.btn.hidden, .hidden { display: none !important; }
-
-.ghost-btn {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 6px 10px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.ghost-btn:active { transform: scale(0.96); color: var(--text); }
-
-.action-row { display: flex; flex-direction: column; gap: 8px; }
-.org-actions, .tac-actions, .dev-actions, .combat-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.hit-btn {
-  font-size: 13px;
-  padding: 14px;
-  letter-spacing: 0.16em;
-}
-.hit-btn:active {
-  transform: scale(0.96);
-  box-shadow: 0 0 0 2px rgba(154, 64, 64, 0.3);
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.field span {
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.field input, .field textarea {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 11px;
-  color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-  letter-spacing: 0.02em;
-  outline: none;
-  transition: border-color var(--fast);
-}
-.field input:focus, .field textarea:focus { border-color: var(--brown-dim); }
-.field textarea { resize: vertical; min-height: 72px; }
-
-.team-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.team-box {
-  padding: 10px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: var(--bg);
-}
-.team-box.blue { border-color: #2a3a4a; }
-.team-box.red  { border-color: #4a2a2a; }
-.team-box span {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.team-box input {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 9px;
-  color: var(--text);
-  font-size: 12px;
-  outline: none;
-}
-
-.check-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 14px 0;
-  cursor: pointer;
-  font-size: 13px;
-  color: var(--text-dim);
-}
-.check-line input { width: 16px; height: 16px; accent-color: var(--accent-dim); }
-
-.briefing-text {
-  color: var(--text-dim);
-  font-size: 13px;
-  line-height: 1.5;
-  margin: 10px 0 12px;
-  white-space: pre-wrap;
-}
-.objective-line {
-  font-size: 12px;
-  color: var(--text-mute);
-  margin-bottom: 8px;
-  letter-spacing: 0.04em;
-}
-.objective-line strong { color: var(--brown); }
-
-.tactical-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 14px;
-}
-.tac-timer-wrap { text-align: right; }
-.timer {
-  font-size: 24px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.08em;
-  color: var(--brown);
-}
-
-.map-card { padding-bottom: 10px; }
-.map-viewport {
-  position: relative;
-  background: #0e100c;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-#tacMap {
-  display: block;
-  width: 100%;
-  height: auto;
-  touch-action: none;
-}
-.map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 6px 8px;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.leg::before {
-  content: "";
-  display: inline-block;
-  width: 7px; height: 7px;
-  margin-right: 4px;
-  vertical-align: middle;
-  border-radius: 1px;
-}
-.leg.you::before { background: var(--brown); box-shadow: 0 0 4px var(--brown-soft); }
-.leg.friend::before { background: var(--blue-team); }
-.leg.enemy::before { background: #a05050; }
-.leg.mine::before { background: #8a8a5a; }
-
-.map-intel {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  padding: 0 2px;
-}
-.map-intel #droneStatus.ready { color: var(--brown); }
-
-.tac-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.radio-card { position: relative; overflow: hidden; }
-
-.radio-toggle {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 4px 9px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-mute);
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.radio-toggle.on {
-  color: var(--live);
-  border-color: var(--live);
-  background: var(--live-bg);
-}
-
-.vu-meter {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 44px;
-  margin: 12px 0 10px;
-  padding: 0 2px;
-}
-.vu-meter span {
-  flex: 1;
-  background: var(--border);
-  border-radius: 1px 1px 0 0;
-  min-height: 3px;
-  transition: height 80ms linear, background 120ms;
-}
-.vu-meter.active span {
-  background: linear-gradient(to top, #2a2c24, var(--beige-dim), var(--beige));
-  animation: vuBounce 0.35s ease-in-out infinite alternate;
-}
-.vu-meter.active span:nth-child(1)  { animation-delay: 0.00s; height: 30%; }
-.vu-meter.active span:nth-child(2)  { animation-delay: 0.04s; height: 55%; }
-.vu-meter.active span:nth-child(3)  { animation-delay: 0.08s; height: 80%; }
-.vu-meter.active span:nth-child(4)  { animation-delay: 0.12s; height: 45%; }
-.vu-meter.active span:nth-child(5)  { animation-delay: 0.02s; height: 70%; }
-.vu-meter.active span:nth-child(6)  { animation-delay: 0.10s; height: 90%; }
-.vu-meter.active span:nth-child(7)  { animation-delay: 0.06s; height: 50%; }
-.vu-meter.active span:nth-child(8)  { animation-delay: 0.14s; height: 65%; }
-.vu-meter.active span:nth-child(9)  { animation-delay: 0.03s; height: 40%; }
-.vu-meter.active span:nth-child(10) { animation-delay: 0.09s; height: 75%; }
-
-@keyframes vuBounce {
-  0%   { transform: scaleY(0.5); opacity: 0.75; }
-  100% { transform: scaleY(1); opacity: 1; }
-}
-
-.radio-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-.channel-ctrl { display: flex; align-items: center; gap: 8px; }
-.ch-btn {
-  width: 30px; height: 30px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  border-radius: var(--radius);
-  font-size: 16px;
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.ch-btn:active { background: var(--surface-2); transform: scale(0.94); }
-#chDisplay {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  min-width: 48px;
-  text-align: center;
-}
-.radio-status {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.radio-status.tx { color: var(--brown); }
-
-.ptt-btn {
-  width: 100%;
-  padding: 14px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: var(--radius);
-  cursor: pointer;
-  user-select: none;
-  touch-action: none;
-  transition: all var(--fast);
-}
-.ptt-btn.transmitting {
-  background: #2a2a2a;
-  border-color: var(--brown);
-  color: var(--text);
-  box-shadow: 0 0 0 1px var(--beige-soft);
-}
-.ptt-btn:active, .ptt-btn.transmitting { transform: scale(0.98); }
-
-.sectors {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 6px;
-}
-.sector {
-  padding: 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  text-align: center;
-}
-.sector span {
-  display: block;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-  margin-bottom: 3px;
-}
-.sector strong {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.sector strong.neutro { color: var(--text-dim); }
-.sector strong.azul   { color: var(--blue-team); }
-.sector strong.vermelho { color: var(--red-team); }
-
-.waiting-wrap {
-  text-align: center;
-  padding: 40px 14px;
-  position: relative;
-}
-.pulse-ring {
-  width: 56px; height: 56px;
-  margin: 0 auto 20px;
-  border: 1px solid var(--accent-dim);
-  border-radius: 50%;
-  position: relative;
-  animation: ringPulse 1.8s ease-out infinite;
-}
-.pulse-ring::after {
-  content: "";
-  position: absolute;
-  inset: 10px;
-  border: 1px solid var(--accent);
-  border-radius: 50%;
-  opacity: 0.5;
-}
-@keyframes ringPulse {
-  0%   { transform: scale(0.85); opacity: 0.9; }
-  70%  { opacity: 0.2; }
-  100% { transform: scale(1.3); opacity: 0; }
-}
-.waiting-wrap h2 {
-  margin: 8px 0 10px;
-  font-size: 18px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.tac-lock {
-  position: absolute;
-  inset: 0;
-  background: rgba(18, 20, 16, 0.92);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 40;
-  padding: 24px;
-  transition: opacity 0.25s var(--ease), visibility 0.25s;
-}
-.tac-lock.hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-.lock-content { text-align: center; max-width: 260px; }
-.lock-content h3 {
-  font-size: 16px;
-  margin: 8px 0 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.lock-content p {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 18px;
-  line-height: 1.5;
-}
-.unlock-btn {
-  width: 100%;
-  padding: 16px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: var(--radius);
-  cursor: pointer;
-  user-select: none;
-  touch-action: none;
-  transition: all var(--fast);
-}
-.unlock-btn:active, .unlock-btn.holding {
-  background: var(--surface-3);
-  border-color: var(--accent);
-  color: var(--text);
-}
-.unlock-progress {
-  margin-top: 10px;
-  height: 3px;
-  background: var(--border);
-  border-radius: 1px;
-  overflow: hidden;
-}
-#unlockBar {
-  height: 100%;
-  width: 0%;
-  background: var(--brown);
-  transition: width 50ms linear;
-}
-
-.dev-status-row {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.dev-seg {
-  flex: 1;
-  padding: 10px 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.dev-seg:hover, .dev-seg.active {
-  border-color: var(--brown);
-  color: var(--brown);
-}
-
-.toast {
-  position: fixed;
-  bottom: 22px;
-  left: 50%;
-  transform: translateX(-50%) translateY(16px);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 11px 18px;
-  border-radius: var(--radius);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.28s var(--ease), transform 0.28s var(--ease);
-  z-index: 100;
-  max-width: calc(100% - 28px);
-  text-align: center;
-}
-.toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-  animation: scaleIn 0.26s var(--ease) both;
-}
-@keyframes scaleIn {
-  from { opacity: 0; transform: translateX(-50%) scale(0.96); }
-  to   { opacity: 1; transform: translateX(-50%) scale(1); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.info-grid .info { animation: fadeIn 0.32s var(--ease) both; }
-.info-grid .info:nth-child(1) { animation-delay: 20ms; }
-.info-grid .info:nth-child(2) { animation-delay: 40ms; }
-.info-grid .info:nth-child(3) { animation-delay: 60ms; }
-.info-grid .info:nth-child(4) { animation-delay: 80ms; }
-.info-grid .info:nth-child(5) { animation-delay: 100ms; }
-.info-grid .info:nth-child(6) { animation-delay: 120ms; }
-
-@media (max-width: 380px) {
-  .form-grid { grid-template-columns: 1fr; }
-  .timer { font-size: 22px; }
-}
-
-/* ── Modules / Tabs / Modal / Volume ── */
-.module-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.module-opt {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.module-opt input { accent-color: var(--accent-dim); width: 14px; height: 14px; }
-
-.tab-row {
-  display: flex;
-  gap: 0;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.tab-btn {
-  flex: 1;
-  padding: 10px 6px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  background: var(--bg);
-  border: none;
-  border-right: 1px solid var(--border);
-  color: var(--text-mute);
-  cursor: pointer;
-  transition: all var(--fast);
-}
-.tab-btn:last-child { border-right: none; }
-.tab-btn.active {
-  background: var(--surface-2);
-  color: var(--text);
-  box-shadow: inset 0 -2px 0 var(--beige);
-}
-.tab-panel.hidden { display: none; }
-
-.vol-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.vol-line input[type="range"] {
-  flex: 1;
-  accent-color: var(--accent-dim);
-  height: 4px;
-}
-
-.dev-team-preview {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-}
-.dev-team-preview strong { color: var(--text); font-size: 14px; }
-
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal.hidden { display: none; }
-.modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.75);
-}
-.modal-window {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  max-width: 340px;
-  width: 100%;
-  text-align: center;
-}
-.modal-window h2 {
-  font-size: 16px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin: 8px 0 10px;
-}
-.modal-window p {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 16px;
-}
-.modal-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.field-wide { grid-column: 1 / -1; }
-
-
-/* ── Compact tactical ── */
-.tac-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 6px;
-}
-.tac-bar h2 {
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-.tac-bar-right { text-align: right; }
-.tac-bar .timer { font-size: 18px; color: var(--beige); }
-
-.tac-top-actions {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-.btn-sm {
-  padding: 7px 10px !important;
-  font-size: 10px !important;
-  letter-spacing: 0.1em !important;
-  flex: 1;
-  min-width: 0;
-}
-
-.score-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 6px;
-  align-items: center;
-  margin-bottom: 8px;
-  padding: 8px;
-  background: var(--surface);
-  border: 1px solid var(--beige-dim);
-  border-radius: var(--radius);
-}
-.score-box {
-  text-align: center;
-}
-.score-box span {
-  display: block;
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-.score-box strong {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--blue-team);
-  letter-spacing: 0.04em;
-}
-.score-box.red strong { color: var(--red-team); }
-.score-mid {
-  text-align: center;
-  padding: 0 8px;
-}
-.score-mid .kicker { margin-bottom: 2px; }
-.score-mid #scoreKills {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--beige);
-}
-
-.compact-map { margin-bottom: 6px; }
-.compact-map .card-head.tight { margin-bottom: 4px; }
-.compact-map .map-viewport { margin-bottom: 4px; }
-#tacMap { max-height: 28vh; }
-
-.tac-bottom {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.mini-sectors {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-.mini-sectors .sector { padding: 6px 8px; }
-.mini-sectors .sector strong { font-size: 11px; }
-
-.radio-compact { padding: 8px 10px !important; margin-bottom: 0; }
-.radio-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.radio-compact .vu-meter {
-  height: 28px;
-  margin: 4px 0 6px;
-}
-.radio-compact .ptt-btn {
-  padding: 11px;
-  font-size: 11px;
-  border-color: var(--beige-dim);
-  color: var(--beige);
-}
-.radio-compact .ptt-btn.transmitting {
-  background: var(--beige-soft);
-  border-color: var(--beige);
-  color: var(--text);
-  box-shadow: 0 0 14px var(--beige-soft);
-}
-
-.lock-icon {
-  font-size: 22px;
-  color: var(--beige);
-  margin-bottom: 6px;
-}
-
-/* yellow focus like screenshot */
-.tab-btn.active { box-shadow: inset 0 -2px 0 var(--beige); }
-.brand-mark { border-color: var(--beige-dim); }
-
-/* ── Org compact + Lobby ── */
-.org-form { gap: 8px; }
-.compact-teams { gap: 6px; }
-.compact-teams .team-box { padding: 8px; gap: 4px; }
-.compact-teams .team-box input {
-  padding: 6px 8px;
-  font-size: 12px;
-}
-.compact-teams .team-box input[type="number"] {
-  width: 100%;
-}
-
-.lobby-count {
-  text-align: center;
-  padding: 12px 0 4px;
-}
-.lobby-count strong {
-  display: block;
-  font-size: 36px;
-  font-weight: 700;
-  color: var(--beige);
-  letter-spacing: 0.04em;
-}
-.lobby-count span {
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--text-mute);
-}
-
-.link-input {
-  width: 100%;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px;
-  color: var(--text-dim);
-  font-size: 11px;
-  margin-bottom: 8px;
-  font-family: inherit;
-}
-
-
-/* Radio olive tone */
-.radio-compact, .radio-card {
-  background: linear-gradient(165deg, #1a2218 0%, #141a14 100%) !important;
-  border-color: #2a3a28 !important;
-}
-.radio-compact .ptt-btn {
-  border-color: #4a6a42;
-  color: #8aba7a;
-}
-.radio-compact .ptt-btn.transmitting {
-  background: rgba(106, 154, 90, 0.2);
-  border-color: #6a9a5a;
-  color: #c8e8b8;
-  box-shadow: 0 0 14px rgba(106, 154, 90, 0.25);
-}
-.radio-toggle.on {
-  color: #8aba7a;
-  border-color: #6a9a5a;
-  background: rgba(26, 40, 24, 0.9);
-}
-.radio-compact .vu-meter.active span {
-  background: linear-gradient(to top, #2a3a24, #5a8a4a, #a0d080) !important;
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#121410">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Desert Falcons — Terminal</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark">
+          <img src="grok_1789444507207.png" alt="Desert Falcons" width="44" height="44">
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">DESERT FALCONS</span>
+          <span class="brand-sub">PLAYER TERMINAL</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div id="globalStatus" class="status-chip">SEM PARTIDA</div>
+        <button type="button" id="devBtn" class="dev-btn" title="Dev">DEV</button>
+      </div>
+    </header>
+
+    <main id="main">
+
+      <!-- ROLE -->
+      <section class="screen active" data-screen="role">
+        <div class="role-wrap">
+          <p class="kicker">ACESSO AO TERMINAL</p>
+          <h1>SELECIONE O MODO</h1>
+          <p class="intro">Escolha como vai operar nesta sessão.</p>
+          <div class="role-list">
+            <button type="button" class="role-card" data-role="player">
+              <span class="role-num">01</span>
+              <div class="role-info">
+                <strong>JOGADOR</strong>
+                <small>Presença, briefing e painel tático</small>
+              </div>
+              <span class="role-arrow">→</span>
+            </button>
+            <button type="button" class="role-card" data-role="organizer">
+              <span class="role-num">02</span>
+              <div class="role-info">
+                <strong>ORGANIZADOR</strong>
+                <small>Criar, iniciar e controlar a partida</small>
+              </div>
+              <span class="role-arrow">→</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLAYER HOME -->
+      <section class="screen" data-screen="player">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">MODO JOGADOR</p>
+            <h2>PAINEL</h2>
+          </div>
+          <button type="button" class="ghost-btn" id="playerDetailsBtn">DETALHES</button>
+        </div>
+        <article class="card match-card">
+          <div class="card-head">
+            <div>
+              <p class="kicker">PARTIDA</p>
+              <h3 id="pMatchName">Nenhuma partida</h3>
+            </div>
+            <span id="pMatchState" class="state-pill">SEM PARTIDA</span>
+          </div>
+          <div class="info-grid">
+            <div class="info"><span>DATA</span><strong id="pMatchDate">—</strong></div>
+            <div class="info"><span>HORÁRIO</span><strong id="pMatchTime">—</strong></div>
+            <div class="info"><span>LOCAL</span><strong id="pMatchLocation">—</strong></div>
+            <div class="info"><span>MAPA</span><strong id="pMatchMap">—</strong></div>
+            <div class="info"><span>MODO</span><strong id="pMatchMode">—</strong></div>
+            <div class="info"><span>DURAÇÃO</span><strong id="pMatchDuration">—</strong></div>
+          </div>
+          <div class="action-row" id="pActions">
+            <button type="button" class="btn primary" id="btnConfirm">CONFIRMAR PRESENÇA</button>
+            <button type="button" class="btn primary hidden" id="btnRequest">SOLICITAR ENTRADA</button>
+            <button type="button" class="btn primary hidden" id="btnEnter">ENTRAR NO JOGO</button>
+          </div>
+        </article>
+        <article class="card compact">
+          <div class="card-head">
+            <div>
+              <p class="kicker">PARTICIPAÇÃO</p>
+              <h3 id="pPartStatus">Aguardando</h3>
+            </div>
+            <span id="pPartBadge" class="state-pill">AGUARDANDO</span>
+          </div>
+          <div class="player-line">
+            <span>JOGADOR</span><strong id="pName">DANI</strong>
+            <span>EQUIPE</span><strong id="pTeam">—</strong>
+          </div>
+        </article>
+      </section>
+
+      <!-- PREP -->
+      <section class="screen" data-screen="prep">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">PREPARAÇÃO</p>
+            <h2>BRIEFING</h2>
+          </div>
+          <button type="button" class="ghost-btn" data-back="player">VOLTAR</button>
+        </div>
+        <article class="card">
+          <h3 id="prepTitle">Briefing da Operação</h3>
+          <p id="prepText" class="briefing-text">—</p>
+          <p class="objective-line"><span>OBJETIVO</span> <strong id="prepObjective">—</strong></p>
+          <label class="check-line">
+            <input type="checkbox" id="prepAck">
+            <span>Li e compreendi o briefing</span>
+          </label>
+          <button type="button" class="btn primary wide" id="btnPrepEnter" disabled>ENTRAR NO JOGO</button>
+        </article>
+      </section>
+
+      <!-- WAITING -->
+      <section class="screen" data-screen="waiting">
+        <div class="waiting-wrap">
+          <div class="pulse-ring"></div>
+          <p class="kicker">SOLICITAÇÃO ENVIADA</p>
+          <h2>AGUARDANDO</h2>
+          <p class="intro">O organizador precisa autorizar sua entrada.</p>
+          <button type="button" class="btn secondary" data-back="player">VOLTAR AO PAINEL</button>
+        </div>
+      </section>
+
+      <!-- TACTICAL -->
+      <section class="screen" data-screen="tactical">
+        <div class="tac-bar">
+          <div class="tac-bar-left">
+            <p class="kicker">PAINEL TÁTICO</p>
+            <h2 id="tacMatchName">—</h2>
+          </div>
+          <div class="tac-bar-right">
+            <span id="tacLivePill" class="state-pill live">ATIVO</span>
+            <div id="tacTimer" class="timer">00:00</div>
+          </div>
+        </div>
+
+        <div class="tac-top-actions">
+          <button type="button" class="btn danger btn-sm" id="btnHit">HIT</button>
+          <button type="button" class="btn danger btn-sm" id="tacLeave">ABANDONAR</button>
+          <button type="button" class="btn secondary btn-sm" id="tacLockBtn">BLOQUEAR</button>
+          <button type="button" class="btn danger btn-sm hidden" id="tacEnd">ENCERRAR</button>
+        </div>
+
+        <div class="score-row">
+          <div class="score-box">
+            <span>AZUL</span>
+            <strong id="scoreBlue">0</strong>
+          </div>
+          <div class="score-mid">
+            <span class="kicker">PLACAR</span>
+            <span id="scoreKills">0 ELIM</span>
+          </div>
+          <div class="score-box red">
+            <span>VERMELHA</span>
+            <strong id="scoreRed">0</strong>
+          </div>
+        </div>
+
+        <article class="card map-card compact-map">
+          <div class="card-head tight">
+            <p class="kicker">MAPA</p>
+            <span id="mapStatus" class="state-pill">GPS</span>
+          </div>
+          <div class="map-viewport" id="mapViewport">
+            <canvas id="tacMap" width="400" height="220"></canvas>
+          </div>
+          <div class="map-intel">
+            <span id="killCount">ELIM 0/3</span>
+            <span id="droneStatus">DRONE STANDBY</span>
+          </div>
+        </article>
+
+        <div class="tac-bottom">
+          <div class="sectors mini-sectors">
+            <div class="sector"><span>ALFA</span><strong id="secAlfa">NEUTRO</strong></div>
+            <div class="sector"><span>BRAVO</span><strong id="secBravo">NEUTRO</strong></div>
+          </div>
+
+          <article class="card radio-card radio-compact">
+            <div class="radio-row">
+              <button type="button" id="radioToggle" class="radio-toggle on">ON</button>
+              <div class="channel-ctrl">
+                <button type="button" id="chDown" class="ch-btn">−</button>
+                <span id="chDisplay">CH 01</span>
+                <button type="button" id="chUp" class="ch-btn">+</button>
+              </div>
+              <span id="radioStatus" class="radio-status">PRONTO</span>
+            </div>
+            <div class="vu-meter" id="vuMeter" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
+            <button type="button" id="pttBtn" class="ptt-btn">SEGURE PARA FALAR</button>
+          </article>
+        </div>
+
+        <div id="tacLock" class="tac-lock">
+          <div class="lock-content">
+            <div class="lock-icon">▣</div>
+            <p class="kicker">CONTROLES PROTEGIDOS</p>
+            <h3>PAINEL BLOQUEADO</h3>
+            <p>Segure 1,5s para liberar.</p>
+            <button type="button" id="unlockBtn" class="unlock-btn">SEGURAR PARA DESBLOQUEAR</button>
+            <div class="unlock-progress"><div id="unlockBar"></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ORGANIZER -->
+      <section class="screen" data-screen="organizer">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">ORGANIZADOR</p>
+            <h2>PARTIDA</h2>
+          </div>
+          <span id="orgStatus" class="state-pill">SEM PARTIDA</span>
+        </div>
+
+        <article class="card">
+          <p class="kicker">DADOS</p>
+          <div class="form-grid org-form">
+            <label class="field field-wide"><span>NOME</span><input id="oName" type="text" placeholder="Operação..." autocomplete="off"></label>
+            <label class="field"><span>DATA</span><input id="oDate" type="date"></label>
+            <label class="field"><span>HORÁRIO</span><input id="oTime" type="time"></label>
+            <label class="field"><span>LOCAL</span><input id="oLocation" type="text" placeholder="Campo" autocomplete="off"></label>
+            <label class="field"><span>MAPA</span><input id="oMap" type="text" placeholder="Complexo" autocomplete="off"></label>
+            <label class="field"><span>MODO</span><input id="oMode" type="text" placeholder="Simulação" autocomplete="off"></label>
+            <label class="field"><span>MIN</span><input id="oDuration" type="number" min="10" max="480" value="60"></label>
+          </div>
+        </article>
+
+        <article class="card">
+          <p class="kicker">EQUIPES</p>
+          <div class="team-row compact-teams">
+            <div class="team-box blue">
+              <span>AZUL</span>
+              <input id="oBlueName" type="text" placeholder="Azul" value="Equipe Azul">
+              <input id="oBlueLimit" type="number" min="1" max="100" value="20" title="Limite">
+            </div>
+            <div class="team-box red">
+              <span>VERMELHA</span>
+              <input id="oRedName" type="text" placeholder="Vermelha" value="Equipe Vermelha">
+              <input id="oRedLimit" type="number" min="1" max="100" value="20" title="Limite">
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <p class="kicker">BRIEFING</p>
+          <label class="field field-wide"><span>OBJETIVO</span><input id="oObjective" type="text" placeholder="Objetivo principal" autocomplete="off"></label>
+          <label class="field field-wide"><span>TEXTO</span><textarea id="oBriefText" rows="2" placeholder="Regras e orientações"></textarea></label>
+          <input type="hidden" id="oBriefTitle" value="Briefing da Operação">
+          <input type="hidden" id="oCheckIn" value="">
+        </article>
+
+        <div class="org-actions">
+          <button type="button" class="btn primary wide" id="oSchedule">AGENDAR PARTIDA</button>
+          <button type="button" class="btn accent wide" id="oStartNow">INICIAR AGORA</button>
+          <button type="button" class="btn danger wide hidden" id="oEnd">ENCERRAR PARTIDA</button>
+          <button type="button" class="btn secondary wide" id="oLeave">SAIR</button>
+        </div>
+      </section>
+
+      <!-- LOBBY (org waiting) -->
+      <section class="screen" data-screen="lobby">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">LOBBY</p>
+            <h2 id="lobbyMatchName">—</h2>
+          </div>
+          <span id="lobbyStatus" class="state-pill scheduled">AGUARDANDO</span>
+        </div>
+        <article class="card">
+          <p class="kicker">PRESENÇA</p>
+          <p id="lobbyPresence" class="intro">Aguardando jogadores confirmarem.</p>
+          <div class="lobby-count">
+            <strong id="lobbyCount">0</strong>
+            <span>confirmados</span>
+          </div>
+        </article>
+        <article class="card">
+          <p class="kicker">LINK PARA A EQUIPE</p>
+          <p class="intro" style="margin-bottom:8px">Envie este link. Quem abrir entra como jogador.</p>
+          <input id="lobbyLink" type="text" readonly class="link-input">
+          <button type="button" class="btn accent wide" id="lobbyCopy">COPIAR LINK</button>
+        </article>
+        <div class="org-actions">
+          <button type="button" class="btn primary wide" id="lobbyStart">INICIAR PARTIDA</button>
+          <button type="button" class="btn danger wide" id="lobbyCancel">CANCELAR</button>
+        </div>
+      </section>
+
+      <!-- DEV -->
+      <section class="screen" data-screen="dev">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">DEV CONTROL</p>
+            <h2>SIMULAÇÃO</h2>
+          </div>
+          <button type="button" class="ghost-btn" data-back="previous">VOLTAR</button>
+        </div>
+        <article class="card">
+          <p class="kicker">STATUS RÁPIDO</p>
+          <div class="dev-status-row">
+            <button type="button" class="dev-seg" data-status="scheduled">AGENDADA</button>
+            <button type="button" class="dev-seg" data-status="live">AO VIVO</button>
+            <button type="button" class="dev-seg" data-status="ended">ENCERRADA</button>
+          </div>
+          <label class="field field-wide" style="margin-bottom:12px">
+            <span>JOGADORES SIMULADOS / EQUIPE</span>
+            <input id="devPlayersPerTeam" type="number" min="0" max="200" value="0">
+          </label>
+          <div class="dev-team-preview" id="devPreview">
+            <span><strong id="devBlueCount">0</strong> AZUL</span>
+            <span>×</span>
+            <span><strong id="devRedCount">0</strong> VERMELHA</span>
+            <span>=</span>
+            <span><strong id="devTotalCount">0</strong> TOTAL</span>
+          </div>
+          <button type="button" class="btn secondary wide" id="devApplyPlayers" style="margin-bottom:10px">APLICAR SIMULAÇÃO</button>
+          <div class="dev-actions">
+            <button type="button" class="btn secondary" id="devGen">GERAR PARTIDA</button>
+            <button type="button" class="btn primary" id="devStart">INICIAR</button>
+            <button type="button" class="btn danger" id="devEnd">ENCERRAR</button>
+          </div>
+          <div class="dev-actions" style="margin-top:8px">
+            <button type="button" class="btn secondary" id="devAsPlayer">VIRAR JOGADOR</button>
+            <button type="button" class="btn secondary" id="devAsOrg">VIRAR ORGANIZADOR</button>
+          </div>
+          <button type="button" class="btn outline-danger wide" id="devReset">RESET TOTAL</button>
+        </article>
+      </section>
+
+      <!-- DETAILS -->
+      <section class="screen" data-screen="details">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">JOGADOR</p>
+            <h2>DETALHES</h2>
+          </div>
+          <button type="button" class="ghost-btn" data-back="player">VOLTAR</button>
+        </div>
+        <div class="tab-row">
+          <button type="button" class="tab-btn active" data-tab="inicio">INÍCIO</button>
+          <button type="button" class="tab-btn" data-tab="briefing">BRIEFING</button>
+          <button type="button" class="tab-btn" data-tab="perfil">PERFIL</button>
+        </div>
+        <div id="tabInicio" class="tab-panel">
+          <article class="card">
+            <div class="info-grid">
+              <div class="info"><span>PARTIDA</span><strong id="dMatchName">—</strong></div>
+              <div class="info"><span>STATUS</span><strong id="dMatchStatus">—</strong></div>
+              <div class="info"><span>MAPA</span><strong id="dMatchMap">—</strong></div>
+              <div class="info"><span>MODO</span><strong id="dMatchMode">—</strong></div>
+            </div>
+          </article>
+        </div>
+        <div id="tabBriefing" class="tab-panel hidden">
+          <article class="card">
+            <h3 id="dBriefTitle">—</h3>
+            <p id="dBriefText" class="briefing-text">—</p>
+            <p class="objective-line"><span>OBJETIVO</span> <strong id="dObjective">—</strong></p>
+          </article>
+        </div>
+        <div id="tabPerfil" class="tab-panel hidden">
+          <article class="card">
+            <div class="info-grid">
+              <div class="info"><span>ID</span><strong id="dId">DF-001</strong></div>
+              <div class="info"><span>NOME</span><strong id="dName">DANI</strong></div>
+              <div class="info"><span>CLASSE</span><strong id="dClass">Assalto</strong></div>
+              <div class="info"><span>EQUIPE</span><strong id="dTeam">—</strong></div>
+              <div class="info"><span>RÁDIO</span><strong id="dRadio">ON</strong></div>
+              <div class="info"><span>CANAL</span><strong id="dChannel">01</strong></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+    </main>
+    <div id="saveModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-window">
+        <p class="kicker">CONFIGURAÇÃO SALVA</p>
+        <h2>PARTIDA REGISTRADA</h2>
+        <p id="saveModalText">A partida foi salva e já está disponível.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" id="saveModalContinue">CONTINUAR ORGANIZANDO</button>
+          <button type="button" class="btn primary" id="saveModalEnter">ENTRAR NO JOGO</button>
+        </div>
+      </div>
+    </div>
+    <div id="toast" class="toast" aria-live="polite"></div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
