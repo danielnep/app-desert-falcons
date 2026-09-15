@@ -353,19 +353,22 @@ function stopGps() {
 
 function spawnEnemiesIfNeeded() {
   if (state.map.enemies.length > 0) return;
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     state.map.enemies.push({
       id: i,
-      x: 0.15 + Math.random() * 0.7,
-      y: 0.15 + Math.random() * 0.7,
-      visible: false,
+      x: 0.55 + Math.random() * 0.38,
+      y: 0.25 + Math.random() * 0.55,
+      visible: true,
       alive: true
     });
   }
-  state.map.friends = [
-    { x: 0.45, y: 0.55 },
-    { x: 0.55, y: 0.4 }
-  ];
+  state.map.friends = [];
+  for (let i = 0; i < 7; i++) {
+    state.map.friends.push({
+      x: 0.08 + Math.random() * 0.4,
+      y: 0.25 + Math.random() * 0.45
+    });
+  }
   save();
 }
 
@@ -377,78 +380,83 @@ function drawMap() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // ground
-  ctx.fillStyle = "#141610";
+  // dark ground - multiple gray tones
+  ctx.fillStyle = "#0e100c";
   ctx.fillRect(0, 0, w, h);
 
-  // subtle grid
-  ctx.strokeStyle = "#1e2018";
+  // fine grid (dry grays)
+  ctx.strokeStyle = "#1a1c16";
   ctx.lineWidth = 1;
-  for (let i = 0; i <= 12; i++) {
-    const x = (i / 12) * w, y = (i / 12) * h;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  const step = 20;
+  for (let x = 0; x <= w; x += step) {
+    ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke();
+  }
+  for (let y = 0; y <= h; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); ctx.stroke();
+  }
+  // stronger every 4th line
+  ctx.strokeStyle = "#24261e";
+  for (let x = 0; x <= w; x += step * 4) {
+    ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); ctx.stroke();
+  }
+  for (let y = 0; y <= h; y += step * 4) {
+    ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); ctx.stroke();
   }
 
-  // asphalt roads
-  ctx.fillStyle = "#1c1e18";
-  ctx.fillRect(0, h * 0.32, w, h * 0.08);
-  ctx.fillRect(0, h * 0.62, w, h * 0.08);
-  ctx.fillRect(w * 0.24, 0, w * 0.08, h);
-  ctx.fillRect(w * 0.58, 0, w * 0.08, h);
+  // roads - mid gray asphalt bands
+  ctx.fillStyle = "#2a2c28";
+  // horizontal
+  ctx.fillRect(0, h * 0.42, w, h * 0.07);
+  ctx.fillRect(0, h * 0.72, w * 0.55, h * 0.05);
+  // vertical / diagonal-ish strips
+  ctx.fillRect(w * 0.48, 0, w * 0.07, h);
+  ctx.save();
+  ctx.translate(w * 0.72, h * 0.55);
+  ctx.rotate(-0.35);
+  ctx.fillRect(-w * 0.08, -h * 0.02, w * 0.55, h * 0.05);
+  ctx.restore();
 
-  // road center dashed yellow
-  ctx.strokeStyle = "rgba(212,184,74,0.35)";
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 8]);
-  ctx.beginPath(); ctx.moveTo(0, h * 0.36); ctx.lineTo(w, h * 0.36); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, h * 0.66); ctx.lineTo(w, h * 0.66); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.28, 0); ctx.lineTo(w * 0.28, h); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.62, 0); ctx.lineTo(w * 0.62, h); ctx.stroke();
-  ctx.setLineDash([]);
+  // road edge highlight
+  ctx.strokeStyle = "#3a3c36";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, h * 0.42, w, h * 0.07);
+  ctx.strokeRect(w * 0.48, 0, w * 0.07, h);
 
-  // buildings
-  const buildings = [
-    { x: 0.03, y: 0.04, w: 0.18, h: 0.24, label: "GALPÃO A" },
-    { x: 0.36, y: 0.04, w: 0.18, h: 0.22, label: "" },
-    { x: 0.70, y: 0.05, w: 0.26, h: 0.22, label: "GALPÃO B" },
-    { x: 0.03, y: 0.44, w: 0.17, h: 0.14, label: "" },
-    { x: 0.36, y: 0.44, w: 0.18, h: 0.14, label: "" },
-    { x: 0.70, y: 0.44, w: 0.24, h: 0.14, label: "" },
-    { x: 0.04, y: 0.74, w: 0.16, h: 0.20, label: "" },
-    { x: 0.36, y: 0.76, w: 0.17, h: 0.18, label: "" },
-    { x: 0.70, y: 0.74, w: 0.24, h: 0.20, label: "" }
+  // units / buildings - yellow border like screenshot
+  const units = [
+    { x: 0.06, y: 0.08, w: 0.28, h: 0.28, label: "UNIDADE 1", sub: "A definir" },
+    { x: 0.38, y: 0.10, w: 0.22, h: 0.24, label: "UNIDADE 2", sub: "A definir" },
+    { x: 0.66, y: 0.08, w: 0.28, h: 0.28, label: "UNIDADE 3", sub: "A definir" },
+    { x: 0.32, y: 0.58, w: 0.28, h: 0.18, label: "VEÍCULO TÁTICO", sub: "A definir" },
+    { x: 0.66, y: 0.58, w: 0.28, h: 0.18, label: "VEÍCULO TÁTICO", sub: "A definir" }
   ];
-  buildings.forEach(b => {
-    const bx = b.x * w, by = b.y * h, bw = b.w * w, bh = b.h * h;
-    ctx.fillStyle = "#1a1c16";
+  units.forEach(u => {
+    const bx = u.x * w, by = u.y * h, bw = u.w * w, bh = u.h * h;
+    ctx.fillStyle = "rgba(18, 20, 16, 0.85)";
     ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#3a3c30";
+    ctx.strokeStyle = "#d4b84a";
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#2a2c24";
-    ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
-    if (b.label) {
-      ctx.fillStyle = "#6a6858";
-      ctx.font = "bold 8px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(b.label, bx + bw / 2, by + bh / 2 + 3);
-    }
-  });
-
-  // sector rings
-  [[0.12, 0.16, "A"], [0.83, 0.16, "B"]].forEach(([x, y, lab]) => {
-    ctx.beginPath();
-    ctx.arc(x * w, y * h, 12, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(212,184,74,0.12)";
-    ctx.fill();
-    ctx.strokeStyle = "rgba(212,184,74,0.5)";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
     ctx.fillStyle = "#d4b84a";
     ctx.font = "bold 9px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(lab, x * w, y * h + 3);
+    ctx.fillText(u.label, bx + bw / 2, by + bh / 2 - 4);
+    ctx.fillStyle = "#8a8860";
+    ctx.font = "8px sans-serif";
+    ctx.fillText(u.sub, bx + bw / 2, by + bh / 2 + 8);
+  });
+
+  // zone circles (objectives)
+  [[0.12, 0.82], [0.88, 0.48]].forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x * w, y * h, 22, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(212,184,74,0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x * w, y * h, 16, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(212,184,74,0.25)";
+    ctx.stroke();
   });
 
   // mines
@@ -461,47 +469,60 @@ function drawMap() {
     ctx.closePath(); ctx.fill();
   });
 
-  // friends
-  (state.map.friends || []).forEach(f => {
+  // glowing friends (yellow)
+  const t = Date.now() / 1000;
+  (state.map.friends || []).forEach((f, i) => {
+    const fx = f.x * w, fy = f.y * h;
+    const pulse = 0.55 + 0.45 * Math.sin(t * 2.2 + i);
     ctx.beginPath();
-    ctx.arc(f.x * w, f.y * h, 5, 0, Math.PI * 2);
-    ctx.fillStyle = "#5a7a9a";
+    ctx.arc(fx, fy, 10 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(212, 184, 74, ${0.12 * pulse})`;
     ctx.fill();
-    ctx.strokeStyle = "#8ab0d0";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(fx, fy, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#e8d070";
+    ctx.shadowColor = "#d4b84a";
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
   });
 
-  // enemies
-  (state.map.enemies || []).forEach(e => {
+  // glowing enemies (red)
+  (state.map.enemies || []).forEach((e, i) => {
     if (!e.alive) return;
     if (!e.visible && !state.map.revealed) return;
+    const ex = e.x * w, ey = e.y * h;
+    const pulse = 0.55 + 0.45 * Math.sin(t * 2.5 + i * 0.7);
     ctx.beginPath();
-    ctx.arc(e.x * w, e.y * h, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#9a5050";
+    ctx.arc(ex, ey, 10 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200, 60, 60, ${0.15 * pulse})`;
     ctx.fill();
-    ctx.strokeStyle = "#d08080";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(ex, ey, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#e06060";
+    ctx.shadowColor = "#ff4040";
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
   });
 
-  // player
+  // player - white/yellow core like screenshot
   const px = state.map.playerPos.x * w;
   const py = state.map.playerPos.y * h;
   ctx.beginPath();
-  ctx.arc(px, py, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "#d4b84a";
+  ctx.arc(px, py, 12, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.12)";
   ctx.fill();
-  ctx.strokeStyle = "#f0e8c0";
+  ctx.beginPath();
+  ctx.arc(px, py, 6, 0, Math.PI * 2);
+  ctx.fillStyle = "#fff8e0";
+  ctx.shadowColor = "#d4b84a";
+  ctx.shadowBlur = 14;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#d4b84a";
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(px, py);
-  ctx.lineTo(px + 11, py - 5);
-  ctx.lineTo(px + 11, py + 5);
-  ctx.closePath();
-  ctx.fillStyle = "rgba(212,184,74,0.4)";
-  ctx.fill();
 }
 
 function startMapLoop() {
@@ -509,13 +530,19 @@ function startMapLoop() {
   mapAnim = setInterval(() => {
     state.map.enemies.forEach(e => {
       if (!e.alive) return;
-      e.x += (Math.random() - 0.5) * 0.004;
-      e.y += (Math.random() - 0.5) * 0.004;
-      e.x = Math.max(0.05, Math.min(0.95, e.x));
-      e.y = Math.max(0.05, Math.min(0.95, e.y));
+      e.x += (Math.random() - 0.5) * 0.006;
+      e.y += (Math.random() - 0.5) * 0.006;
+      e.x = Math.max(0.08, Math.min(0.92, e.x));
+      e.y = Math.max(0.12, Math.min(0.88, e.y));
+    });
+    (state.map.friends || []).forEach(f => {
+      f.x += (Math.random() - 0.5) * 0.004;
+      f.y += (Math.random() - 0.5) * 0.004;
+      f.x = Math.max(0.08, Math.min(0.5, f.x));
+      f.y = Math.max(0.2, Math.min(0.7, f.y));
     });
     drawMap();
-  }, 800);
+  }, 120);
 }
 
 function stopMapLoop() {
