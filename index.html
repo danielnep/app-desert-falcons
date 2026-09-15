@@ -29,7 +29,7 @@
 
     <main id="main">
 
-      <!-- ROLE SELECT -->
+      <!-- ROLE -->
       <section class="screen active" data-screen="role">
         <div class="role-wrap">
           <p class="kicker">ACESSO AO TERMINAL</p>
@@ -65,7 +65,6 @@
           </div>
           <button type="button" class="ghost-btn" id="playerDetailsBtn">DETALHES</button>
         </div>
-
         <article class="card match-card">
           <div class="card-head">
             <div>
@@ -88,7 +87,6 @@
             <button type="button" class="btn primary hidden" id="btnEnter">ENTRAR NO JOGO</button>
           </div>
         </article>
-
         <article class="card compact">
           <div class="card-head">
             <div>
@@ -104,7 +102,7 @@
         </article>
       </section>
 
-      <!-- PREPARATION / BRIEFING -->
+      <!-- PREP -->
       <section class="screen" data-screen="prep">
         <div class="screen-head">
           <div>
@@ -136,7 +134,7 @@
         </div>
       </section>
 
-      <!-- TACTICAL (live) -->
+      <!-- TACTICAL -->
       <section class="screen" data-screen="tactical">
         <div class="tactical-top">
           <div>
@@ -148,6 +146,27 @@
             <div id="tacTimer" class="timer">00:00</div>
           </div>
         </div>
+
+        <!-- MAPA TÁTICO -->
+        <article class="card map-card">
+          <div class="card-head">
+            <p class="kicker">MAPA TÁTICO</p>
+            <span id="mapStatus" class="state-pill">GPS</span>
+          </div>
+          <div class="map-viewport" id="mapViewport">
+            <canvas id="tacMap" width="400" height="280"></canvas>
+            <div class="map-legend">
+              <span class="leg you">VOCÊ</span>
+              <span class="leg friend">ALIADO</span>
+              <span class="leg enemy">INIMIGO</span>
+              <span class="leg mine">MINA</span>
+            </div>
+          </div>
+          <div class="map-intel">
+            <span id="killCount">ELIMINAÇÕES: 0/3</span>
+            <span id="droneStatus">DRONE: STANDBY</span>
+          </div>
+        </article>
 
         <div class="tac-grid">
           <article class="card radio-card">
@@ -173,21 +192,32 @@
           <article class="card">
             <p class="kicker">SETORES</p>
             <div class="sectors">
-              <div class="sector" data-sec="alfa">
-                <span>ALFA</span>
-                <strong id="secAlfa">NEUTRO</strong>
-              </div>
-              <div class="sector" data-sec="bravo">
-                <span>BRAVO</span>
-                <strong id="secBravo">NEUTRO</strong>
-              </div>
+              <div class="sector"><span>ALFA</span><strong id="secAlfa">NEUTRO</strong></div>
+              <div class="sector"><span>BRAVO</span><strong id="secBravo">NEUTRO</strong></div>
             </div>
           </article>
         </div>
 
+        <!-- AÇÕES DE COMBATE -->
+        <div class="combat-actions">
+          <button type="button" id="btnHit" class="btn danger wide hit-btn">HIT / OUT</button>
+          <button type="button" id="btnKill" class="btn accent wide">REGISTRAR ELIMINAÇÃO</button>
+        </div>
+
         <div class="tac-actions">
-          <button type="button" class="btn secondary" id="tacLeave">SAIR DA PARTIDA</button>
+          <button type="button" class="btn secondary" id="tacLeave">ABANDONAR PARTIDA</button>
           <button type="button" class="btn danger hidden" id="tacEnd">ENCERRAR PARTIDA</button>
+        </div>
+
+        <!-- LOCK OVERLAY -->
+        <div id="tacLock" class="tac-lock">
+          <div class="lock-content">
+            <p class="kicker">CONTROLES PROTEGIDOS</p>
+            <h3>PAINEL BLOQUEADO</h3>
+            <p>Segure o botão por 1,5s para liberar.<br>Evita toque acidental e suor.</p>
+            <button type="button" id="unlockBtn" class="unlock-btn">SEGURAR PARA DESBLOQUEAR</button>
+            <div class="unlock-progress"><div id="unlockBar"></div></div>
+          </div>
         </div>
       </section>
 
@@ -200,7 +230,6 @@
           </div>
           <span id="orgStatus" class="state-pill">SEM PARTIDA</span>
         </div>
-
         <article class="card">
           <p class="kicker">01 · PARTIDA</p>
           <div class="form-grid">
@@ -213,34 +242,37 @@
             <label class="field"><span>DURAÇÃO (min)</span><input id="oDuration" type="number" min="10" max="480" value="60"></label>
           </div>
         </article>
-
         <article class="card">
           <p class="kicker">02 · BRIEFING</p>
           <label class="field"><span>TÍTULO</span><input id="oBriefTitle" type="text" autocomplete="off"></label>
           <label class="field"><span>TEXTO</span><textarea id="oBriefText" rows="4" placeholder="Regras, objetivo..."></textarea></label>
           <label class="field"><span>OBJETIVO</span><input id="oObjective" type="text" autocomplete="off"></label>
         </article>
-
         <article class="card">
           <p class="kicker">03 · EQUIPES</p>
           <div class="team-row">
             <div class="team-box blue">
               <span>AZUL</span>
               <input id="oBlueName" type="text" placeholder="Equipe Azul">
-              <input id="oBlueLimit" type="number" min="1" max="100" value="20" title="Limite">
+              <input id="oBlueLimit" type="number" min="1" max="100" value="20">
             </div>
             <div class="team-box red">
               <span>VERMELHA</span>
               <input id="oRedName" type="text" placeholder="Equipe Vermelha">
-              <input id="oRedLimit" type="number" min="1" max="100" value="20" title="Limite">
+              <input id="oRedLimit" type="number" min="1" max="100" value="20">
             </div>
           </div>
         </article>
-
+        <article class="card">
+          <p class="kicker">04 · MINAS (SIMULADAS)</p>
+          <p class="intro" style="margin-bottom:10px">Toque no mapa do painel tático para posicionar. Máx 6.</p>
+          <button type="button" class="btn secondary wide" id="oClearMines">LIMPAR MINAS</button>
+        </article>
         <div class="org-actions">
           <button type="button" class="btn primary wide" id="oSave">SALVAR PARTIDA</button>
           <button type="button" class="btn accent wide hidden" id="oStart">INICIAR PARTIDA</button>
           <button type="button" class="btn danger wide hidden" id="oEnd">ENCERRAR PARTIDA</button>
+          <button type="button" class="btn secondary wide" id="oLeave">SAIR DO MODO ORGANIZADOR</button>
         </div>
       </section>
 
@@ -269,7 +301,7 @@
         </article>
       </section>
 
-      <!-- PLAYER DETAILS -->
+      <!-- DETAILS -->
       <section class="screen" data-screen="details">
         <div class="screen-head">
           <div>
@@ -291,7 +323,6 @@
       </section>
 
     </main>
-
     <div id="toast" class="toast" aria-live="polite"></div>
   </div>
   <script src="app.js"></script>
