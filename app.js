@@ -8,20 +8,22 @@ function initial() {
     match: {
       exists: false, name: "", status: "none",
       date: "", time: "", location: "", map: "Complexo Industrial",
-      mode: "Simulação", duration: 60, startedAt: null, elapsed: 0
+      mode: "Simulação", duration: 60, checkIn: "", startedAt: null, elapsed: 0
     },
     org: {
       briefTitle: "Briefing da Operação",
       briefText: "Objetivo, regras e orientações da partida.",
       objective: "Dominar setores e eliminar a força adversária.",
       blueName: "Equipe Azul", blueLimit: 20,
-      redName: "Equipe Vermelha", redLimit: 20
+      redName: "Equipe Vermelha", redLimit: 20, participates: false
     },
     player: {
       id: "DF-001", name: "DANI", class: "Assalto", team: "azul",
       presence: false, entry: false, briefAck: false,
-      radio: true, channel: 1, alive: true, kills: 0
+      radio: true, channel: 1, radioVolume: 70, alive: true, kills: 0
     },
+    modules: { medical: true, zone: true, score: false, tracking: false, objectives: true, events: false },
+    simulatedPlayers: { perTeam: 0 },
     sectors: { alfa: "neutro", bravo: "neutro" },
     map: {
       playerPos: { x: 0.5, y: 0.5 },
@@ -47,7 +49,9 @@ function load() {
       org: { ...base.org, ...(s.org || {}) },
       player: { ...base.player, ...(s.player || {}) },
       sectors: { ...base.sectors, ...(s.sectors || {}) },
-      map: { ...base.map, ...(s.map || {}) }
+      map: { ...base.map, ...(s.map || {}) },
+      modules: { ...base.modules, ...(s.modules || {}) },
+      simulatedPlayers: { ...base.simulatedPlayers, ...(s.simulatedPlayers || {}) }
     };
   } catch { return initial(); }
 }
@@ -186,6 +190,8 @@ function renderTactical() {
   setText("#tacMatchName", state.match.name || "—");
   setText("#tacTimer", fmtTimer(state.match.elapsed));
   setText("#chDisplay", "CH " + String(state.player.channel).padStart(2, "0"));
+  const vol = $("#radioVol");
+  if (vol) vol.value = state.player.radioVolume ?? 70;
   setText("#secAlfa", (state.sectors.alfa || "neutro").toUpperCase());
   setText("#secBravo", (state.sectors.bravo || "neutro").toUpperCase());
   const a = $("#secAlfa"), b = $("#secBravo");
@@ -226,6 +232,7 @@ function renderOrganizer() {
   setVal("#oMap", m.map);
   setVal("#oMode", m.mode);
   setVal("#oDuration", m.duration);
+  setVal("#oCheckIn", m.checkIn || "");
   setVal("#oBriefTitle", state.org.briefTitle);
   setVal("#oBriefText", state.org.briefText);
   setVal("#oObjective", state.org.objective);
@@ -233,18 +240,41 @@ function renderOrganizer() {
   setVal("#oBlueLimit", state.org.blueLimit);
   setVal("#oRedName", state.org.redName);
   setVal("#oRedLimit", state.org.redLimit);
+  const part = $("#oParticipates"); if (part) part.checked = !!state.org.participates;
+  const mods = state.modules || {};
+  const setC = (s, v) => { const el = $(s); if (el) el.checked = !!v; };
+  setC("#modMedical", mods.medical);
+  setC("#modZone", mods.zone);
+  setC("#modScore", mods.score);
+  setC("#modTrack", mods.tracking);
+  setC("#modObj", mods.objectives);
+  setC("#modEvents", mods.events);
+  // presence
+  const sim = state.simulatedPlayers?.perTeam || 0;
+  let presenceMsg = "Nenhum jogador confirmado.";
+  if (state.player.presence) presenceMsg = "1 jogador confirmado (você).";
+  if (sim > 0) presenceMsg = (state.player.presence ? 1 : 0) + sim * 2 + " presenças (incl. simulação).";
+  setText("#orgPresenceText", presenceMsg);
   toggle("#oStart", m.exists && m.status === "scheduled");
   toggle("#oEnd", m.status === "live");
 }
 
 function renderDetails() {
   const p = state.player;
+  const m = state.match;
   setText("#dId", p.id);
   setText("#dName", p.name);
   setText("#dClass", p.class);
   setText("#dTeam", p.team ? teamName(p.team) : "—");
   setText("#dRadio", p.radio ? "ON" : "OFF");
   setText("#dChannel", String(p.channel).padStart(2, "0"));
+  setText("#dMatchName", m.exists ? (m.name || "—") : "—");
+  setText("#dMatchStatus", m.exists ? statusLabel(m.status) : "—");
+  setText("#dMatchMap", m.map || "—");
+  setText("#dMatchMode", m.mode || "—");
+  setText("#dBriefTitle", state.org.briefTitle || "—");
+  setText("#dBriefText", state.org.briefText || "—");
+  setText("#dObjective", state.org.objective || "—");
 }
 
 function updateLock() {
@@ -543,6 +573,7 @@ function readOrg() {
   state.match.map = val("#oMap") || "Complexo Industrial";
   state.match.mode = val("#oMode") || "Simulação";
   state.match.duration = Number(val("#oDuration")) || 60;
+  state.match.checkIn = val("#oCheckIn");
   state.org.briefTitle = val("#oBriefTitle") || "Briefing da Operação";
   state.org.briefText = val("#oBriefText") || "";
   state.org.objective = val("#oObjective") || "";
@@ -550,6 +581,13 @@ function readOrg() {
   state.org.blueLimit = Number(val("#oBlueLimit")) || 20;
   state.org.redName = val("#oRedName") || "Equipe Vermelha";
   state.org.redLimit = Number(val("#oRedLimit")) || 20;
+  state.org.participates = !!$("#oParticipates")?.checked;
+  state.modules.medical = !!$("#modMedical")?.checked;
+  state.modules.zone = !!$("#modZone")?.checked;
+  state.modules.score = !!$("#modScore")?.checked;
+  state.modules.tracking = !!$("#modTrack")?.checked;
+  state.modules.objectives = !!$("#modObj")?.checked;
+  state.modules.events = !!$("#modEvents")?.checked;
 }
 
 function saveMatch() {
@@ -572,7 +610,9 @@ function saveMatch() {
   state.map.revealed = false;
   save();
   render();
-  toast("Partida salva.");
+  const modal = $("#saveModal");
+  if (modal) modal.classList.remove("hidden");
+  else toast("Partida salva.");
 }
 
 function startMatch() {
@@ -623,6 +663,8 @@ function changeCh(d) {
   state.player.channel = Math.max(1, Math.min(99, (state.player.channel || 1) + d));
   save();
   setText("#chDisplay", "CH " + String(state.player.channel).padStart(2, "0"));
+  const vol = $("#radioVol");
+  if (vol) vol.value = state.player.radioVolume ?? 70;
 }
 
 function setText(s, t) { const el = $(s); if (el) el.textContent = t ?? "—"; }
@@ -751,6 +793,66 @@ $("#tacMap")?.addEventListener("click", (e) => {
   drawMap();
   toast("Mina posicionada.");
 });
+
+
+// Tabs
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) {
+    $$(".tab-btn").forEach(b => b.classList.remove("active"));
+    tab.classList.add("active");
+    const name = tab.dataset.tab;
+    $("#tabInicio")?.classList.toggle("hidden", name !== "inicio");
+    $("#tabBriefing")?.classList.toggle("hidden", name !== "briefing");
+    $("#tabPerfil")?.classList.toggle("hidden", name !== "perfil");
+  }
+});
+
+$("#tacLockBtn")?.addEventListener("click", () => {
+  state.locked = true;
+  updateLock();
+  updateVu(false);
+  toast("Painel bloqueado.");
+});
+
+$("#radioVol")?.addEventListener("input", (e) => {
+  state.player.radioVolume = Number(e.target.value);
+  save();
+});
+
+$("#saveModalContinue")?.addEventListener("click", () => {
+  $("#saveModal")?.classList.add("hidden");
+});
+$("#saveModalEnter")?.addEventListener("click", () => {
+  $("#saveModal")?.classList.add("hidden");
+  if (state.match.status === "scheduled") startMatch();
+  else show("tactical");
+});
+
+$("#devApplyPlayers")?.addEventListener("click", () => {
+  const n = Number(val("#devPlayersPerTeam")) || 0;
+  state.simulatedPlayers.perTeam = Math.max(0, Math.min(200, n));
+  setText("#devBlueCount", String(state.simulatedPlayers.perTeam));
+  setText("#devRedCount", String(state.simulatedPlayers.perTeam));
+  setText("#devTotalCount", String(state.simulatedPlayers.perTeam * 2));
+  save();
+  render();
+  toast("Simulação aplicada: " + state.simulatedPlayers.perTeam + " por equipe.");
+});
+
+$("#devAsPlayer")?.addEventListener("click", () => {
+  state.role = "player";
+  save();
+  show("player", false);
+  toast("Modo jogador.");
+});
+$("#devAsOrg")?.addEventListener("click", () => {
+  state.role = "organizer";
+  save();
+  show("organizer", false);
+  toast("Modo organizador.");
+});
+
 
 function boot() {
   if (localStorage.getItem(KEY)) {
