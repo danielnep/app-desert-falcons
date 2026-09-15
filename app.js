@@ -1,19 +1,25 @@
-const STORAGE_KEY = "desert_falcons_terminal_v10";
+const STORAGE_KEY = "desert_falcons_terminal_v8";
+const DEMO_CENTER = { lat: -19.9167, lng: -43.9345 };
 
-let previousScreen = "role-select";
+let previousScreen = "player-home";
 let currentScreen = "role-select";
 let unlockTimer = null;
-let gpsWatchId = null;
-
-let state = loadState();
+let unlockStarted = false;
+let radioPushTimer = null;
 
 function createInitialState() {
   return {
+    version: 8,
     role: "player",
-    match: { exists: false, name: "", status: "none", date: "", time: "", location: "", startedAt: null, elapsedSeconds: 0, blueKills: 0, redKills: 0 },
-    organizer: { briefingTitle: "Briefing Oficial", briefingText: "Executar varredura no setor e neutralizar alvos hostiles.", objective: "Controlar Setor Alfa", participates: false },
-    player: { id: "DF-001", name: "DANI", team: "AZUL", class: "COMANDO", participation: false, entryRequested: false, briefingAck: false, radio: true, channel: 1 },
-    gps: { lat: null, lng: null, active: false }
+    match: { exists: false, name: "", status: "none", date: "", time: "", location: "", map: "Complexo Industrial", mode: "Simulação", duration: 60, checkInTime: "", startedAt: null, elapsedSeconds: 0 },
+    organizer: { briefingTitle: "Briefing da Operação", briefingText: "Objetivo, regras da partida, condições de participação e orientações gerais.", objective: "", teamBlueName: "Equipe Azul", teamBlueLimit: 20, teamRedName: "Equipe Vermelha", teamRedLimit: 20, participates: false },
+    player: { id: "DF-001", name: "DANI", team: "azul", class: "Assalto", participation: false, entryRequested: false, briefingAck: false, radio: true, channel: 1, radioVolume: 70 },
+    gps: { lat: null, lng: null, accuracy: null, ready: false },
+    objectives: { alfa: { name: "Setor Alfa", control: "neutro" }, bravo: { name: "Setor Bravo", control: "neutro" } },
+    modules: { medical: true, zone: true, score: false, tracking: false, objectives: true, events: false },
+    simulatedPlayers: { perTeam: 0, blue: [], red: [] },
+    events: [],
+    dev: { lastRole: "player" }
   };
 }
 
@@ -21,274 +27,321 @@ function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return createInitialState();
-    return { ...createInitialState(), ...JSON.parse(raw) };
-  } catch (e) { return createInitialState(); }
+    return mergeState(createInitialState(), JSON.parse(raw));
+  } catch (error) { return createInitialState(); }
 }
 
-function persist() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function mergeState(base, saved) {
+  if (!saved || typeof saved !== "object") return base;
+  return {
+    ...base, ...saved,
+    match: { ...base.match, ...(saved.match || {}) },
+    organizer: { ...base.organizer, ...(saved.organizer || {}) },
+    player: { ...base.player, ...(saved.player || {}) },
+    gps: { ...base.gps, ...(saved.gps || {}) },
+    objectives: { ...base.objectives, ...(saved.objectives || {}) },
+    modules: { ...base.modules, ...(saved.modules || {}) },
+    simulatedPlayers: { ...base.simulatedPlayers, ...(saved.simulatedPlayers || {}) },
+    dev: { ...base.dev, ...(saved.dev || {}) },
+    events: Array.isArray(saved.events) ? saved.events : base.events
+  };
+}
+
+let state = loadState();
+
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-function formatTimer(s) {
-  const m = Math.floor(s/60); const sec = s%60;
-  return String(m).padStart(2,"0")+":"+String(sec).padStart(2,"0");
+function escapeHTML(v) { return String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;"); }
+function formatDate(d) { if (!d) return "—"; const p = d.split("-"); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d; }
+function formatDuration(m) { if (!m) return "—"; const v = Number(m); return v < 60 ? `${v} min` : `${Math.floor(v/60)}h ${v%60 ? (v%60+'min') : ''}`; }
+function formatTimer(sec) { const t = Math.max(0, Number(sec)||0); return String(Math.floor(t/60)).padStart(2,"0") + ":" + String(t%60).padStart(2,"0"); }
+function getStatusLabel(s) { return { none: "SEM PARTIDA", scheduled: "AGENDADA", live: "AO VIVO", ended: "ENCERRADA" }[s] || "SEM PARTIDA"; }
+function showToast(msg) {
+  const t = $("#toast"); if (!t) return; t.textContent = msg; t.classList.add("show");
+  clearTimeout(showToast.timer); showToast.timer = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
 function showScreen(screenName, remember = true) {
   const target = $(`[data-screen="${screenName}"]`);
   if (!target) return;
   if (remember && currentScreen !== screenName && screenName !== 'dev') previousScreen = currentScreen;
+  else if (remember && screenName === 'dev') previousScreen = state.role === "organizer" ? "organizer" : "player-home";
   currentScreen = screenName;
   $$(".screen").forEach(s => s.classList.remove("active"));
   target.classList.add("active");
+  window.scrollTo({ top: 0, behavior: "instant" });
   render();
 }
 
-function goBack() { showScreen(previousScreen, false); }
-
-function render() {
-  const status = $("#globalMatchStatus");
-  if(status) {
-    status.textContent = state.match.status === "none" ? "SEM PARTIDA" : state.match.status === "live" ? "AO VIVO" : "AGENDADA";
-    status.className = "match-status";
-    if (state.match.status === "live") status.classList.add("live");
+function goBack() {
+  if (previousScreen === "previous" || previousScreen === currentScreen) {
+    showScreen(state.role === "organizer" ? "organizer" : "player-home", false); return;
   }
-  if(currentScreen === "player-home") renderPlayer();
-  if(currentScreen === "organizer") renderOrganizer();
-  if(currentScreen === "tactical") renderTactical();
-  if(currentScreen === "waiting") renderWaiting();
+  showScreen(previousScreen, false);
 }
+
+function selectRole(role) {
+  if (role !== "player" && role !== "organizer") return;
+  state.role = role; state.dev.lastRole = role; persist();
+  showScreen(role === "player" ? "player-home" : "organizer", false);
+}
+
+function renderGlobalHeader() {
+  const s = $("#globalMatchStatus"); if (!s) return;
+  s.textContent = getStatusLabel(state.match.exists ? state.match.status : "none");
+  s.className = "match-status";
+  if (state.match.status === "live") s.classList.add("live");
+  else if (state.match.status === "scheduled") s.classList.add("scheduled");
+  else if (state.match.status === "ended") s.classList.add("ended");
+}
+
+function render() { renderGlobalHeader(); renderPlayer(); renderPlayerDetails(); renderOrganizer(); renderDev(); renderTactical(); }
 
 function renderPlayer() {
   const hasMatch = state.match.exists && state.match.status !== "ended";
-  $("#playerMatchName").textContent = state.match.name || "Nenhuma partida cadastrada";
-  $("#playerMatchState").textContent = state.match.status === "live" ? "AO VIVO" : "AGENDADA";
-  $("#playerMatchDate").textContent = state.match.date || "—";
-  $("#playerMatchLocation").textContent = state.match.location || "—";
-  $("#playerMatchMap").textContent = "Complexo Alfa";
+  setText("#playerMatchName", state.match.exists ? (state.match.name || "Partida sem nome") : "Nenhuma partida cadastrada");
+  setText("#playerMatchState", getStatusLabel(state.match.status));
+  setText("#playerMatchDate", formatDate(state.match.date));
+  setText("#playerMatchTime", state.match.time || "—");
+  setText("#playerMatchLocation", state.match.location || "—");
+  setText("#playerMatchMap", state.match.map || "—");
+  setText("#playerMatchMode", state.match.mode || "—");
+  setText("#playerMatchDuration", formatDuration(state.match.duration));
+  setText("#playerDisplayName", state.player.name);
+  setText("#playerDisplayTeam", getTeamName(state.player.team));
 
-  $("#playerScheduledActions").classList.toggle("hidden", !(hasMatch && state.match.status === "scheduled"));
-  $("#playerLiveActions").classList.toggle("hidden", !(hasMatch && state.match.status === "live" && !state.player.entryRequested && !state.player.participation));
-  $("#playerEnterActions").classList.toggle("hidden", !(hasMatch && state.match.status === "live" && (state.player.entryRequested || state.player.participation)));
+  $("#playerScheduledActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "scheduled"));
+  $("#playerLiveActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && !state.player.entryRequested && !state.player.participation));
+  $("#playerEnterActions")?.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && (state.player.entryRequested || state.player.participation)));
+
+  let pText = "Aguardando confirmação", pBadge = "AGUARDANDO";
+  if (state.player.participation) { pText = "Participação confirmada"; pBadge = "CONFIRMADO"; }
+  else if (state.player.entryRequested) { pText = "Entrada solicitada"; pBadge = "SOLICITADA"; }
+  setText("#playerParticipationStatus", pText); setText("#playerParticipationBadge", pBadge);
 }
 
-function confirmPresence() { state.player.participation = true; state.player.entryRequested = false; persist(); showScreen("player-preparation"); }
-function requestEntry() { state.player.entryRequested = true; persist(); showScreen("waiting"); }
+function confirmPresence() {
+  if (!state.match.exists) return showToast("Não há partida cadastrada.");
+  state.player.participation = true; state.player.entryRequested = false; persist();
+  renderPreparation(); showScreen("player-preparation"); render(); showToast("Presença confirmada.");
+}
+
+function requestEntry() {
+  if (!state.match.exists) return showToast("Não há partida disponível.");
+  state.player.entryRequested = true; persist(); showScreen("waiting"); render(); showToast("Solicitação enviada.");
+}
+
 function enterMatch() {
-  if(!state.player.briefingAck && state.player.participation) return showScreen("player-preparation");
-  state.player.participation = true; state.player.entryRequested = false; persist(); showScreen("tactical");
+  if (!state.match.exists || state.match.status !== "live") return showToast("Partida indisponível ou não iniciada.");
+  state.player.participation = true; state.player.entryRequested = false; persist(); showScreen("tactical"); render(); showToast("Entrada autorizada.");
 }
 
-function renderWaiting() {
-  const btn = $("#waitingBackButton");
-  if (state.player.participation) {
-    $("#waitingTitle").textContent = "ACESSO AUTORIZADO";
-    $("#waitingText").textContent = "Comando liberou seu terminal.";
-    btn.textContent = "ENTRAR NO TÁTICO";
-    btn.className = "primary-action";
-  } else {
-    $("#waitingTitle").textContent = "AGUARDANDO COMANDO";
-    btn.textContent = "VOLTAR";
-    btn.className = "secondary-action";
-  }
+function renderPreparation() {
+  setText("#preparationMatchName", state.match.name || "—");
+  setText("#preparationStatus", getStatusLabel(state.match.status));
+  setText("#preparationBriefingTitle", state.organizer.briefingTitle || "Briefing");
+  setText("#preparationBriefingText", state.organizer.briefingText || "—");
+  const cb = $("#playerBriefingAck"); if (cb) cb.checked = !!state.player.briefingAck;
 }
 
-// ORGANIZADOR
-function saveMatch() {
-  state.match.name = $("#orgMatchName").value || "Operação Tática";
-  state.match.date = $("#orgMatchDate").value;
-  state.match.location = $("#orgMatchLocation").value;
-  state.organizer.briefingText = $("#orgBriefingText").value;
-  state.organizer.participates = $("#orgOrganizerParticipates").checked;
-  state.match.exists = true;
-  if(state.match.status !== "live") state.match.status = "scheduled";
-  persist();
-  $("#saveConfirmModal").classList.remove("hidden");
+function acknowledgeBriefing() {
+  const cb = $("#playerBriefingAck"); if (!cb) return;
+  state.player.briefingAck = cb.checked; persist(); render();
 }
 
-function startMatch() {
-  state.match.status = "live";
-  state.match.startedAt = Date.now();
-  if(state.player.entryRequested) state.player.participation = true;
-  persist();
-  $("#saveConfirmModal").classList.add("hidden");
-  if (state.organizer.participates) {
-    state.player.participation = true;
-    showScreen("tactical");
-  } else {
-    showScreen("organizer");
-  }
+function enterFromPreparation() {
+  if (!state.player.briefingAck) return showToast("Confirme a leitura do briefing.");
+  enterMatch();
 }
 
-function endMatch() {
-  state.match.status = "ended"; persist();
-  showScreen(state.role === "organizer" ? "organizer" : "player-home");
+function renderPlayerDetails() {
+  setText("#detailInicioStatus", state.match.exists ? getStatusLabel(state.match.status) : "Aguardando partida");
+  setText("#detailPlayerName", state.player.name); setText("#detailPlayerId", state.player.id);
+  setText("#detailPlayerTeam", getTeamName(state.player.team)); setText("#detailPlayerClass", state.player.class);
+  setText("#detailBriefingTitle", state.organizer.briefingTitle || "Nenhum briefing disponível");
+  setText("#detailBriefingText", state.organizer.briefingText || "O organizador não cadastrou briefing.");
+  setText("#profileName", state.player.name); setText("#profileId", state.player.id);
+  setText("#profileTeam", getTeamName(state.player.team)); setText("#profileClass", state.player.class);
+  setText("#profileRadioStatus", state.player.radio ? "ATIVO" : "DESATIVADO");
+  const ack = $("#detailBriefingAck"); if (ack) ack.checked = !!state.player.briefingAck;
+}
+
+function switchDetailTab(tab) {
+  $$(".detail-tab").forEach(b => b.classList.toggle("active", b.dataset.detailTab === tab));
+  $$("[data-detail-content]").forEach(c => c.classList.toggle("active", c.dataset.detailContent === tab));
+}
+
+function readOrganizerForm() {
+  state.match.name = valueOf("#orgMatchName"); state.match.date = valueOf("#orgMatchDate");
+  state.match.time = valueOf("#orgMatchTime"); state.match.location = valueOf("#orgMatchLocation");
+  state.match.map = valueOf("#orgMatchMap") || "Complexo Industrial"; state.match.mode = valueOf("#orgMatchMode") || "Simulação";
+  state.match.duration = numberValue("#orgMatchDuration", 60); state.match.checkInTime = valueOf("#orgCheckInTime");
+  state.organizer.briefingTitle = valueOf("#orgBriefingTitle") || "Briefing da Operação";
+  state.organizer.briefingText = valueOf("#orgBriefingText") || ""; state.organizer.objective = valueOf("#orgObjective") || "";
+  state.organizer.teamBlueName = valueOf("#orgTeamBlueName") || "Equipe Azul"; state.organizer.teamBlueLimit = numberValue("#orgTeamBlueLimit", 20);
+  state.organizer.teamRedName = valueOf("#orgTeamRedName") || "Equipe Vermelha"; state.organizer.teamRedLimit = numberValue("#orgTeamRedLimit", 20);
+  state.organizer.participates = checkedOf("#orgOrganizerParticipates");
+}
+
+function writeOrganizerForm() {
+  setValue("#orgMatchName", state.match.name); setValue("#orgMatchDate", state.match.date); setValue("#orgMatchTime", state.match.time);
+  setValue("#orgMatchLocation", state.match.location); setValue("#orgMatchMap", state.match.map); setValue("#orgMatchMode", state.match.mode);
+  setValue("#orgMatchDuration", state.match.duration); setValue("#orgCheckInTime", state.match.checkInTime);
+  setValue("#orgBriefingTitle", state.organizer.briefingTitle); setValue("#orgBriefingText", state.organizer.briefingText); setValue("#orgObjective", state.organizer.objective);
+  setValue("#orgTeamBlueName", state.organizer.teamBlueName); setValue("#orgTeamBlueLimit", state.organizer.teamBlueLimit);
+  setValue("#orgTeamRedName", state.organizer.teamRedName); setValue("#orgTeamRedLimit", state.organizer.teamRedLimit);
+  setChecked("#orgOrganizerParticipates", state.organizer.participates);
 }
 
 function renderOrganizer() {
-  $("#orgMatchName").value = state.match.name;
-  $("#orgMatchDate").value = state.match.date;
-  $("#orgMatchLocation").value = state.match.location;
-  $("#orgBriefingText").value = state.organizer.briefingText;
-  $("#orgOrganizerParticipates").checked = state.organizer.participates;
-  $("#organizerEndButton").classList.toggle("hidden", state.match.status !== "live");
-  $("#organizerStartButton").classList.toggle("hidden", state.match.status !== "scheduled");
+  writeOrganizerForm();
+  setText("#organizerMatchStateText", state.match.exists ? `STATUS: ${getStatusLabel(state.match.status)}` : "Nenhuma partida salva.");
+  $("#organizerStartButton")?.classList.toggle("hidden", !(state.match.exists && state.match.status === "scheduled"));
+  $("#organizerEndButton")?.classList.toggle("hidden", state.match.status !== "live");
+  setText("#organizerPresence", "Equipes configuradas e prontas.");
 }
 
-// TÁTICO & GPS REAL
+function saveMatch() {
+  if (state.role !== "organizer") return showToast("Somente o organizador.");
+  readOrganizerForm();
+  if (!state.match.name.trim()) return showToast("Informe o nome.");
+  state.match.exists = true;
+  if (state.match.status !== "live") state.match.status = "scheduled";
+  persist(); render();
+  $("#saveConfirmModal")?.classList.remove("hidden");
+}
+
+function startMatch(source = "organizer") {
+  if (state.role !== "organizer" && source !== "dev") return showToast("Apenas o organizador.");
+  if (!state.match.exists) return showToast("Salve uma partida.");
+  state.match.status = "live"; state.match.startedAt = Date.now(); state.match.elapsedSeconds = 0;
+  persist(); render(); showToast("Partida iniciada.");
+}
+
+function endMatch(source = "organizer") {
+  if (state.role !== "organizer" && source !== "dev") return showToast("Apenas o organizador.");
+  state.match.status = "ended"; persist(); render(); showToast("Partida encerrada.");
+}
+
+function renderDev() {
+  $$(".dev-segment[data-dev-role]").forEach(b => b.classList.toggle("active", b.dataset.devRole === state.role));
+  $$(".dev-segment[data-dev-status]").forEach(b => b.classList.toggle("active", b.dataset.devStatus === state.match.status));
+}
+
 function renderTactical() {
-  $("#tacticalMatchName").textContent = state.match.name || "ZONA DE COMBATE";
-  $("#tacticalStatus").textContent = state.match.status === "live" ? "AO VIVO" : "AGUARDANDO";
-  $("#scoreBlue").textContent = state.match.blueKills || 0;
-  $("#scoreRed").textContent = state.match.redKills || 0;
-  $("#tacticalKills").textContent = `${(state.match.blueKills || 0) + (state.match.redKills || 0)} Kills`;
-  $("#tacticalOrganizerEnd").classList.toggle("hidden", state.role !== "organizer" || state.match.status !== "live");
-  $("#tacticalPlayerLeave").classList.toggle("hidden", state.role !== "player" || state.match.status !== "live");
+  setText("#tacticalMatchName", state.match.name || "SEM PARTIDA");
+  setText("#tacticalMapName", state.match.map || "Complexo Industrial");
+  setText("#tacticalObjective", state.organizer.objective || "Aguardando briefing.");
+  setText("#tacticalStatus", getStatusLabel(state.match.status));
+  setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds));
+  setText("#tacticalPlayerCount", Number(state.simulatedPlayers.perTeam||0)*2 + (state.player.participation?1:0));
+  setText("#radioChannel", String(state.player.channel).padStart(2, "0"));
+
+  const rt = $("#radioToggle");
+  if (rt) { rt.textContent = state.player.radio ? "ON" : "OFF"; rt.classList.toggle("active", state.player.radio); }
   
-  initRealGps();
+  $("#tacticalOrganizerStart")?.classList.toggle("hidden", !(state.role === "organizer" && state.match.status === "scheduled"));
+  $("#tacticalOrganizerEnd")?.classList.toggle("hidden", !(state.role === "organizer" && state.match.status === "live"));
+  $("#tacticalPlayerLeave")?.classList.toggle("hidden", !(state.role === "player" && state.match.status === "live"));
 }
 
-function initRealGps() {
-  if (!navigator.geolocation) {
-    $("#tacticalGpsStatus").textContent = "GPS INDISPONÍVEL";
-    return;
-  }
-  $("#tacticalGpsStatus").textContent = "BUSCANDO SATÉLITES...";
-  if (gpsWatchId) return;
+function unlockStart() {
+  if (unlockStarted) return; unlockStarted = true;
+  unlockTimer = setTimeout(() => { $("#touchGuard")?.classList.add("hidden"); unlockStarted = false; showToast("Painel desbloqueado."); }, 900);
+}
+function unlockCancel() { clearTimeout(unlockTimer); unlockStarted = false; }
+function lockTacticalPanel() { $("#touchGuard")?.classList.remove("hidden"); }
 
-  gpsWatchId = navigator.geolocation.watchPosition(
-    (pos) => {
-      state.gps.lat = pos.coords.latitude;
-      state.gps.lng = pos.coords.longitude;
-      state.gps.active = true;
-      $("#tacticalGpsStatus").textContent = `SINAL FIXO (±${Math.round(pos.coords.accuracy)}m)`;
-      
-      // Simula movimento sutil do marcador no mapa com base no GPS real ou deslocamento
-      const marker = $("#playerGpsMarker");
-      if (marker) {
-        // Converte coordenadas em pixels relativos simples para a demonstração visual no mapa
-        const xPercent = 50 + ((pos.coords.longitude % 0.01) * 10000);
-        const yPercent = 50 - ((pos.coords.latitude % 0.01) * 10000);
-        marker.style.left = `${Math.max(10, Math.min(90, xPercent))}%`;
-        marker.style.top = `${Math.max(10, Math.min(90, yPercent))}%`;
-      }
-    },
-    (err) => {
-      $("#tacticalGpsStatus").textContent = "GPS OFFLINE (MODO SIMULADO)";
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-  );
+function toggleRadio() { state.player.radio = !state.player.radio; persist(); render(); }
+function changeChannel(d) { state.player.channel = Math.max(1, Math.min(99, Number(state.player.channel||1) + d)); persist(); render(); }
+function leaveMatch() {
+  if (!window.confirm("Abandonar a partida?")) return;
+  state.player.participation = false; state.player.entryRequested = false; persist(); showScreen("player-home"); render();
 }
 
-// MODAIS DE OBJETIVOS E INSTRUÇÕES FUNCIONAIS
-function openModal(title, content) {
-  $("#appModalTitle").textContent = title;
-  $("#appModalBody").innerHTML = content;
-  $("#appModal").classList.remove("hidden");
-}
-
-$("#tacticalObjectivesButton")?.addEventListener("click", () => {
-  openModal("OBJETIVOS DA MISSÃO", `<p><strong>Meta Primária:</strong> ${escapeHTML(state.organizer.objective)}</p><p style="margin-top:8px;color:#888;">Mantenha o controle da zona designada e evite baixas desnecessárias.</p>`);
-});
-
-$("#tacticalInstructionsButton")?.addEventListener("click", () => {
-  openModal("INSTRUÇÕES DE COMBATE", `<p><strong>Briefing:</strong></p><p style="margin-top:5px;color:#aaa;">${escapeHTML(state.organizer.briefingText || "Nenhuma instrução detalhada cadastrada pelo comando.")}</p>`);
-});
-
-// CRONÔMETRO
 setInterval(() => {
   if (state.match.status === "live" && state.match.startedAt) {
-    state.match.elapsedSeconds = Math.floor((Date.now() - state.match.startedAt) / 1000);
-    const tmr = $("#tacticalTimer"); if(tmr) tmr.textContent = formatTimer(state.match.elapsedSeconds);
-    
-    // Simula pontuação orgânica subindo aos poucos para dar vida ao demo
-    if (Math.random() < 0.1) {
-      if (Math.random() > 0.5) state.match.blueKills = (state.match.blueKills || 0) + 1;
-      else state.match.redKills = (state.match.redKills || 0) + 1;
-      persist();
-      if(currentScreen === "tactical") {
-        $("#scoreBlue").textContent = state.match.blueKills;
-        $("#scoreRed").textContent = state.match.redKills;
-        $("#tacticalKills").textContent = `${state.match.blueKills + state.match.redKills} Kills`;
-      }
-    }
+    state.match.elapsedSeconds = Math.floor((Date.now() - state.match.startedAt)/1000);
+    setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds));
   }
 }, 1000);
 
-// LISTENERS
+function valueOf(s) { return $(s)?.value || ""; }
+function setValue(s, v) { const el = $(s); if(el) el.value = v ?? ""; }
+function checkedOf(s) { return !!$(s)?.checked; }
+function setChecked(s, v) { const el = $(s); if(el) el.checked = !!v; }
+function numberValue(s, f) { const n = Number(valueOf(s)); return Number.isFinite(n) ? n : f; }
+function setText(s, t) { const el = $(s); if(el) el.textContent = t ?? ""; }
+function getTeamName(t) { return t === "azul" ? (state.organizer.teamBlueName || "Equipe Azul") : (state.organizer.teamRedName || "Equipe Vermelha"); }
+
 document.addEventListener("click", (e) => {
-  const rc = e.target.closest("[data-role-choice]");
-  if (rc) { state.role = rc.dataset.roleChoice; persist(); showScreen(state.role === "player" ? "player-home" : "organizer"); }
-  const back = e.target.closest("[data-back-screen]");
-  if(back) { const t = back.dataset.backScreen; if(t==="previous") goBack(); else showScreen(t); }
+  const rc = e.target.closest("[data-role-choice]"); if (rc) { selectRole(rc.dataset.roleChoice); return; }
+  const back = e.target.closest("[data-back-screen]"); if (back) { const t = back.dataset.backScreen; if (t === "previous") goBack(); else showScreen(t); return; }
+  const dt = e.target.closest("[data-detail-tab]"); if (dt) { switchDetailTab(dt.dataset.detailTab); return; }
+  const dr = e.target.closest("[data-dev-role]"); if (dr) { selectRole(dr.dataset.devRole); return; }
+  const ds = e.target.closest("[data-dev-status]"); if (ds) {
+    if(!state.match.exists) state.match.exists = true;
+    state.match.status = ds.dataset.devStatus; persist(); render(); showToast("Status alterado."); return;
+  }
 });
 
 $("#devButton")?.addEventListener("click", () => showScreen("dev"));
 $("#playerConfirmPresence")?.addEventListener("click", confirmPresence);
 $("#playerRequestEntry")?.addEventListener("click", requestEntry);
 $("#playerEnterMatch")?.addEventListener("click", enterMatch);
-$("#playerPreparationEnter")?.addEventListener("click", enterMatch);
-$("#playerBriefingAck")?.addEventListener("change", (e) => { state.player.briefingAck = e.target.checked; persist(); });
+$("#playerDetailsButton")?.addEventListener("click", () => showScreen("player-details"));
+$("#playerPreparationEnter")?.addEventListener("click", enterFromPreparation);
+$("#playerBriefingAck")?.addEventListener("change", acknowledgeBriefing);
 
 $("#organizerSaveButton")?.addEventListener("click", saveMatch);
-$("#organizerStartButton")?.addEventListener("click", startMatch);
-$("#saveConfirmContinue")?.addEventListener("click", () => { $("#saveConfirmModal").classList.add("hidden"); showScreen("role-select"); });
-$("#saveConfirmEnter")?.addEventListener("click", startMatch);
-$("#organizerEndButton")?.addEventListener("click", endMatch);
-$("#tacticalOrganizerEnd")?.addEventListener("click", endMatch);
-$("#tacticalPlayerLeave")?.addEventListener("click", () => { state.player.participation = false; persist(); showScreen("player-home"); });
+$("#organizerStartButton")?.addEventListener("click", () => startMatch("organizer"));
+$("#organizerEndButton")?.addEventListener("click", () => endMatch("organizer"));
+$("#saveConfirmContinue")?.addEventListener("click", () => $("#saveConfirmModal").classList.add("hidden"));
+$("#saveConfirmEnter")?.addEventListener("click", () => { $("#saveConfirmModal").classList.add("hidden"); startMatch("organizer"); showScreen("tactical"); });
 
-// TRAVA TÁTICO
-$("#tacticalLockButton")?.addEventListener("click", () => $("#touchGuard").classList.remove("hidden"));
+$("#tacticalOrganizerStart")?.addEventListener("click", () => startMatch("organizer"));
+$("#tacticalOrganizerEnd")?.addEventListener("click", () => endMatch("organizer"));
+$("#tacticalPlayerLeave")?.addEventListener("click", leaveMatch);
+$("#tacticalLockButton")?.addEventListener("click", lockTacticalPanel);
+
 const unlockBtn = $("#unlockButton");
-if(unlockBtn){
-  let timerUnlock = null;
-  unlockBtn.addEventListener("pointerdown", (e)=>{ e.preventDefault(); timerUnlock = setTimeout(()=>$("#touchGuard").classList.add("hidden"), 900); });
-  unlockBtn.addEventListener("pointerup", ()=>clearTimeout(timerUnlock));
-  unlockBtn.addEventListener("pointerleave", ()=>clearTimeout(timerUnlock));
+if (unlockBtn) {
+  unlockBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); unlockStart(); });
+  unlockBtn.addEventListener("pointerup", unlockCancel);
+  unlockBtn.addEventListener("pointercancel", unlockCancel);
 }
 
-// RÁDIO COM ANIMAÇÃO REALISTA DE ONDAS
+$("#radioToggle")?.addEventListener("click", toggleRadio);
+$("#channelDown")?.addEventListener("click", () => changeChannel(-1));
+$("#channelUp")?.addEventListener("click", () => changeChannel(1));
+$("#radioVolume")?.addEventListener("input", (e) => { state.player.radioVolume = e.target.value; persist(); });
+
 const ptt = $("#pttButton");
-const waves = $("#radioWaves");
-const pttText = $("#pttText");
 if (ptt) {
-  ptt.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    ptt.classList.add("transmitting");
-    waves.classList.remove("hidden");
-    pttText.textContent = "TRANSMITINDO SINAL...";
-  });
-  const stopPtt = () => {
-    ptt.classList.remove("transmitting");
-    waves.classList.add("hidden");
-    pttText.textContent = "PRESSIONE PARA FALAR";
-  };
-  ptt.addEventListener("pointerup", stopPtt);
-  ptt.addEventListener("pointerleave", stopPtt);
+  ptt.addEventListener("pointerdown", (e) => { e.preventDefault(); setText("#radioFeedback", "TRANSMITINDO..."); ptt.classList.add("transmitting"); });
+  ptt.addEventListener("pointerup", () => { setText("#radioFeedback", "RÁDIO PRONTO"); ptt.classList.remove("transmitting"); });
 }
 
-$("#radioToggle")?.addEventListener("click", () => {
-  state.player.radio = !state.player.radio;
-  persist();
-  $("#radioToggle").textContent = state.player.radio ? "ON" : "OFF";
-  $("#radioToggle").classList.toggle("active", state.player.radio);
-});
-
-$("#appModalClose")?.addEventListener("click", () => $("#appModal").classList.add("hidden"));
-$("#waitingBackButton")?.addEventListener("click", () => {
-  if(state.player.participation) enterMatch(); else showScreen("player-home");
-});
-
-// DEV
+$("#waitingBackButton")?.addEventListener("click", () => showScreen("player-home"));
 $("#devGenerateMatch")?.addEventListener("click", () => {
-  state.match = { exists:true, name:"Operação Alpha", status:"scheduled", date:"2026-10-15", elapsedSeconds:0, blueKills:3, redKills:2 }; persist(); showScreen("organizer");
+  state.match = { exists: true, name: "Operação Red Sand", status: "scheduled", date: "2026-10-10", elapsedSeconds: 0 }; persist(); render(); showToast("Criada!");
 });
-$("#devStartMatch")?.addEventListener("click", startMatch);
+$("#devStartMatch")?.addEventListener("click", () => startMatch("dev"));
+$("#devEndMatch")?.addEventListener("click", () => endMatch("dev"));
 $("#devReset")?.addEventListener("click", () => { localStorage.removeItem(STORAGE_KEY); state = createInitialState(); showScreen("role-select", false); render(); });
 
-function escapeHTML(str) { return String(str).replace(/[&<>'"]/g, 
-  tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-); }
+$("#appModalClose")?.addEventListener("click", () => $("#appModal").classList.add("hidden"));
 
-showScreen("role-select", false);
+function initialize() {
+  const has = localStorage.getItem(STORAGE_KEY);
+  if (has) { showScreen(state.role === "organizer" ? "organizer" : "player-home", false); }
+  else { state.role = "player"; showScreen("role-select", false); }
+  persist(); render();
+}
+
+initialize();
