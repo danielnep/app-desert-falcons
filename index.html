@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0b0e10">
   <title>Desert Falcons — Player Terminal</title>
   <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
   <div id="app">
+
     <header class="app-header">
       <div class="brand">
         <div class="brand-symbol">
@@ -17,9 +19,10 @@
         </div>
         <div class="brand-text">
           <div class="brand-title">DESERT FALCONS</div>
-          <div class="brand-subtitle">TERMINAL TÁTICO</div>
+          <div class="brand-subtitle">PLAYER TERMINAL</div>
         </div>
       </div>
+
       <div class="header-status">
         <div id="globalMatchStatus" class="match-status">SEM PARTIDA</div>
         <button id="devButton" class="dev-button" type="button">DEV</button>
@@ -27,18 +30,19 @@
     </header>
 
     <main id="appMain">
+
       <!-- ROLE SELECT -->
       <section id="screenRoleSelect" class="screen active" data-screen="role-select">
         <div class="role-select">
-          <div class="screen-kicker">TERMINAL DE OPERAÇÕES</div>
-          <h1>IDENTIFICAÇÃO</h1>
-          <p class="screen-intro">Selecione o seu perfil de acesso.</p>
+          <div class="screen-kicker">DESERT FALCONS / TERMINAL</div>
+          <h1>SELECIONE O ACESSO</h1>
+          <p class="screen-intro">Escolha como você deseja utilizar o terminal.</p>
           <div class="role-options">
             <button type="button" class="role-option" data-role-choice="player">
               <span class="role-option-code">01</span>
               <span class="role-option-content">
                 <strong>JOGADOR</strong>
-                <small>Acesso ao painel tático, rádio e telemetria.</small>
+                <small>Consultar partidas, confirmar presença, solicitar entrada e acessar o painel.</small>
               </span>
               <span class="role-option-arrow">→</span>
             </button>
@@ -46,7 +50,7 @@
               <span class="role-option-code">02</span>
               <span class="role-option-content">
                 <strong>ORGANIZADOR</strong>
-                <small>Comando central, parâmetros e controle de partidas.</small>
+                <small>Criar, configurar, iniciar e encerrar partidas.</small>
               </span>
               <span class="role-option-arrow">→</span>
             </button>
@@ -61,32 +65,54 @@
             <span class="screen-kicker">MODO JOGADOR</span>
             <h2>PAINEL DA PARTIDA</h2>
           </div>
-          <button type="button" id="playerDetailsButton" class="header-action">PERFIL</button>
+          <button type="button" id="playerDetailsButton" class="header-action">DETALHES</button>
         </div>
 
         <div class="player-home-content">
           <section id="playerMatchPanel" class="surface-section">
             <div class="section-heading">
               <div>
-                <span class="section-kicker">MISSÃO</span>
+                <span class="section-kicker">PARTIDA</span>
                 <h3 id="playerMatchName">Nenhuma partida cadastrada</h3>
               </div>
               <span id="playerMatchState" class="state-label">SEM PARTIDA</span>
             </div>
+
             <div class="match-info-grid">
               <div class="info-item"><span>DATA</span><strong id="playerMatchDate">—</strong></div>
               <div class="info-item"><span>HORÁRIO</span><strong id="playerMatchTime">—</strong></div>
               <div class="info-item"><span>LOCAL</span><strong id="playerMatchLocation">—</strong></div>
               <div class="info-item"><span>MAPA</span><strong id="playerMatchMap">—</strong></div>
+              <div class="info-item"><span>MODO</span><strong id="playerMatchMode">—</strong></div>
+              <div class="info-item"><span>DURAÇÃO</span><strong id="playerMatchDuration">—</strong></div>
             </div>
+
             <div id="playerScheduledActions" class="action-area">
               <button type="button" id="playerConfirmPresence" class="primary-action">CONFIRMAR PRESENÇA</button>
             </div>
+
             <div id="playerLiveActions" class="action-area hidden">
               <button type="button" id="playerRequestEntry" class="primary-action">SOLICITAR ENTRADA</button>
             </div>
+
             <div id="playerEnterActions" class="action-area hidden">
               <button type="button" id="playerEnterMatch" class="primary-action">ENTRAR NO JOGO</button>
+            </div>
+          </section>
+
+          <section class="surface-section compact-section">
+            <div class="section-heading">
+              <div>
+                <span class="screen-kicker">PARTICIPAÇÃO</span>
+                <h3 id="playerParticipationStatus">Aguardando confirmação</h3>
+              </div>
+              <span id="playerParticipationBadge" class="state-label">AGUARDANDO</span>
+            </div>
+            <div class="player-summary-line">
+              <span>JOGADOR</span>
+              <strong id="playerDisplayName">DANI</strong>
+              <span>EQUIPE</span>
+              <strong id="playerDisplayTeam">—</strong>
             </div>
           </section>
         </div>
@@ -96,20 +122,37 @@
       <section id="screenPlayerPreparation" class="screen" data-screen="player-preparation">
         <div class="screen-heading">
           <button type="button" class="back-button" data-back-screen="player-home">← VOLTAR</button>
-          <div><span class="screen-kicker">PREPARAÇÃO</span><h2>BRIEFING</h2></div>
+          <div>
+            <span class="screen-kicker">PREPARAÇÃO</span>
+            <h2>ENTRADA NA PARTIDA</h2>
+          </div>
           <div></div>
         </div>
+
         <div class="preparation-content">
           <section class="surface-section">
+            <span class="screen-kicker">PARTIDA</span>
+            <h3 id="preparationMatchName">—</h3>
+            <div class="preparation-status">
+              <span id="preparationStatus">AGUARDANDO</span>
+            </div>
+          </section>
+
+          <section class="surface-section">
+            <span class="screen-kicker">BRIEFING</span>
             <h3 id="preparationBriefingTitle">—</h3>
             <p id="preparationBriefingText">—</p>
           </section>
+
           <section class="surface-section">
-            <label class="check-line">
-              <input id="playerBriefingAck" type="checkbox">
-              <span>Compreendi as ordens de operação.</span>
-            </label>
+            <div class="acknowledgement-line">
+              <label class="check-line">
+                <input id="playerBriefingAck" type="checkbox">
+                <span>Li e estou ciente do briefing da partida.</span>
+              </label>
+            </div>
           </section>
+
           <button type="button" id="playerPreparationEnter" class="primary-action wide-action">ENTRAR NO JOGO</button>
         </div>
       </section>
@@ -118,15 +161,55 @@
       <section id="screenPlayerDetails" class="screen" data-screen="player-details">
         <div class="screen-heading">
           <button type="button" class="back-button" data-back-screen="player-home">← VOLTAR</button>
-          <div><span class="screen-kicker">IDENTIDADE</span><h2>DADOS DO OPERADOR</h2></div>
+          <div>
+            <span class="screen-kicker">JOGADOR</span>
+            <h2>DETALHES</h2>
+          </div>
           <div></div>
         </div>
-        <div class="detail-content active">
+
+        <nav class="detail-tabs">
+          <button type="button" class="detail-tab active" data-detail-tab="inicio">INÍCIO</button>
+          <button type="button" class="detail-tab" data-detail-tab="briefing">BRIEFING</button>
+          <button type="button" class="detail-tab" data-detail-tab="perfil">PERFIL</button>
+        </nav>
+
+        <div id="detailInicio" class="detail-content active" data-detail-content="inicio">
           <section class="surface-section">
-            <div class="detail-row"><span>OPERADOR</span><strong id="detailPlayerName">DANI</strong></div>
-            <div class="detail-row"><span>ID REGISTRO</span><strong id="detailPlayerId">DF-001</strong></div>
-            <div class="detail-row"><span>CLASSE</span><strong id="detailPlayerClass">COMANDO</strong></div>
-            <div class="detail-row"><span>STATUS GPS</span><strong id="detailGpsInfo">AGUARDANDO SINAL</strong></div>
+            <span class="screen-kicker">STATUS</span>
+            <h3 id="detailInicioStatus">Aguardando partida</h3>
+            <p id="detailInicioText">As informações da partida aparecerão aqui assim que o organizador salvar uma programação.</p>
+          </section>
+          <section class="surface-section">
+            <div class="detail-row"><span>JOGADOR</span><strong id="detailPlayerName">DANI</strong></div>
+            <div class="detail-row"><span>ID</span><strong id="detailPlayerId">DF-001</strong></div>
+            <div class="detail-row"><span>EQUIPE</span><strong id="detailPlayerTeam">—</strong></div>
+            <div class="detail-row"><span>FUNÇÃO</span><strong id="detailPlayerClass">—</strong></div>
+          </section>
+        </div>
+
+        <div id="detailBriefing" class="detail-content" data-detail-content="briefing">
+          <section class="surface-section">
+            <span class="screen-kicker">BRIEFING DA OPERAÇÃO</span>
+            <h3 id="detailBriefingTitle">Nenhum briefing disponível</h3>
+            <p id="detailBriefingText">O organizador ainda não cadastrou o briefing.</p>
+          </section>
+          <section class="surface-section">
+            <label class="check-line">
+              <input id="detailBriefingAck" type="checkbox">
+              <span>Li e estou ciente das informações apresentadas.</span>
+            </label>
+          </section>
+        </div>
+
+        <div id="detailPerfil" class="detail-content" data-detail-content="perfil">
+          <section class="surface-section">
+            <span class="screen-kicker">IDENTIDADE</span>
+            <div class="detail-row"><span>NOME</span><strong id="profileName">DANI</strong></div>
+            <div class="detail-row"><span>ID</span><strong id="profileId">DF-001</strong></div>
+            <div class="detail-row"><span>EQUIPE</span><strong id="profileTeam">—</strong></div>
+            <div class="detail-row"><span>CLASSE</span><strong id="profileClass">—</strong></div>
+            <div class="detail-row"><span>RÁDIO</span><strong id="profileRadioStatus">ATIVO</strong></div>
           </section>
         </div>
       </section>
@@ -135,115 +218,236 @@
       <section id="screenOrganizer" class="screen" data-screen="organizer">
         <div class="screen-heading organizer-heading">
           <div>
-            <span class="screen-kicker">COMANDO CENTRAL</span>
-            <h2>NOVA OPERAÇÃO</h2>
+            <span class="screen-kicker">MODO ORGANIZADOR</span>
+            <h2>CONFIGURAÇÃO DA PARTIDA</h2>
             <p id="organizerMatchStateText"></p>
           </div>
-          <button type="button" id="organizerStartButton" class="primary-action organizer-start-button hidden">INICIAR COMBATE</button>
+          <button type="button" id="organizerStartButton" class="primary-action organizer-start-button hidden">INICIAR PARTIDA</button>
         </div>
+
         <div class="organizer-content">
           <section class="organizer-section">
+            <div class="section-heading">
+              <div>
+                <span class="section-kicker">01 / PARTIDA</span>
+                <h3>INFORMAÇÕES PRINCIPAIS</h3>
+              </div>
+            </div>
             <div class="form-grid">
-              <label class="field field-wide"><span>NOME DA OPERAÇÃO</span><input id="orgMatchName" type="text" placeholder="Ex: Op. Blackout"></label>
+              <label class="field field-wide"><span>NOME DA PARTIDA</span><input id="orgMatchName" type="text" autocomplete="off" placeholder="Nome da partida"></label>
               <label class="field"><span>DATA</span><input id="orgMatchDate" type="date"></label>
               <label class="field"><span>HORÁRIO</span><input id="orgMatchTime" type="time"></label>
-              <label class="field field-wide"><span>LOCAL / ÁREA</span><input id="orgMatchLocation" type="text" placeholder="Setor Industrial"></label>
-              <label class="field field-wide"><span>BRIEFING DA MISSÃO</span><textarea id="orgBriefingText" rows="3" placeholder="Instruções de engajamento."></textarea></label>
+              <label class="field field-wide"><span>LOCAL</span><input id="orgMatchLocation" type="text" autocomplete="off" placeholder="Local da partida"></label>
+              <label class="field"><span>MAPA / ÁREA</span><input id="orgMatchMap" type="text" autocomplete="off" placeholder="Área de operação"></label>
+              <label class="field"><span>MODO</span>
+                <select id="orgMatchMode">
+                  <option value="Simulação">Simulação</option>
+                  <option value="Confronto">Confronto</option>
+                  <option value="Objetivos">Objetivos</option>
+                  <option value="Treinamento">Treinamento</option>
+                </select>
+              </label>
+              <label class="field"><span>DURAÇÃO</span><input id="orgMatchDuration" type="number" min="1" max="1440" step="1" inputmode="numeric" placeholder="Minutos"></label>
+              <label class="field"><span>CHECK-IN</span><input id="orgCheckInTime" type="time"></label>
             </div>
-            <label class="toggle-line" style="margin-top:15px;">
+          </section>
+
+          <section class="organizer-section">
+            <div class="section-heading">
+              <div>
+                <span class="section-kicker">02 / BRIEFING</span>
+                <h3>BRIEFING DA OPERAÇÃO</h3>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label class="field field-wide"><span>TÍTULO DO BRIEFING</span><input id="orgBriefingTitle" type="text" autocomplete="off" placeholder="Título apresentado aos jogadores"></label>
+              <label class="field field-wide"><span>BRIEFING</span><textarea id="orgBriefingText" rows="7" placeholder="Objetivo, regras da partida, condições de participação e orientações gerais."></textarea></label>
+              <label class="field field-wide"><span>OBJETIVO PRINCIPAL</span><input id="orgObjective" type="text" autocomplete="off" placeholder="Objetivo geral da partida"></label>
+            </div>
+          </section>
+
+          <section class="organizer-section">
+            <div class="section-heading">
+              <div>
+                <span class="section-kicker">03 / EQUIPES</span>
+                <h3>CONFIGURAÇÃO DAS EQUIPES</h3>
+              </div>
+            </div>
+            <div class="team-grid">
+              <div class="team-config team-blue">
+                <div class="team-heading"><span>AZUL</span><strong>EQUIPE A</strong></div>
+                <label class="field"><span>NOME DA EQUIPE</span><input id="orgTeamBlueName" type="text" autocomplete="off" placeholder="Equipe Azul"></label>
+                <label class="field"><span>LIMITE DE JOGADORES</span><input id="orgTeamBlueLimit" type="number" min="0" max="500" step="1" inputmode="numeric"></label>
+              </div>
+              <div class="team-config team-red">
+                <div class="team-heading"><span>VERMELHA</span><strong>EQUIPE B</strong></div>
+                <label class="field"><span>NOME DA EQUIPE</span><input id="orgTeamRedName" type="text" autocomplete="off" placeholder="Equipe Vermelha"></label>
+                <label class="field"><span>LIMITE DE JOGADORES</span><input id="orgTeamRedLimit" type="number" min="0" max="500" step="1" inputmode="numeric"></label>
+              </div>
+            </div>
+            <label class="toggle-line">
               <input id="orgOrganizerParticipates" type="checkbox">
-              <span>COMANDO EM CAMPO (Participar do Painel Tático)</span>
+              <span>O organizador também participa desta partida.</span>
             </label>
           </section>
+
+          <section class="organizer-section">
+            <div class="section-heading">
+              <div>
+                <span class="section-kicker">04 / MÓDULOS</span>
+                <h3>RECURSOS DA PARTIDA</h3>
+              </div>
+            </div>
+            <div class="module-grid">
+              <label class="module-option"><input id="moduleMedical" type="checkbox"><span><strong>ATENDIMENTO</strong><small>Registro administrativo.</small></span></label>
+              <label class="module-option"><input id="moduleZone" type="checkbox"><span><strong>ZONAS</strong><small>Controle visual.</small></span></label>
+              <label class="module-option"><input id="moduleScore" type="checkbox"><span><strong>PONTUAÇÃO</strong><small>Resultado.</small></span></label>
+              <label class="module-option"><input id="moduleTracking" type="checkbox"><span><strong>POSICIONAMENTO</strong><small>Localização.</small></span></label>
+              <label class="module-option"><input id="moduleObjectives" type="checkbox"><span><strong>OBJETIVOS</strong><small>Controle.</small></span></label>
+              <label class="module-option"><input id="moduleEvents" type="checkbox"><span><strong>EVENTOS</strong><small>Registro.</small></span></label>
+            </div>
+          </section>
+
+          <section class="organizer-section">
+            <div class="section-heading">
+              <div>
+                <span class="section-kicker">05 / PRESENÇA</span>
+                <h3>JOGADORES</h3>
+              </div>
+            </div>
+            <div id="organizerPresence" class="presence-list">Nenhum jogador registrado.</div>
+          </section>
+
           <section class="organizer-actions">
-            <button type="button" id="organizerSaveButton" class="primary-action">SALVAR OPERAÇÃO</button>
-            <button type="button" id="organizerEndButton" class="danger-action hidden">ENCERRAR OPERAÇÃO</button>
+            <button type="button" id="organizerSaveButton" class="primary-action">SALVAR PARTIDA</button>
+            <button type="button" id="organizerEndButton" class="danger-action hidden">ENCERRAR PARTIDA</button>
           </section>
         </div>
       </section>
 
-      <!-- DEV CONTROL -->
+      <!-- DEV -->
       <section id="screenDev" class="screen" data-screen="dev">
         <div class="screen-heading">
           <button type="button" class="back-button" data-back-screen="previous">← VOLTAR</button>
-          <div><span class="screen-kicker">SISTEMA</span><h2>DEV CONTROL</h2></div>
+          <div>
+            <span class="screen-kicker">DESENVOLVIMENTO</span>
+            <h2>DEV CONTROL</h2>
+          </div>
+          <span class="dev-state-label">PERSISTENTE</span>
         </div>
+
         <div class="dev-content">
-          <div class="dev-actions">
-            <button type="button" class="dev-segment" data-dev-role="player">MODO JOGADOR</button>
-            <button type="button" class="dev-segment" data-dev-role="organizer">MODO ORG</button>
-          </div>
-          <br>
-          <div class="dev-actions">
-            <button type="button" id="devGenerateMatch" class="secondary-action">GERAR TESTE</button>
-            <button type="button" id="devStartMatch" class="primary-action">FORÇAR AO VIVO</button>
-            <button type="button" id="devReset" class="danger-action">RESET TOTAL</button>
-          </div>
+          <section class="dev-section">
+            <div class="section-heading"><div><span class="screen-kicker">CONTEXTO</span><h3>FUNÇÃO ATUAL</h3></div></div>
+            <div class="dev-segmented">
+              <button type="button" class="dev-segment" data-dev-role="player">JOGADOR</button>
+              <button type="button" class="dev-segment" data-dev-role="organizer">ORGANIZADOR</button>
+            </div>
+          </section>
+
+          <section class="dev-section">
+            <div class="section-heading"><div><span class="screen-kicker">PARTIDA</span><h3>ESTADO</h3></div></div>
+            <div class="dev-segmented">
+              <button type="button" class="dev-segment" data-dev-status="scheduled">AGENDADA</button>
+              <button type="button" class="dev-segment" data-dev-status="live">AO VIVO</button>
+              <button type="button" class="dev-segment" data-dev-status="ended">ENCERRADA</button>
+            </div>
+          </section>
+
+          <section class="dev-section">
+            <div class="section-heading"><div><span class="screen-kicker">SIMULAÇÃO</span><h3>QUANTIDADE DE JOGADORES</h3></div></div>
+            <label class="field field-wide">
+              <span>JOGADORES SIMULADOS POR EQUIPE</span>
+              <input id="devPlayersPerTeam" type="number" min="0" max="500" step="1" inputmode="numeric">
+            </label>
+            <div class="dev-team-preview">
+              <div><span id="devBlueCount">0</span><small>AZUL</small></div>
+              <span class="dev-preview-symbol">×</span>
+              <div><span id="devRedCount">0</span><small>VERMELHA</small></div>
+              <span class="dev-preview-symbol">=</span>
+              <div><span id="devTotalCount">0</span><small>TOTAL</small></div>
+            </div>
+            <button type="button" id="devApplyPlayers" class="primary-action wide-action">APLICAR SIMULAÇÃO</button>
+          </section>
+
+          <section class="dev-section">
+            <div class="section-heading"><div><span class="screen-kicker">SIMULAÇÃO</span><h3>CONFIGURAÇÃO RÁPIDA</h3></div></div>
+            <div class="dev-actions">
+              <button type="button" id="devGenerateMatch" class="secondary-action">GERAR PARTIDA</button>
+              <button type="button" id="devStartMatch" class="primary-action">INICIAR PARTIDA</button>
+              <button type="button" id="devEndMatch" class="danger-action">ENCERRAR PARTIDA</button>
+            </div>
+          </section>
+
+          <section class="dev-section dev-danger-section">
+            <div class="section-heading"><div><span class="screen-kicker">ATENÇÃO</span><h3>ESTADO DO DISPOSITIVO</h3></div></div>
+            <button type="button" id="devReset" class="outline-danger">RESETAR DADOS DA PARTIDA</button>
+          </section>
         </div>
       </section>
 
-      <!-- PAINEL TÁTICO (COM MAPA QUADRADO E PONTUAÇÃO DE ELIMINAÇÃO) -->
+      <!-- TACTICAL -->
       <section id="screenTactical" class="screen tactical-screen" data-screen="tactical">
         <div class="tactical-header">
           <div class="tactical-heading">
-            <span class="screen-kicker">ZONA DE COMBATE</span>
+            <span class="screen-kicker">PAINEL TÁTICO</span>
             <h2 id="tacticalMatchName">—</h2>
           </div>
           <div class="tactical-header-actions">
             <button type="button" id="tacticalLockButton" class="small-action">BLOQUEAR</button>
+            <button type="button" id="tacticalOrganizerStart" class="primary-action tactical-top-action hidden">INICIAR</button>
             <button type="button" id="tacticalOrganizerEnd" class="danger-action tactical-top-action hidden">ENCERRAR</button>
             <button type="button" id="tacticalPlayerLeave" class="outline-danger tactical-top-action hidden">ABANDONAR</button>
           </div>
         </div>
 
         <div class="tactical-content">
-          <!-- MAPA TÁTICO EXPANDIDO EM QUADRADO COM PLACAR DE ELIMINAÇÕES -->
           <section class="tactical-map">
             <div class="map-top">
-              <div><span class="map-kicker">TELEMETRIA GPS</span><strong id="tacticalGpsStatus">CONECTANDO...</strong></div>
-              <div class="live-score-board">
-                <span class="score-team blue">AZUL: <b id="scoreBlue">0</b></span>
-                <span class="score-sep">|</span>
-                <span class="score-team red">VERM: <b id="scoreRed">0</b></span>
+              <div>
+                <span class="map-kicker">ÁREA DE OPERAÇÃO</span>
+                <strong id="tacticalMapName">—</strong>
               </div>
+              <span id="tacticalGpsStatus" class="gps-indicator">GPS OFFLINE</span>
             </div>
 
-            <div class="fictional-map square-map grid-bg" id="mapContainer">
-              <div class="map-grid-lines"></div>
-              <!-- Outros operadores em movimento simulado -->
-              <div class="map-enemy-marker" id="enemyMarker1" style="top: 305px; left: 45px;">VM-1</div>
-              <div class="map-enemy-marker" id="enemyMarker2" style="top: 75px; left: 220px;">VM-2</div>
-              <div class="map-ally-marker" id="allyMarker1" style="top: 180px; left: 180px;">AZ-2</div>
-              <!-- Seu marcador real atrelado ao GPS -->
-              <div class="map-player-marker" id="playerGpsMarker">DF</div>
+            <div class="fictional-map">
+              <div class="map-grid"></div>
+              <div class="map-zone map-zone-a"><span>SETOR ALFA</span></div>
+              <div class="map-zone map-zone-b"><span>SETOR BRAVO</span></div>
+              <div class="map-player-marker">DF</div>
+              <div class="map-objective-marker marker-a">A</div>
+              <div class="map-objective-marker marker-b">B</div>
             </div>
 
             <div class="objective-bar">
-              <span>OBJETIVO</span><strong id="tacticalObjective">Aguardando diretrizes.</strong>
+              <span>OBJETIVO</span>
+              <strong id="tacticalObjective">Aguardando briefing.</strong>
             </div>
           </section>
 
-          <!-- PAINEL LATERAL COM RÁDIO ANIMADO E BOTÕES FUNCIONAIS -->
           <section class="tactical-side">
             <div class="tactical-status-strip">
               <div><span>STATUS</span><strong id="tacticalStatus">AGUARDANDO</strong></div>
-              <div><span>ELIMINAÇÕES</span><strong id="tacticalKills">0 Kills</strong></div>
+              <div><span>JOGADORES</span><strong id="tacticalPlayerCount">0</strong></div>
               <div><span>TEMPO</span><strong id="tacticalTimer">00:00</strong></div>
             </div>
 
             <div class="radio-console">
               <div class="radio-header">
-                <div><span>FREQ. RÁDIO</span><strong>CH <b id="radioChannel">01</b></strong></div>
+                <div><span>RÁDIO</span><strong>CANAL <b id="radioChannel">01</b></strong></div>
                 <button type="button" id="radioToggle" class="radio-toggle">ON</button>
               </div>
               <button type="button" id="pttButton" class="ptt-button">
                 <span class="ptt-symbol">●</span>
-                <span id="pttText">PRESSIONE PARA FALAR</span>
+                <span>PRESSIONE PARA FALAR</span>
               </button>
-              <!-- Animação de ondas de áudio do rádio -->
-              <div class="radio-wave-bars hidden" id="radioWaves">
-                <span></span><span></span><span></span><span></span><span></span>
+              <div class="radio-controls">
+                <button type="button" id="channelDown" class="mini-control">−</button>
+                <label class="volume-control"><span>VOLUME</span><input id="radioVolume" type="range" min="0" max="100" step="5"></label>
+                <button type="button" id="channelUp" class="mini-control">+</button>
               </div>
+              <div id="radioFeedback" class="radio-feedback">RÁDIO PRONTO</div>
             </div>
 
             <div class="tactical-actions">
@@ -253,11 +457,11 @@
           </section>
         </div>
 
-        <!-- TRAVA DE SEGURANÇA -->
-        <div id="touchGuard" class="touch-guard hidden">
+        <div id="touchGuard" class="touch-guard">
           <div class="touch-guard-content">
-            <span class="screen-kicker">SISTEMA BLOQUEADO</span>
-            <p>Segure para liberar os comandos</p>
+            <span class="screen-kicker">CONTROLES PROTEGIDOS</span>
+            <h3>PAINEL BLOQUEADO</h3>
+            <p>Segure o botão para liberar os controles do painel.</p>
             <button type="button" id="unlockButton" class="unlock-button">SEGURAR PARA DESBLOQUEAR</button>
           </div>
         </div>
@@ -269,15 +473,28 @@
           <div class="waiting-symbol">
             <img src="https://raw.githubusercontent.com/danielnep/app-desert-falcons/refs/heads/dev-experiments/assets/IMG-20260912-WA0015(1).png" alt="DF">
           </div>
-          <span class="screen-kicker">AUTORIZAÇÃO</span>
-          <h2 id="waitingTitle">AGUARDANDO COMANDO</h2>
-          <p id="waitingText">O organizador precisa liberar seu terminal.</p>
-          <button type="button" id="waitingBackButton" class="secondary-action">VOLTAR</button>
+          <span class="screen-kicker">SOLICITAÇÃO ENVIADA</span>
+          <h2>AGUARDANDO AUTORIZAÇÃO</h2>
+          <p id="waitingText">Aguarde a liberação da partida pelo organizador.</p>
+          <button type="button" id="waitingBackButton" class="secondary-action">VOLTAR AO PAINEL</button>
         </div>
       </section>
+
     </main>
 
-    <!-- MODAL DE OBJETIVOS E INSTRUÇÕES -->
+    <div id="saveConfirmModal" class="modal hidden" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-window">
+        <span class="screen-kicker">CONFIGURAÇÃO SALVA</span>
+        <h2>PARTIDA REGISTRADA</h2>
+        <p id="saveConfirmText">A partida foi salva e já está disponível para o jogador.</p>
+        <div class="modal-actions">
+          <button type="button" id="saveConfirmContinue" class="secondary-action">CONTINUAR ORGANIZANDO</button>
+          <button type="button" id="saveConfirmEnter" class="primary-action">ENTRAR NO JOGO</button>
+        </div>
+      </div>
+    </div>
+
     <div id="appModal" class="modal hidden" aria-hidden="true">
       <div class="modal-backdrop"></div>
       <div class="modal-window">
@@ -290,22 +507,10 @@
       </div>
     </div>
 
-    <!-- MODAL SALVAR -->
-    <div id="saveConfirmModal" class="modal hidden" aria-hidden="true">
-      <div class="modal-backdrop"></div>
-      <div class="modal-window">
-        <span class="screen-kicker">COMANDO CENTRAL</span>
-        <h2>OPERAÇÃO SALVA</h2>
-        <p>Deseja iniciar o combate imediatamente?</p>
-        <div class="modal-actions">
-          <button type="button" id="saveConfirmContinue" class="secondary-action">SAIR</button>
-          <button type="button" id="saveConfirmEnter" class="primary-action">INICIAR</button>
-        </div>
-      </div>
-    </div>
-
     <div id="toast" class="toast" aria-live="polite"></div>
+
   </div>
+
   <script src="app.js"></script>
 </body>
 </html>
