@@ -1,343 +1,743 @@
 /* ============================================================
-   DESERT FALCONS — STYLE.CSS
-   Visual base única do terminal.
+   DESERT FALCONS — APP.JS
+   Estado, navegação, jogador, organizador e DEV.
 ============================================================ */
 
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+const STORAGE_KEY = "desert_falcons_terminal_v8";
+const DEMO_CENTER = { lat: -19.9167, lng: -43.9345 };
 
-html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+let previousScreen = "player-home";
+let currentScreen = "role-select";
+let unlockTimer = null;
+let unlockStarted = false;
+let radioPushTimer = null;
 
-html { background: #090c0f; }
-
-body {
-  min-height: 100dvh;
-  color: #e8eceb;
-  background: radial-gradient(circle at 15% 10%, rgba(64, 78, 63, 0.12), transparent 35%), radial-gradient(circle at 85% 85%, rgba(91, 72, 36, 0.10), transparent 38%), #090c0f;
-  font-family: Inter, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-size: 14px; line-height: 1.45;
+function createInitialState() {
+  return {
+    version: 8,
+    role: "player",
+    match: { exists: false, name: "", status: "none", date: "", time: "", location: "", map: "Complexo Industrial", mode: "Simulação", duration: 60, checkInTime: "", startedAt: null, elapsedSeconds: 0 },
+    organizer: { briefingTitle: "Briefing da Operação", briefingText: "Objetivo, regras da partida, condições de participação e orientações gerais.", objective: "", teamBlueName: "Equipe Azul", teamBlueLimit: 20, teamRedName: "Equipe Vermelha", teamRedLimit: 20, participates: false },
+    player: { id: "DF-001", name: "DANI", team: "azul", class: "Assalto", participation: false, entryRequested: false, briefingAck: false, radio: true, channel: 1, radioVolume: 70 },
+    gps: { lat: null, lng: null, accuracy: null, ready: false },
+    objectives: { alfa: { name: "Setor Alfa", control: "neutro" }, bravo: { name: "Setor Bravo", control: "neutro" } },
+    modules: { medical: true, zone: true, score: false, tracking: false, objectives: true, events: false },
+    simulatedPlayers: { perTeam: 0, blue: [], red: [] },
+    events: [],
+    dev: { lastRole: "player" }
+  };
 }
 
-button, input, select, textarea { font: inherit; }
-button { border: 0; cursor: pointer; }
-button:disabled { cursor: default; opacity: 0.45; }
-input, select, textarea { color: #edf1ef; }
-textarea { resize: vertical; }
-
-#app { position: relative; width: 100%; height: 100dvh; min-height: 100dvh; overflow: hidden; }
-
-#app::before {
-  content: ""; position: fixed; inset: 0; pointer-events: none; opacity: 0.20;
-  background-image: linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 34px 34px; mask-image: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent 92%);
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return createInitialState();
+    const saved = JSON.parse(raw);
+    return mergeState(createInitialState(), saved);
+  } catch (error) {
+    console.warn("Falha ao carregar estado:", error);
+    return createInitialState();
+  }
 }
 
-.app-header {
-  position: relative; z-index: 100; width: 100%; height: 66px; display: flex; align-items: center; justify-content: space-between;
-  padding: 0 max(16px, env(safe-area-inset-left)) 0 max(16px, env(safe-area-inset-right));
-  border-bottom: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(13,17,19,0.97), rgba(9,12,15,0.96)); backdrop-filter: blur(14px);
+function mergeState(base, saved) {
+  if (!saved || typeof saved !== "object") return base;
+  return {
+    ...base, ...saved,
+    match: { ...base.match, ...(saved.match || {}) },
+    organizer: { ...base.organizer, ...(saved.organizer || {}) },
+    player: { ...base.player, ...(saved.player || {}) },
+    gps: { ...base.gps, ...(saved.gps || {}) },
+    objectives: { ...base.objectives, ...(saved.objectives || {}) },
+    modules: { ...base.modules, ...(saved.modules || {}) },
+    simulatedPlayers: { ...base.simulatedPlayers, ...(saved.simulatedPlayers || {}) },
+    dev: { ...base.dev, ...(saved.dev || {}) },
+    events: Array.isArray(saved.events) ? saved.events : base.events
+  };
 }
 
-.brand { display: flex; align-items: center; min-width: 0; }
-.brand-symbol {
-  width: 34px; height: 34px; display: grid; place-items: center; margin-right: 10px;
-  color: #d7bd73; border: 1px solid rgba(215,189,115,0.45); font-size: 11px; font-weight: 800; letter-spacing: 0.12em;
-  background: linear-gradient(135deg, rgba(215,189,115,0.08), rgba(255,255,255,0.025));
-}
-.brand-text { min-width: 0; }
-.brand-title { color: #edf0ec; font-size: 12px; line-height: 1.05; font-weight: 800; letter-spacing: 0.16em; white-space: nowrap; }
-.brand-subtitle { margin-top: 3px; color: #78827f; font-size: 8px; font-weight: 700; letter-spacing: 0.18em; }
+let state = loadState();
 
-.header-status { display: flex; align-items: center; gap: 8px; }
-.match-status, .dev-button { height: 32px; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
-
-.match-status { padding: 0 10px; color: #8f9996; border: 1px solid rgba(255,255,255,0.08); font-size: 9px; font-weight: 800; letter-spacing: 0.12em; background: rgba(255,255,255,0.025); }
-.match-status.scheduled { color: #d7bd73; border-color: rgba(215,189,115,0.24); }
-.match-status.live { color: #9bcf97; border-color: rgba(116,181,113,0.35); }
-.match-status.ended { color: #989f9d; }
-
-.dev-button { padding: 0 12px; color: #d9dedc; border: 1px solid rgba(255,255,255,0.12); font-size: 10px; font-weight: 900; letter-spacing: 0.14em; background: linear-gradient(180deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025)); }
-.dev-button:active { transform: translateY(1px); }
-
-#appMain { position: relative; width: 100%; height: calc(100dvh - 66px); min-height: 0; }
-
-.screen { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; display: none; overflow: hidden; background: radial-gradient(circle at 50% 0%, rgba(255,255,255,0.015), transparent 42%); }
-.screen.active { display: block; }
-
-.screen-kicker, .section-kicker, .map-kicker, .map-label, .radio-header > div > span, .tactical-status-strip span, .info-item span, .detail-row span, .field > span, .team-heading span, .waiting-screen .screen-kicker {
-  color: #76817d; font-size: 8px; line-height: 1.1; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+function persist() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } 
+  catch (error) { console.warn("Não foi possível persistir o estado:", error); }
 }
 
-h1, h2, h3, p { margin: 0; }
-h1 { margin-top: 8px; color: #eef1ef; font-size: clamp(26px, 6vw, 40px); line-height: 1.04; font-weight: 800; letter-spacing: -0.025em; }
-h2 { margin-top: 5px; color: #eef1ef; font-size: clamp(20px, 4.5vw, 28px); line-height: 1.05; font-weight: 800; letter-spacing: -0.018em; }
-h3 { margin-top: 5px; color: #e7ece9; font-size: 14px; line-height: 1.15; font-weight: 800; letter-spacing: 0.01em; }
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-.screen-role { display: none; align-items: center; justify-content: center; padding: 24px; }
-.screen-role.active { display: flex; }
-.role-select { width: min(620px, 100%); max-height: calc(100% - 20px); }
-.role-select .screen-intro { max-width: 520px; margin-top: 10px; color: #9aa39f; font-size: 13px; }
-.role-options { display: grid; gap: 10px; margin-top: 26px; }
-
-.role-option {
-  width: 100%; display: grid; grid-template-columns: 38px 1fr 22px; gap: 12px; align-items: center; min-height: 94px; padding: 14px 16px; text-align: left;
-  color: #e9eeeb; border: 1px solid rgba(255,255,255,0.09); background: linear-gradient(110deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
-}
-.role-option:hover { border-color: rgba(215,189,115,0.28); background: linear-gradient(110deg, rgba(215,189,115,0.055), rgba(255,255,255,0.02)); }
-.role-option:active { transform: translateY(1px); }
-.role-option-code { color: #75817d; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; }
-.role-option-content { display: grid; gap: 5px; }
-.role-option-content strong { font-size: 15px; letter-spacing: 0.05em; }
-.role-option-content small { color: #8d9794; font-size: 11px; line-height: 1.4; }
-.role-option-arrow { color: #d7bd73; font-size: 18px; text-align: right; }
-
-.screen-heading { height: 74px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.screen-heading > div:nth-child(2) { min-width: 0; }
-.screen-heading > div:nth-child(2) h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.header-subtext, #organizerMatchStateText { margin-top: 3px; color: #737e7a; font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
-
-.header-action, .back-button, .small-action { min-height: 34px; padding: 0 11px; color: #b4bdb9; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.025); font-size: 9px; font-weight: 800; letter-spacing: 0.10em; }
-.back-button { white-space: nowrap; }
-.header-action:active, .back-button:active, .small-action:active { transform: translateY(1px); }
-
-.player-home-content { height: calc(100% - 74px); min-height: 0; overflow: auto; padding: 18px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.10) transparent; }
-.surface-section { border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); background: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.008)); }
-.surface-section + .surface-section { margin-top: 14px; }
-.section-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; padding: 15px 16px; }
-.state-label { flex: 0 0 auto; margin-top: 2px; padding: 4px 7px; color: #89928f; border: 1px solid rgba(255,255,255,0.08); font-size: 8px; font-weight: 900; letter-spacing: 0.12em; }
-.match-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border-top: 1px solid rgba(255,255,255,0.06); }
-.info-item { min-width: 0; padding: 13px 16px; border-right: 1px solid rgba(255,255,255,0.055); border-bottom: 1px solid rgba(255,255,255,0.055); }
-.info-item:nth-child(2n) { border-right: 0; }
-.info-item strong { display: block; margin-top: 5px; color: #dce2df; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.action-area { display: flex; padding: 15px 16px; }
-.player-summary-line { display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.06); color: #77827e; font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; }
-.player-summary-line strong { color: #dde3e0; font-size: 10px; letter-spacing: 0.04em; text-transform: none; }
-.compact-section { padding-bottom: 0; }
-
-.primary-action, .secondary-action, .danger-action, .outline-danger, .unlock-button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; padding: 0 16px; font-size: 10px; font-weight: 900; letter-spacing: 0.11em; text-transform: uppercase; transition: transform 140ms ease, filter 140ms ease, border-color 140ms ease; }
-.primary-action:active, .secondary-action:active, .danger-action:active, .outline-danger:active, .unlock-button:active { transform: translateY(1px); }
-.primary-action { color: #10130f; border: 1px solid #d7bd73; background: linear-gradient(180deg, #d9c17d, #baa15d); }
-.primary-action:hover { filter: brightness(1.05); }
-.secondary-action { color: #d3dbd7; border: 1px solid rgba(255,255,255,0.11); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025)); }
-.secondary-action:hover { border-color: rgba(215,189,115,0.28); }
-.danger-action { color: #f0cbc7; border: 1px solid rgba(180,90,81,0.50); background: linear-gradient(180deg, rgba(156,67,58,0.24), rgba(110,38,31,0.18)); }
-.outline-danger { color: #d6aaa6; border: 1px solid rgba(170,91,83,0.36); background: rgba(125,43,36,0.08); }
-.wide-action { width: 100%; }
-.compact-action { min-height: 35px; padding: 0 10px; font-size: 8px; }
-.top-start-action, .organizer-start-button { min-height: 42px; padding: 0 17px; }
-
-.preparation-content { height: calc(100% - 74px); min-height: 0; overflow: auto; padding: 16px 18px 24px; }
-.preparation-content .surface-section { padding-bottom: 16px; }
-.preparation-content .surface-section p { padding: 0 16px; color: #949e9a; font-size: 12px; line-height: 1.6; }
-.preparation-content .surface-section h3 { padding: 0 16px; }
-.preparation-status { margin-top: 11px; padding: 9px 16px 0; color: #d7bd73; font-size: 9px; font-weight: 900; letter-spacing: 0.13em; }
-.acknowledgement-line { padding: 14px 16px; }
-.check-line, .toggle-line { display: flex; gap: 10px; align-items: flex-start; color: #adb6b2; font-size: 11px; line-height: 1.45; cursor: pointer; }
-.check-line input, .toggle-line input, .module-option input { flex: 0 0 auto; margin-top: 2px; accent-color: #d7bd73; }
-
-.screen[data-screen="player-details"] { background: linear-gradient(180deg, rgba(11,14,16,0.99), rgba(9,12,15,0.99)); }
-.detail-tabs { height: 46px; display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid rgba(255,255,255,0.07); }
-.detail-tab { position: relative; color: #727d79; border-bottom: 1px solid transparent; background: transparent; font-size: 9px; font-weight: 900; letter-spacing: 0.12em; }
-.detail-tab.active { color: #d7bd73; }
-.detail-tab.active::after { content: ""; position: absolute; left: 16%; right: 16%; bottom: -1px; height: 1px; background: #d7bd73; }
-.detail-content { display: none; height: calc(100% - 120px); overflow: auto; padding: 15px 18px 24px; }
-.detail-content.active { display: block; }
-.detail-row { display: flex; justify-content: space-between; gap: 14px; padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.05); }
-.detail-row strong { color: #d8dfdc; text-align: right; font-size: 11px; }
-
-.organizer-heading { height: 82px; }
-.organizer-content { height: calc(100% - 82px); min-height: 0; overflow: auto; padding: 0 18px 28px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.10) transparent; }
-.organizer-section { padding: 17px 0 18px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.organizer-section .section-heading { padding: 0 0 14px; }
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 12px; }
-.field { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.field-wide { grid-column: 1 / -1; }
-.field input, .field select, .field textarea { width: 100%; min-height: 42px; padding: 10px 11px; color: #e4e9e6; border: 1px solid rgba(255,255,255,0.09); outline: none; background: rgba(255,255,255,0.025); }
-.field textarea { min-height: 118px; line-height: 1.5; }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: rgba(215,189,115,0.45); box-shadow: 0 0 0 2px rgba(215,189,115,0.06); }
-.field input::placeholder, .field textarea::placeholder { color: #55605c; }
-.field select { appearance: none; background: linear-gradient(45deg, transparent 50%, #75807c 50%) calc(100% - 14px) 18px / 5px 5px no-repeat, linear-gradient(135deg, #75807c 50%, transparent 50%) calc(100% - 10px) 18px / 5px 5px no-repeat, rgba(255,255,255,0.025); }
-.field-help { margin-top: 8px; color: #707b77; font-size: 10px; line-height: 1.5; }
-.strong-help { color: #8f9995; }
-
-.team-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.team-config { min-width: 0; padding: 13px; border-top: 2px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.014); }
-.team-blue { border-top-color: rgba(93,142,176,0.75); }
-.team-red { border-top-color: rgba(161,91,82,0.75); }
-.team-heading { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 12px; }
-.team-heading strong { color: #dbe1de; font-size: 11px; }
-.team-config .field + .field { margin-top: 10px; }
-.toggle-line { margin-top: 14px; }
-
-.module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.module-option { min-height: 64px; display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 11px; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.014); cursor: pointer; }
-.module-option span { display: grid; gap: 3px; }
-.module-option strong { color: #d5dcda; font-size: 9px; font-weight: 900; letter-spacing: 0.07em; }
-.module-option small { color: #68736f; font-size: 9px; line-height: 1.35; }
-
-.presence-list { padding: 13px 0; color: #8b9591; font-size: 10px; line-height: 1.7; }
-.organizer-actions { display: flex; gap: 10px; padding: 18px 0; }
-.organizer-actions > * { flex: 1; }
-
-.dev-content { height: calc(100% - 74px); min-height: 0; overflow: auto; padding: 0 18px 24px; }
-.dev-section { padding: 17px 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.dev-section .section-heading { padding: 0 0 13px; }
-.dev-segmented { display: flex; gap: 7px; }
-.dev-segment { flex: 1; min-height: 43px; padding: 0 11px; color: #7e8985; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.018); font-size: 8px; font-weight: 900; letter-spacing: 0.10em; }
-.dev-segment.active { color: #11140f; border-color: #d7bd73; background: linear-gradient(180deg, #d9c17d, #b79c57); }
-.dev-help { margin-top: 10px; color: #68736f; font-size: 10px; line-height: 1.55; }
-.dev-team-preview { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; gap: 9px; align-items: center; margin: 15px 0; padding: 13px 10px; border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
-.dev-team-preview > div { display: grid; justify-items: center; gap: 4px; }
-.dev-team-preview > div span { color: #dce3df; font-size: 22px; font-weight: 800; line-height: 1; }
-.dev-team-preview > div small { color: #6e7975; font-size: 8px; font-weight: 900; letter-spacing: 0.10em; }
-.dev-preview-symbol { color: #66716d; font-size: 12px; }
-.dev-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.dev-danger-section { border-bottom: 0; }
-.dev-state-label { color: #77827f; font-size: 8px; font-weight: 800; letter-spacing: 0.12em; }
-
-.tactical-screen { background: radial-gradient(circle at 22% 12%, rgba(65,82,69,0.10), transparent 30%), #0a0e10; }
-.tactical-header { height: 74px; display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 9px 14px 9px 18px; border-bottom: 1px solid rgba(255,255,255,0.07); }
-.tactical-heading { min-width: 0; }
-.tactical-heading h2 { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tactical-header-actions { display: flex; gap: 7px; flex-wrap: nowrap; justify-content: flex-end; }
-.tactical-top-action, .tactical-header-actions .small-action { flex: 0 0 auto; }
-.tactical-content { height: calc(100% - 74px); min-height: 0; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.85fr); gap: 10px; padding: 10px; }
-
-.tactical-map { position: relative; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border: 1px solid rgba(255,255,255,0.07); background: linear-gradient(135deg, rgba(21,29,29,0.92), rgba(8,12,14,0.96)); }
-.map-top { min-height: 54px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.map-top strong { display: block; margin-top: 4px; color: #d9dfdc; font-size: 11px; }
-.gps-indicator { color: #7d8784; font-size: 8px; font-weight: 900; letter-spacing: 0.10em; white-space: nowrap; }
-.fictional-map { position: relative; min-height: 0; overflow: hidden; background: radial-gradient(ellipse at 50% 42%, rgba(92,111,91,0.12), transparent 45%), linear-gradient(135deg, #101714, #0a0e10); }
-.map-grid { position: absolute; inset: 0; opacity: 0.26; background-image: linear-gradient(rgba(166,184,172,0.075) 1px, transparent 1px), linear-gradient(90deg, rgba(166,184,172,0.075) 1px, transparent 1px); background-size: 30px 30px; }
-.map-zone { position: absolute; display: flex; align-items: flex-end; padding: 9px; border: 1px dashed rgba(213,189,115,0.22); color: rgba(213,189,115,0.50); font-size: 8px; font-weight: 800; letter-spacing: 0.10em; }
-.map-zone-a { left: 7%; top: 12%; width: 36%; height: 29%; }
-.map-zone-b { right: 7%; bottom: 12%; width: 36%; height: 29%; }
-.map-player-marker, .map-objective-marker { position: absolute; display: grid; place-items: center; z-index: 3; }
-.map-player-marker { left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px; color: #10130f; background: #d7bd73; border-radius: 50%; font-size: 8px; font-weight: 900; box-shadow: 0 0 0 5px rgba(215,189,115,0.08); }
-.map-objective-marker { width: 24px; height: 24px; border: 1px solid rgba(215,189,115,0.5); color: #d7bd73; background: rgba(9,13,15,0.8); font-size: 9px; font-weight: 900; }
-.marker-a { left: 28%; top: 27%; }
-.marker-b { right: 26%; bottom: 27%; }
-.map-structure { position: absolute; border: 1px solid rgba(160,177,166,0.12); background: rgba(132,148,137,0.045); }
-.structure-one { left: 45%; top: 18%; width: 18%; height: 11%; }
-.structure-two { left: 22%; bottom: 18%; width: 16%; height: 13%; }
-.structure-three { right: 18%; top: 18%; width: 13%; height: 10%; }
-.objective-bar { min-height: 44px; display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; padding: 0 12px; border-top: 1px solid rgba(255,255,255,0.06); }
-.objective-bar span { color: #72807a; font-size: 8px; font-weight: 900; letter-spacing: 0.11em; }
-.objective-bar strong { min-width: 0; color: #d1d8d5; font-size: 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.tactical-side { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; }
-.tactical-status-strip { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid rgba(255,255,255,0.07); border-bottom: 1px solid rgba(255,255,255,0.07); }
-.tactical-status-strip > div { min-width: 0; padding: 10px 8px; border-right: 1px solid rgba(255,255,255,0.055); }
-.tactical-status-strip > div:last-child { border-right: 0; }
-.tactical-status-strip strong { display: block; margin-top: 4px; color: #d5dcd9; font-size: 11px; white-space: nowrap; }
-
-.radio-console { min-height: 0; display: grid; grid-template-rows: auto auto auto 1fr; gap: 10px; padding: 12px; border: 1px solid rgba(255,255,255,0.07); background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.008)); }
-.radio-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.radio-header > div { display: grid; gap: 4px; }
-.radio-header strong { color: #d4dcd8; font-size: 11px; letter-spacing: 0.05em; }
-.radio-header strong b { color: #d7bd73; }
-.radio-toggle { min-width: 44px; height: 30px; color: #9aa39f; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.025); font-size: 8px; font-weight: 900; letter-spacing: 0.10em; }
-.radio-toggle.active { color: #121511; border-color: #d7bd73; background: #d7bd73; }
-.ptt-button { width: 100%; min-height: 92px; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; color: #dedfda; border: 1px solid rgba(215,189,115,0.28); background: radial-gradient(circle at center, rgba(215,189,115,0.08), rgba(255,255,255,0.018)); font-size: 9px; font-weight: 900; letter-spacing: 0.09em; touch-action: none; }
-.ptt-button.transmitting { color: #121511; border-color: #d7bd73; background: linear-gradient(180deg, #d9c17d, #b79c57); }
-.ptt-symbol { font-size: 9px; }
-.radio-controls { display: grid; grid-template-columns: 32px 1fr 32px; gap: 7px; align-items: center; }
-.mini-control { height: 30px; color: #a0aaa6; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); font-size: 14px; }
-.volume-control { min-width: 0; display: grid; gap: 5px; }
-.volume-control span { color: #68736f; font-size: 8px; font-weight: 800; letter-spacing: 0.10em; }
-.volume-control input { width: 100%; accent-color: #d7bd73; }
-.radio-feedback { align-self: end; padding-top: 7px; color: #68736f; border-top: 1px solid rgba(255,255,255,0.055); font-size: 8px; font-weight: 900; letter-spacing: 0.10em; }
-
-.tactical-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.tactical-action-button { min-height: 43px; }
-
-.touch-guard { position: absolute; z-index: 40; inset: 74px 0 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(5,8,10,0.72); backdrop-filter: blur(8px); }
-.touch-guard.hidden { display: none; }
-.touch-guard-content { width: min(390px, 100%); padding: 22px; border-top: 1px solid rgba(215,189,115,0.35); border-bottom: 1px solid rgba(215,189,115,0.13); text-align: center; background: linear-gradient(180deg, rgba(18,23,24,0.97), rgba(10,14,16,0.98)); }
-.touch-guard-content p { margin-top: 8px; color: #87918d; font-size: 11px; }
-.touch-guard-content h3 { margin-top: 7px; }
-.unlock-button { width: 100%; margin-top: 18px; color: #121511; border: 1px solid #d7bd73; background: linear-gradient(180deg, #d9c17d, #b79c57); }
-
-.waiting-screen { width: min(520px, calc(100% - 36px)); height: 100%; margin: 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
-.waiting-symbol { width: 56px; height: 56px; display: grid; place-items: center; margin-bottom: 17px; color: #d7bd73; border: 1px solid rgba(215,189,115,0.35); font-size: 13px; font-weight: 900; letter-spacing: 0.12em; }
-.waiting-screen h2 { margin-top: 9px; }
-.waiting-screen p { max-width: 390px; margin-top: 10px; color: #828d88; font-size: 11px; }
-.waiting-screen .secondary-action, .waiting-screen .primary-action { margin-top: 20px; }
-
-.modal { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; }
-.modal.hidden { display: none; }
-.modal-backdrop { position: absolute; inset: 0; background: rgba(2,5,7,0.84); backdrop-filter: blur(10px); }
-.modal-window { position: relative; z-index: 1; width: min(500px, 100%); max-height: min(80dvh, 620px); overflow: auto; padding: 22px; border-top: 1px solid rgba(215,189,115,0.40); border-bottom: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, #12181a, #0c1012); box-shadow: 0 20px 60px rgba(0,0,0,0.45); }
-.modal-window h2 { margin-top: 8px; }
-.modal-window > p { margin-top: 10px; color: #929c98; font-size: 11px; line-height: 1.6; }
-.modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
-.modal-info-list { margin-top: 12px; color: #9aa39f; font-size: 11px; line-height: 1.65; }
-.modal-info-list strong { color: #d1d8d4; }
-
-.toast { position: fixed; z-index: 1200; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translate(-50%, 15px); max-width: calc(100% - 28px); padding: 10px 13px; color: #dfe5e2; border: 1px solid rgba(255,255,255,0.10); background: rgba(15,20,22,0.96); box-shadow: 0 12px 30px rgba(0,0,0,0.35); font-size: 10px; font-weight: 800; letter-spacing: 0.04em; opacity: 0; pointer-events: none; transition: opacity 180ms ease, transform 180ms ease; }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
-
-.hidden { display: none !important; }
-
-@media (max-width: 760px) {
-  .app-header { height: 60px; }
-  #appMain { height: calc(100dvh - 60px); }
-  .brand-symbol { width: 30px; height: 30px; }
-  .brand-title { font-size: 10px; }
-  .brand-subtitle { font-size: 7px; }
-  .match-status { display: none; }
-  .screen-heading { height: 68px; padding: 8px 14px; }
-  .screen-heading h2 { font-size: 19px; }
-  .tactical-header { height: 66px; padding: 8px 11px 8px 14px; }
-  .tactical-heading h2 { max-width: 34vw; font-size: 16px; }
-  .tactical-content { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; height: calc(100% - 66px); padding: 8px; gap: 8px; }
-  .tactical-map { min-height: 0; }
-  .tactical-side { min-height: 0; grid-template-columns: 1fr; grid-template-rows: auto auto auto; }
-  .radio-console { min-height: 0; }
-  .ptt-button { min-height: 70px; }
-  .tactical-actions { display: grid; grid-template-columns: 1fr 1fr; }
-  .touch-guard { inset: 66px 0 0; }
-  .form-grid, .team-grid, .module-grid { grid-template-columns: 1fr; }
-  .field-wide { grid-column: auto; }
-  .dev-segmented { flex-wrap: wrap; }
-  .dev-segment { min-width: 0; }
-  .dev-actions { grid-template-columns: 1fr; }
-  .organizer-actions { flex-direction: column; }
+function escapeHTML(value) {
+  return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
-@media (max-width: 430px) {
-  body { font-size: 13px; }
-  .app-header { padding-left: 11px; padding-right: 11px; }
-  .brand-title { letter-spacing: 0.10em; }
-  .dev-button { padding: 0 9px; }
-  .screen-role { padding: 16px; }
-  .role-option { min-height: 84px; grid-template-columns: 28px 1fr 15px; gap: 9px; padding: 12px; }
-  .role-option-content small { font-size: 10px; }
-  .screen-heading { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
-  .screen-heading h2 { font-size: 17px; }
-  .header-action, .back-button { padding: 0 8px; font-size: 8px; }
-  .player-home-content, .preparation-content, .detail-content, .organizer-content, .dev-content { padding-left: 12px; padding-right: 12px; }
-  .match-info-grid { grid-template-columns: 1fr 1fr; }
-  .player-summary-line { grid-template-columns: 1fr 1fr; }
-  .player-summary-line strong { justify-self: end; }
-  .tactical-header-actions { gap: 4px; }
-  .tactical-top-action, .tactical-header-actions .small-action { padding-left: 7px; padding-right: 7px; font-size: 7px; }
-  .tactical-side { gap: 7px; }
-  .tactical-status-strip strong { font-size: 10px; }
-  .modal-actions { grid-template-columns: 1fr; }
+function formatDate(date) {
+  if (!date) return "—";
+  const parts = date.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : date;
 }
 
-@supports (padding: max(0px)) {
-  .app-header { padding-top: env(safe-area-inset-top); height: calc(66px + env(safe-area-inset-top)); }
-  #appMain { height: calc( 100dvh - 66px - env(safe-area-inset-top) ); }
-  .screen-heading, .tactical-header { padding-top: max( 8px, env(safe-area-inset-top) ); }
+function formatDuration(minutes) {
+  if (!minutes) return "—";
+  const value = Number(minutes);
+  if (value < 60) return `${value} min`;
+  const hours = Math.floor(value / 60);
+  const rest = value % 60;
+  return rest ? `${hours}h ${rest}min` : `${hours}h`;
 }
 
-@media (pointer: coarse) {
-  button, .role-option, .check-line, .toggle-line, .module-option { touch-action: manipulation; }
-  .ptt-button, .unlock-button { user-select: none; -webkit-user-select: none; touch-action: none; }
+function formatTimer(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(total / 60);
+  const secs = total % 60;
+  return String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+function getStatusLabel(status) {
+  const labels = { none: "SEM PARTIDA", scheduled: "AGENDADA", live: "AO VIVO", ended: "ENCERRADA" };
+  return labels[status] || "SEM PARTIDA";
 }
+
+function showToast(message) {
+  const toast = $("#toast");
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { toast.classList.remove("show"); }, 2800);
+}
+
+/* ============================================================
+   NAVEGAÇÃO (REFEITA PRO SEU FLUXO)
+============================================================ */
+
+function showScreen(screenName, remember = true) {
+  const target = $(`[data-screen="${screenName}"]`);
+  if (!target) return;
+
+  if (remember && currentScreen !== screenName && screenName !== 'dev') {
+    previousScreen = currentScreen;
+  } else if (remember && screenName === 'dev') {
+    previousScreen = state.role === "organizer" ? "organizer" : "player-home";
+  }
+
+  currentScreen = screenName;
+  $$(".screen").forEach(screen => screen.classList.remove("active"));
+  target.classList.add("active");
+  window.scrollTo({ top: 0, behavior: "instant" });
+  render();
+}
+
+function goBack() {
+  if (previousScreen === "previous" || previousScreen === currentScreen) {
+    showScreen(state.role === "organizer" ? "organizer" : "player-home", false);
+    return;
+  }
+  showScreen(previousScreen, false);
+}
+
+function selectRole(role) {
+  if (role !== "player" && role !== "organizer") return;
+  state.role = role;
+  state.dev.lastRole = role;
+  persist();
+  showScreen(role === "player" ? "player-home" : "organizer", false);
+}
+
+function renderGlobalHeader() {
+  const status = $("#globalMatchStatus");
+  if (!status) return;
+  status.textContent = getStatusLabel(state.match.exists ? state.match.status : "none");
+  status.className = "match-status";
+  if (state.match.status === "live") status.classList.add("live");
+  else if (state.match.status === "scheduled") status.classList.add("scheduled");
+  else if (state.match.status === "ended") status.classList.add("ended");
+  else status.classList.add("neutral");
+}
+
+function render() {
+  renderGlobalHeader();
+  renderPlayer();
+  renderPlayerDetails();
+  renderOrganizer();
+  renderDev();
+  renderTactical();
+  renderWaiting(); // Adicionado aqui
+}
+
+/* ============================================================
+   JOGADOR E TELA WAITING (REVISADO)
+============================================================ */
+
+function renderPlayer() {
+  const hasMatch = state.match.exists && state.match.status !== "ended";
+  const name = $("#playerMatchName");
+  const stateLabel = $("#playerMatchState");
+  if (!name || !stateLabel) return;
+
+  if (!state.match.exists) {
+    name.textContent = "Nenhuma partida cadastrada";
+    stateLabel.textContent = "SEM PARTIDA";
+  } else {
+    name.textContent = state.match.name || "Partida sem nome";
+    stateLabel.textContent = getStatusLabel(state.match.status);
+  }
+
+  setText("#playerMatchDate", formatDate(state.match.date));
+  setText("#playerMatchTime", state.match.time || "—");
+  setText("#playerMatchLocation", state.match.location || "—");
+  setText("#playerMatchMap", state.match.map || "—");
+  setText("#playerMatchMode", state.match.mode || "—");
+  setText("#playerMatchDuration", formatDuration(state.match.duration));
+  setText("#playerDisplayName", state.player.name);
+  setText("#playerDisplayTeam", getTeamName(state.player.team));
+
+  const scheduledActions = $("#playerScheduledActions");
+  const liveActions = $("#playerLiveActions");
+  const enterActions = $("#playerEnterActions");
+
+  if (scheduledActions) scheduledActions.classList.toggle("hidden", !(hasMatch && state.match.status === "scheduled"));
+  if (liveActions) liveActions.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && !state.player.entryRequested && !state.player.participation));
+  if (enterActions) enterActions.classList.toggle("hidden", !(hasMatch && state.match.status === "live" && (state.player.entryRequested || state.player.participation)));
+
+  let participationText = "Aguardando confirmação";
+  let participationBadge = "AGUARDANDO";
+
+  if (state.player.participation) {
+    participationText = "Participação confirmada";
+    participationBadge = "CONFIRMADO";
+  } else if (state.player.entryRequested) {
+    participationText = "Entrada solicitada";
+    participationBadge = "SOLICITADA";
+  }
+
+  setText("#playerParticipationStatus", participationText);
+  setText("#playerParticipationBadge", participationBadge);
+}
+
+function confirmPresence() {
+  if (!state.match.exists) return showToast("Não há partida cadastrada.");
+  if (state.match.status !== "scheduled") return showToast("A partida não está em estado agendado.");
+  state.player.participation = true;
+  state.player.entryRequested = false;
+  addEvent("player", "Presença confirmada");
+  persist();
+  renderPreparation(); 
+  showScreen("player-preparation");
+  render();
+  showToast("Presença confirmada.");
+}
+
+function requestEntry() {
+  if (!state.match.exists) return showToast("Não há partida disponível.");
+  if (state.match.status !== "live") return showToast("A partida ainda não está ao vivo.");
+  state.player.entryRequested = true;
+  addEvent("player", "Entrada solicitada");
+  persist();
+  showScreen("waiting");
+  render();
+  showToast("Solicitação enviada.");
+}
+
+function enterMatch() {
+  if (!state.match.exists) return showToast("Nenhuma partida disponível.");
+  if (state.match.status !== "live") return showToast("A partida ainda não foi iniciada.");
+  if (!state.player.briefingAck && state.player.participation) {
+      showScreen("player-preparation");
+      showToast("Confirme o briefing da operação antes de avançar.");
+      return;
+  }
+  state.player.participation = true;
+  state.player.entryRequested = false;
+  addEvent("player", "Jogador entrou na partida");
+  persist();
+  showScreen("tactical");
+  render();
+  showToast("Entrada autorizada.");
+}
+
+function renderPreparation() {
+  setText("#preparationMatchName", state.match.name || "—");
+  setText("#preparationStatus", getStatusLabel(state.match.status));
+  setText("#preparationBriefingTitle", state.organizer.briefingTitle || "Briefing");
+  setText("#preparationBriefingText", state.organizer.briefingText || "—");
+  const checkbox = $("#playerBriefingAck");
+  if (checkbox) checkbox.checked = !!state.player.briefingAck;
+}
+
+function acknowledgeBriefing() {
+  const checkbox = $("#playerBriefingAck");
+  if (!checkbox) return;
+  state.player.briefingAck = checkbox.checked;
+  persist();
+  render();
+}
+
+function enterFromPreparation() {
+  if (!state.player.briefingAck) return showToast("Confirme a leitura do briefing.");
+  if (state.match.status !== "live") return showToast("A partida ainda não foi iniciada.");
+  enterMatch();
+}
+
+function openPlayerDetails() { showScreen("player-details"); }
+
+function renderPlayerDetails() {
+  setText("#detailInicioStatus", state.match.exists ? getStatusLabel(state.match.status) : "Aguardando partida");
+  setText("#detailInicioText", state.match.exists ? (state.match.status === "live" ? "A partida está ao vivo." : "A partida está programada.") : "As informações da partida aparecerão aqui assim que o organizador salvar uma programação.");
+  setText("#detailPlayerName", state.player.name);
+  setText("#detailPlayerId", state.player.id);
+  setText("#detailPlayerTeam", getTeamName(state.player.team));
+  setText("#detailPlayerClass", state.player.class);
+  setText("#detailBriefingTitle", state.organizer.briefingTitle || "Nenhum briefing disponível");
+  setText("#detailBriefingText", state.organizer.briefingText || "O organizador ainda não cadastrou o briefing.");
+  setText("#profileName", state.player.name);
+  setText("#profileId", state.player.id);
+  setText("#profileTeam", getTeamName(state.player.team));
+  setText("#profileClass", state.player.class);
+  setText("#profileRadioStatus", state.player.radio ? "ATIVO" : "DESATIVADO");
+  const ack = $("#detailBriefingAck");
+  if (ack) ack.checked = !!state.player.briefingAck;
+}
+
+function switchDetailTab(tab) {
+  const validTabs = ["inicio", "briefing", "perfil"];
+  if (!validTabs.includes(tab)) return;
+  $$(".detail-tab").forEach(b => b.classList.toggle("active", b.dataset.detailTab === tab));
+  $$("[data-detail-content]").forEach(c => c.classList.toggle("active", c.dataset.detailContent === tab));
+}
+
+/* ============================================================
+   WAITING SCREEN (A INTELIGÊNCIA DA ESPERA AQUI)
+============================================================ */
+
+function renderWaiting() {
+  if (currentScreen !== "waiting") return;
+  const waitingText = $("#waitingText");
+  const waitingBtn = $("#waitingBackButton");
+  const waitingTitle = $("#waitingTitle");
+  if (!waitingText || !waitingBtn) return;
+
+  if (state.player.participation) {
+    waitingTitle.textContent = "ENTRADA AUTORIZADA";
+    waitingText.textContent = "O organizador liberou seu acesso ao terminal da partida.";
+    waitingBtn.textContent = "IR PARA PAINEL TÁTICO";
+    waitingBtn.classList.replace("secondary-action", "primary-action");
+  } else {
+    waitingTitle.textContent = "AGUARDANDO AUTORIZAÇÃO";
+    waitingText.textContent = "Aguarde a liberação da partida pelo organizador.";
+    waitingBtn.textContent = "VOLTAR AO PAINEL";
+    waitingBtn.classList.replace("primary-action", "secondary-action");
+  }
+}
+
+$("#waitingBackButton")?.addEventListener("click", () => {
+    if (state.player.participation) enterMatch();
+    else showScreen("player-home");
+});
+
+/* ============================================================
+   ORGANIZADOR (Fluxo modificado a seu pedido)
+============================================================ */
+
+function readOrganizerForm() {
+  state.match.name = valueOf("#orgMatchName");
+  state.match.date = valueOf("#orgMatchDate");
+  state.match.time = valueOf("#orgMatchTime");
+  state.match.location = valueOf("#orgMatchLocation");
+  state.match.map = valueOf("#orgMatchMap") || "Complexo Industrial";
+  state.match.mode = valueOf("#orgMatchMode") || "Simulação";
+  state.match.duration = numberValue("#orgMatchDuration", 60);
+  state.match.checkInTime = valueOf("#orgCheckInTime");
+  state.organizer.briefingTitle = valueOf("#orgBriefingTitle") || "Briefing da Operação";
+  state.organizer.briefingText = valueOf("#orgBriefingText") || "";
+  state.organizer.objective = valueOf("#orgObjective") || "";
+  state.organizer.teamBlueName = valueOf("#orgTeamBlueName") || "Equipe Azul";
+  state.organizer.teamBlueLimit = numberValue("#orgTeamBlueLimit", 20);
+  state.organizer.teamRedName = valueOf("#orgTeamRedName") || "Equipe Vermelha";
+  state.organizer.teamRedLimit = numberValue("#orgTeamRedLimit", 20);
+  state.organizer.participates = checkedOf("#orgOrganizerParticipates");
+  state.modules.medical = checkedOf("#moduleMedical");
+  state.modules.zone = checkedOf("#moduleZone");
+  state.modules.score = checkedOf("#moduleScore");
+  state.modules.tracking = checkedOf("#moduleTracking");
+  state.modules.objectives = checkedOf("#moduleObjectives");
+  state.modules.events = checkedOf("#moduleEvents");
+}
+
+function writeOrganizerForm() {
+  setValue("#orgMatchName", state.match.name); setValue("#orgMatchDate", state.match.date); setValue("#orgMatchTime", state.match.time); setValue("#orgMatchLocation", state.match.location); setValue("#orgMatchMap", state.match.map); setValue("#orgMatchMode", state.match.mode); setValue("#orgMatchDuration", state.match.duration); setValue("#orgCheckInTime", state.match.checkInTime);
+  setValue("#orgBriefingTitle", state.organizer.briefingTitle); setValue("#orgBriefingText", state.organizer.briefingText); setValue("#orgObjective", state.organizer.objective);
+  setValue("#orgTeamBlueName", state.organizer.teamBlueName); setValue("#orgTeamBlueLimit", state.organizer.teamBlueLimit); setValue("#orgTeamRedName", state.organizer.teamRedName); setValue("#orgTeamRedLimit", state.organizer.teamRedLimit);
+  setChecked("#orgOrganizerParticipates", state.organizer.participates);
+  setChecked("#moduleMedical", state.modules.medical); setChecked("#moduleZone", state.modules.zone); setChecked("#moduleScore", state.modules.score); setChecked("#moduleTracking", state.modules.tracking); setChecked("#moduleObjectives", state.modules.objectives); setChecked("#moduleEvents", state.modules.events);
+}
+
+function renderOrganizer() {
+  writeOrganizerForm();
+  setText("#organizerMatchStateText", state.match.exists ? `STATUS: ${getStatusLabel(state.match.status)}` : "Nenhuma partida salva.");
+  
+  // Como pedido, o botão INICIAR fica escondido dentro da configuração, substituído pela lógica do salvar/agendar. 
+  // No painel do organizador original, "Salvar" que dita se vai Iniciar.
+}
+
+function saveMatch() {
+  if (state.role !== "organizer") return showToast("Somente o organizador pode salvar a partida.");
+  readOrganizerForm();
+  if (!state.match.name.trim()) return showToast("Informe o nome da partida.");
+  if (!state.match.date) return showToast("Informe a data da partida.");
+  if (!state.match.time) return showToast("Informe o horário da partida.");
+  if (!state.match.location.trim()) return showToast("Informe o local da partida.");
+
+  const wasLive = state.match.status === "live";
+  state.match.exists = true;
+  if (!wasLive) state.match.status = "scheduled";
+  addEvent("organizer", "Partida salva");
+  persist();
+  render();
+  openSaveConfirmation();
+}
+
+function openSaveConfirmation() {
+  const modal = $("#saveConfirmModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeSaveConfirmation() {
+  const modal = $("#saveConfirmModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function startMatch(source = "organizer") {
+  if (state.role !== "organizer" && source !== "dev") return showToast("Somente o organizador pode iniciar a partida.");
+  if (!state.match.exists) return showToast("Salve uma partida antes de iniciar.");
+  if (state.match.status !== "scheduled" && source !== "dev") return showToast("A partida não está agendada.");
+
+  state.match.status = "live";
+  state.match.startedAt = Date.now();
+  state.match.elapsedSeconds = 0;
+  
+  // Autoriza magicamente se o organizador starta a partida pro player e for no mesmo device.
+  if (state.player.entryRequested) state.player.participation = true;
+
+  addEvent("organizer", "Partida iniciada");
+  persist();
+
+  // A MÁGICA SOLICITADA AQUI:
+  if (state.role === "organizer") {
+      if (state.organizer.participates) {
+          showScreen("tactical");
+      } else {
+          showScreen("organizer");
+      }
+  }
+  render();
+  showToast("Partida iniciada.");
+}
+
+function endMatch(source = "organizer") {
+  if (state.role !== "organizer" && source !== "dev") return showToast("Somente o organizador pode encerrar a partida.");
+  if (!state.match.exists) return showToast("Não existe partida ativa.");
+  if (state.match.status !== "live") return showToast("A partida não está ao vivo.");
+  
+  state.match.status = "ended";
+  updateElapsedTime();
+  addEvent("organizer", "Partida encerrada");
+  persist();
+  showScreen(state.role === "organizer" ? "organizer" : "player-home");
+  render();
+  showToast("Partida encerrada.");
+}
+
+/* ============================================================
+   DEV
+============================================================ */
+
+function renderDev() {
+  const playersInput = $("#devPlayersPerTeam");
+  if (playersInput && document.activeElement !== playersInput) playersInput.value = state.simulatedPlayers.perTeam;
+  updateDevPreview();
+  $$(".dev-segment[data-dev-role]").forEach(b => b.classList.toggle("active", b.dataset.devRole === state.role));
+  $$(".dev-segment[data-dev-status]").forEach(b => b.classList.toggle("active", b.dataset.devStatus === state.match.status));
+}
+
+function switchDevRole(role) {
+  if (role !== "player" && role !== "organizer") return;
+  state.role = role;
+  state.dev.lastRole = role;
+  persist();
+  render();
+  showToast(role === "player" ? "DEV: jogador" : "DEV: organizador");
+}
+
+function setDevStatus(status) {
+  const valid = ["scheduled", "live", "ended"];
+  if (!valid.includes(status)) return;
+  if (!state.match.exists) generateDevMatch(false);
+  
+  state.match.status = status;
+  if (status === "live" && !state.match.startedAt) state.match.startedAt = Date.now();
+  if (status !== "live") state.match.startedAt = null;
+  if (status === "ended") state.match.elapsedSeconds = 0;
+  
+  // Se DEV muda pra live, simula aprovação se jogador tiver pedido pra testar
+  if (status === "live" && state.player.entryRequested) state.player.participation = true;
+
+  persist();
+  render();
+  showToast(`DEV: ${getStatusLabel(status)}`);
+}
+
+function updateDevPreview() {
+  const input = $("#devPlayersPerTeam");
+  const value = input ? Math.max(0, Math.floor(Number(input.value) || 0)) : state.simulatedPlayers.perTeam;
+  setText("#devBlueCount", value); setText("#devRedCount", value); setText("#devTotalCount", value * 2);
+}
+
+function applyDevPlayers() {
+  const input = $("#devPlayersPerTeam");
+  if (!input) return;
+  const amount = Math.max(0, Math.min(500, Math.floor(Number(input.value) || 0)));
+  state.simulatedPlayers.perTeam = amount;
+  state.simulatedPlayers.blue = createSimulatedTeam("AZ", amount);
+  state.simulatedPlayers.red = createSimulatedTeam("VM", amount);
+  addEvent("dev", `${amount} jogadores simulados por equipe`);
+  persist();
+  render();
+  showToast(`${amount} por equipe aplicados.`);
+}
+
+function createSimulatedTeam(prefix, amount) {
+  const players = [];
+  for (let i = 1; i <= amount; i++) players.push({ id: `${prefix}-${String(i).padStart(3, "0")}`, name: `${prefix} ${String(i).padStart(3, "0")}` });
+  return players;
+}
+
+function generateDevMatch(showMessage = true) {
+  state.match.exists = true; state.match.name = "Operação Red Sand"; state.match.status = "scheduled";
+  state.match.date = getTodayISO(); state.match.time = "19:00"; state.match.location = "Complexo Industrial"; state.match.map = "Complexo Industrial";
+  state.match.mode = "Simulação"; state.match.duration = 60; state.match.checkInTime = "18:30"; state.match.startedAt = null; state.match.elapsedSeconds = 0;
+  state.organizer.briefingTitle = "Briefing da Operação"; state.organizer.briefingText = "Objetivo, regras da partida, condições de participação e orientações gerais.";
+  state.organizer.objective = "Acompanhar os objetivos definidos pelo organizador."; state.organizer.teamBlueName = "Equipe Azul"; state.organizer.teamRedName = "Equipe Vermelha";
+  addEvent("dev", "Partida de teste gerada");
+  persist();
+  render();
+  if (showMessage) showToast("Partida de teste criada.");
+}
+
+function devStartMatch() { state.role = "organizer"; if (!state.match.exists) generateDevMatch(false); startMatch("dev"); }
+function devEndMatch() { endMatch("dev"); }
+
+function resetAllState() {
+  if (!window.confirm("Resetar todos os dados persistentes da partida?")) return;
+  state = createInitialState();
+  persist();
+  currentScreen = "role-select";
+  previousScreen = "player-home";
+  showScreen("role-select", false);
+  render();
+  showToast("Dados resetados.");
+}
+
+function buildPresenceText() {
+  const blue = state.simulatedPlayers.blue || []; const red = state.simulatedPlayers.red || [];
+  const blueName = state.organizer.teamBlueName || "Equipe Azul"; const redName = state.organizer.teamRedName || "Equipe Vermelha";
+  const playerStatus = state.player.participation ? "confirmado" : state.player.entryRequested ? "solicitação enviada" : "aguardando";
+  return `${escapeHTML(blueName)}: ${blue.length} jogadores simulados • ${escapeHTML(redName)}: ${red.length} jogadores simulados • ${escapeHTML(state.player.name)}: ${playerStatus}`.replace(/\s+/g, " ").trim();
+}
+
+/* ============================================================
+   PAINEL TÁTICO E TRAVA
+============================================================ */
+
+function renderTactical() {
+  setText("#tacticalMatchName", state.match.name || "SEM PARTIDA"); setText("#tacticalMapName", state.match.map || "Complexo Industrial");
+  setText("#tacticalObjective", state.organizer.objective || "Aguardando briefing."); setText("#tacticalStatus", getStatusLabel(state.match.status));
+  setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds)); setText("#tacticalPlayerCount", getTotalPlayerCount());
+  setText("#radioChannel", String(state.player.channel).padStart(2, "0"));
+
+  const radioToggle = $("#radioToggle");
+  if (radioToggle) {
+    radioToggle.textContent = state.player.radio ? "ON" : "OFF";
+    radioToggle.classList.toggle("active", state.player.radio);
+  }
+  const volume = $("#radioVolume"); if (volume) volume.value = state.player.radioVolume;
+
+  const organizerEnd = $("#tacticalOrganizerEnd");
+  const playerLeave = $("#tacticalPlayerLeave");
+
+  // O organizador sai pelo End, e o jogador abandona
+  if (organizerEnd) organizerEnd.classList.toggle("hidden", !(state.role === "organizer" && state.match.status === "live"));
+  if (playerLeave) playerLeave.classList.toggle("hidden", !(state.role === "player" && state.match.status === "live"));
+
+  const lockButton = $("#tacticalLockButton");
+  if (lockButton) lockButton.textContent = "BLOQUEAR";
+}
+
+function getTotalPlayerCount() {
+  return (Number(state.simulatedPlayers.perTeam || 0) * 2) + (state.player.participation ? 1 : 0);
+}
+
+function unlockStart() {
+  if (unlockStarted) return;
+  unlockStarted = true;
+  const guard = $("#touchGuard");
+  if (!guard) return;
+  unlockTimer = setTimeout(() => {
+    guard.classList.add("hidden");
+    unlockStarted = false;
+    showToast("Painel desbloqueado.");
+  }, 900);
+}
+
+function unlockCancel() {
+  clearTimeout(unlockTimer);
+  unlockStarted = false;
+}
+
+function lockTacticalPanel() {
+  const guard = $("#touchGuard");
+  if (!guard) return;
+  guard.classList.remove("hidden");
+  showToast("Painel bloqueado.");
+}
+
+/* ============================================================
+   RÁDIO / GPS / EXTRAS
+============================================================ */
+
+function toggleRadio() { state.player.radio = !state.player.radio; persist(); render(); showToast(state.player.radio ? "Rádio ativado." : "Rádio desativado."); }
+function changeChannel(delta) { let channel = Number(state.player.channel) || 1; channel += delta; if (channel < 1) channel = 1; if (channel > 99) channel = 99; state.player.channel = channel; persist(); render(); }
+function changeVolume(value) { state.player.radioVolume = Math.max(0, Math.min(100, Number(value) || 0)); persist(); }
+function radioPushStart() { if (!state.player.radio) return showToast("Rádio desligado."); clearTimeout(radioPushTimer); setText("#radioFeedback", "TRANSMITINDO..."); $("#pttButton")?.classList.add("transmitting"); }
+function radioPushEnd() { clearTimeout(radioPushTimer); setText("#radioFeedback", "RÁDIO PRONTO"); $("#pttButton")?.classList.remove("transmitting"); }
+
+function requestGPS() {
+  if (!navigator.geolocation) return setGPSStatus("GPS INDISPONÍVEL");
+  setGPSStatus("LOCALIZANDO...");
+  navigator.geolocation.getCurrentPosition(
+    (position) => { state.gps.lat = position.coords.latitude; state.gps.lng = position.coords.longitude; state.gps.accuracy = position.coords.accuracy; state.gps.ready = true; persist(); setGPSStatus(`GPS ±${Math.round(position.coords.accuracy)}m`); },
+    () => { state.gps.lat = DEMO_CENTER.lat; state.gps.lng = DEMO_CENTER.lng; state.gps.ready = false; persist(); setGPSStatus("GPS INDISPONÍVEL"); },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+  );
+}
+
+function setGPSStatus(text) { setText("#tacticalGpsStatus", text); }
+function openObjectives() { openAppModal("OBJETIVOS", "OBJETIVOS DA PARTIDA", `<div class="modal-info-list"><p><strong>SETOR ALFA</strong> — ${escapeHTML(state.objectives.alfa.control)}</p><p><strong>SETOR BRAVO</strong> — ${escapeHTML(state.objectives.bravo.control)}</p></div>`); }
+function openInstructions() { openAppModal("INSTRUÇÕES", "ORIENTAÇÕES DA PARTIDA", `<p>Consulte o briefing para as regras da partida.</p><p><strong>Briefing:</strong> ${escapeHTML(state.organizer.briefingTitle || "Não definido")}</p><p>${escapeHTML(state.organizer.briefingText || "Nenhuma orientação cadastrada.")}</p>`); }
+
+function leaveMatch() {
+  if (state.role !== "player" || state.match.status !== "live") return showToast("Não há partida para abandonar.");
+  if (!window.confirm("Abandonar a partida atual?")) return;
+  state.player.participation = false; state.player.entryRequested = false;
+  addEvent("player", "Jogador abandonou a partida");
+  persist(); showScreen("player-home"); render(); showToast("Você saiu da partida.");
+}
+
+function openAppModal(kicker, title, body) {
+  const modal = $("#appModal"); if (!modal) return;
+  setText("#appModalKicker", kicker); setText("#appModalTitle", title);
+  const content = $("#appModalBody"); if (content) content.innerHTML = body;
+  modal.classList.remove("hidden"); modal.setAttribute("aria-hidden", "false");
+}
+function closeAppModal() { const modal = $("#appModal"); if (!modal) return; modal.classList.add("hidden"); modal.setAttribute("aria-hidden", "true"); }
+
+function updateElapsedTime() {
+  if (state.match.status !== "live" || !state.match.startedAt) return;
+  state.match.elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.match.startedAt) / 1000));
+}
+setInterval(() => {
+  if (state.match.status === "live" && state.match.startedAt) {
+    updateElapsedTime(); setText("#tacticalTimer", formatTimer(state.match.elapsedSeconds));
+  }
+}, 1000);
+
+function addEvent(source, description) {
+  state.events.push({ source, description, timestamp: Date.now() });
+  if (state.events.length > 200) state.events = state.events.slice(-200);
+}
+
+function valueOf(selector) { const element = $(selector); return element ? element.value : ""; }
+function setValue(selector, value) { const element = $(selector); if (element) element.value = value ?? ""; }
+function checkedOf(selector) { const element = $(selector); return !!(element && element.checked); }
+function setChecked(selector, value) { const element = $(selector); if (element) element.checked = !!value; }
+function numberValue(selector, fallback) { const value = Number(valueOf(selector)); return Number.isFinite(value) ? value : fallback; }
+function setText(selector, text) { const element = $(selector); if (element) element.textContent = text ?? ""; }
+function getTeamName(team) { if (team === "azul") return state.organizer.teamBlueName || "Equipe Azul"; if (team === "vermelha") return state.organizer.teamRedName || "Equipe Vermelha"; return "—"; }
+function getTodayISO() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
+
+/* ============================================================
+   EVENT LISTENERS
+============================================================ */
+
+document.addEventListener("click", (event) => {
+  const roleChoice = event.target.closest("[data-role-choice]"); if (roleChoice) { selectRole(roleChoice.dataset.roleChoice); return; }
+  const backButton = event.target.closest("[data-back-screen]"); if (backButton) { const target = backButton.dataset.backScreen; if (target === "previous") goBack(); else showScreen(target); return; }
+  const detailTab = event.target.closest("[data-detail-tab]"); if (detailTab) { switchDetailTab(detailTab.dataset.detailTab); return; }
+  const devRole = event.target.closest("[data-dev-role]"); if (devRole) { switchDevRole(devRole.dataset.devRole); return; }
+  const devStatus = event.target.closest("[data-dev-status]"); if (devStatus) { setDevStatus(devStatus.dataset.devStatus); return; }
+});
+
+$("#devButton")?.addEventListener("click", () => showScreen("dev"));
+$("#playerConfirmPresence")?.addEventListener("click", confirmPresence);
+$("#playerRequestEntry")?.addEventListener("click", requestEntry);
+$("#playerEnterMatch")?.addEventListener("click", enterMatch);
+$("#playerDetailsButton")?.addEventListener("click", openPlayerDetails);
+$("#playerPreparationEnter")?.addEventListener("click", enterFromPreparation);
+$("#playerBriefingAck")?.addEventListener("change", acknowledgeBriefing);
+$("#detailBriefingAck")?.addEventListener("change", (event) => { state.player.briefingAck = event.target.checked; persist(); });
+
+$("#organizerSaveButton")?.addEventListener("click", saveMatch);
+$("#organizerEndButton")?.addEventListener("click", () => endMatch("organizer"));
+$("#saveConfirmContinue")?.addEventListener("click", closeSaveConfirmation);
+$("#saveConfirmEnter")?.addEventListener("click", () => { closeSaveConfirmation(); startMatch("organizer"); });
+
+$("#tacticalOrganizerEnd")?.addEventListener("click", () => endMatch("organizer"));
+$("#tacticalPlayerLeave")?.addEventListener("click", leaveMatch);
+$("#tacticalLockButton")?.addEventListener("click", lockTacticalPanel);
+$("#tacticalObjectivesButton")?.addEventListener("click", openObjectives);
+$("#tacticalInstructionsButton")?.addEventListener("click", openInstructions);
+
+const unlockButton = $("#unlockButton");
+if (unlockButton) {
+  unlockButton.addEventListener("pointerdown", (e) => { e.preventDefault(); unlockStart(); });
+  unlockButton.addEventListener("pointerup", unlockCancel);
+  unlockButton.addEventListener("pointercancel", unlockCancel);
+  unlockButton.addEventListener("pointerleave", unlockCancel);
+}
+
+$("#radioToggle")?.addEventListener("click", toggleRadio);
+$("#channelDown")?.addEventListener("click", () => changeChannel(-1));
+$("#channelUp")?.addEventListener("click", () => changeChannel(1));
+$("#radioVolume")?.addEventListener("input", (e) => changeVolume(e.target.value));
+
+const pttButton = $("#pttButton");
+if (pttButton) {
+  pttButton.addEventListener("pointerdown", (e) => { e.preventDefault(); radioPushStart(); });
+  pttButton.addEventListener("pointerup", radioPushEnd);
+  pttButton.addEventListener("pointercancel", radioPushEnd);
+  pttButton.addEventListener("pointerleave", radioPushEnd);
+}
+
+$("#devPlayersPerTeam")?.addEventListener("input", updateDevPreview);
+$("#devApplyPlayers")?.addEventListener("click", applyDevPlayers);
+$("#devGenerateMatch")?.addEventListener("click", () => generateDevMatch(true));
+$("#devStartMatch")?.addEventListener("click", devStartMatch);
+$("#devEndMatch")?.addEventListener("click", devEndMatch);
+$("#devReset")?.addEventListener("click", resetAllState);
+
+$("#appModalClose")?.addEventListener("click", closeAppModal);
+$("#appModal .modal-backdrop")?.addEventListener("click", closeAppModal);
+
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeAppModal(); closeSaveConfirmation(); } });
+
+function initialize() {
+  const hasPersistentSession = localStorage.getItem(STORAGE_KEY);
+  if (hasPersistentSession) { showScreen(state.role === "organizer" ? "organizer" : "player-home", false); } 
+  else { state.role = "player"; showScreen("role-select", false); }
+  persist(); requestGPS(); render();
+}
+
+initialize();
