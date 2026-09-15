@@ -557,7 +557,7 @@ body {
 .map-card { padding-bottom: 10px; }
 .map-viewport {
   position: relative;
-  background: #161812;
+  background: #0e100c;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -1212,4 +1212,29 @@ body {
   font-size: 11px;
   margin-bottom: 8px;
   font-family: inherit;
+}
+
+
+/* Radio olive tone */
+.radio-compact, .radio-card {
+  background: linear-gradient(165deg, #1a2218 0%, #141a14 100%) !important;
+  border-color: #2a3a28 !important;
+}
+.radio-compact .ptt-btn {
+  border-color: #4a6a42;
+  color: #8aba7a;
+}
+.radio-compact .ptt-btn.transmitting {
+  background: rgba(106, 154, 90, 0.2);
+  border-color: #6a9a5a;
+  color: #c8e8b8;
+  box-shadow: 0 0 14px rgba(106, 154, 90, 0.25);
+}
+.radio-toggle.on {
+  color: #8aba7a;
+  border-color: #6a9a5a;
+  background: rgba(26, 40, 24, 0.9);
+}
+.radio-compact .vu-meter.active span {
+  background: linear-gradient(to top, #2a3a24, #5a8a4a, #a0d080) !important;
 }
