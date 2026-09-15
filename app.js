@@ -15,7 +15,7 @@ function initial() {
       briefText: "Objetivo, regras e orientações da partida.",
       objective: "Dominar setores e eliminar a força adversária.",
       blueName: "Equipe Azul", blueLimit: 20,
-      redName: "Equipe Vermelha", redLimit: 20, participates: false
+      redName: "Equipe Vermelha", redLimit: 20, participates: true
     },
     player: {
       id: "DF-001", name: "DANI", class: "Assalto", team: "azul",
@@ -130,6 +130,7 @@ function render() {
   renderPrep();
   renderTactical();
   renderOrganizer();
+  renderLobby();
   renderDetails();
 }
 
@@ -205,11 +206,23 @@ function renderTactical() {
   }
   if (!window._pttActive) updateVu(false);
 
-  setText("#killCount", `ELIMINAÇÕES: ${state.player.kills}/3`);
+  setText("#killCount", `ELIM ${state.player.kills}/3`);
   const ds = $("#droneStatus");
   if (ds) {
-    ds.textContent = state.map.droneReady ? "DRONE: POSIÇÕES DISPONÍVEIS" : "DRONE: STANDBY";
+    ds.textContent = state.map.droneReady ? "DRONE OK" : "DRONE STANDBY";
     ds.className = state.map.droneReady ? "ready" : "";
+  }
+  // placar
+  const sim = state.simulatedPlayers?.perTeam || 0;
+  const blueScore = state.player.team === "azul" ? state.player.kills : Math.floor(sim * 0.4);
+  const redScore = state.player.team === "vermelho" ? state.player.kills : Math.floor(sim * 0.35) + (state.player.team === "azul" ? 0 : state.player.kills);
+  setText("#scoreBlue", String(state.player.team === "azul" ? state.player.kills + sim : sim));
+  setText("#scoreRed", String(state.player.team !== "azul" ? state.player.kills + sim : Math.max(0, sim - 1)));
+  setText("#scoreKills", state.player.kills + " ELIM");
+  const pill = $("#tacLivePill");
+  if (pill) {
+    pill.textContent = state.match.status === "live" ? "ATIVO" : statusLabel(state.match.status);
+    pill.className = "state-pill " + (state.match.status === "live" ? "live" : "");
   }
 
   const isOrg = state.role === "organizer";
@@ -232,31 +245,29 @@ function renderOrganizer() {
   setVal("#oMap", m.map);
   setVal("#oMode", m.mode);
   setVal("#oDuration", m.duration);
-  setVal("#oCheckIn", m.checkIn || "");
-  setVal("#oBriefTitle", state.org.briefTitle);
   setVal("#oBriefText", state.org.briefText);
   setVal("#oObjective", state.org.objective);
   setVal("#oBlueName", state.org.blueName);
   setVal("#oBlueLimit", state.org.blueLimit);
   setVal("#oRedName", state.org.redName);
   setVal("#oRedLimit", state.org.redLimit);
-  const part = $("#oParticipates"); if (part) part.checked = !!state.org.participates;
-  const mods = state.modules || {};
-  const setC = (s, v) => { const el = $(s); if (el) el.checked = !!v; };
-  setC("#modMedical", mods.medical);
-  setC("#modZone", mods.zone);
-  setC("#modScore", mods.score);
-  setC("#modTrack", mods.tracking);
-  setC("#modObj", mods.objectives);
-  setC("#modEvents", mods.events);
-  // presence
-  const sim = state.simulatedPlayers?.perTeam || 0;
-  let presenceMsg = "Nenhum jogador confirmado.";
-  if (state.player.presence) presenceMsg = "1 jogador confirmado (você).";
-  if (sim > 0) presenceMsg = (state.player.presence ? 1 : 0) + sim * 2 + " presenças (incl. simulação).";
-  setText("#orgPresenceText", presenceMsg);
-  toggle("#oStart", m.exists && m.status === "scheduled");
   toggle("#oEnd", m.status === "live");
+}
+
+function renderLobby() {
+  setText("#lobbyMatchName", state.match.name || "Partida");
+  const sim = state.simulatedPlayers?.perTeam || 0;
+  const count = (state.player.presence ? 1 : 0) + sim * 2;
+  setText("#lobbyCount", String(count));
+  setText("#lobbyPresence", count ? count + " presença(s) confirmada(s)." : "Aguardando jogadores confirmarem.");
+  const link = location.origin + location.pathname + "?join=1&m=" + encodeURIComponent(state.match.name || "partida");
+  const input = $("#lobbyLink");
+  if (input) input.value = link;
+  const st = $("#lobbyStatus");
+  if (st) {
+    st.textContent = state.match.status === "live" ? "AO VIVO" : "AGUARDANDO";
+    st.className = "state-pill " + (state.match.status === "live" ? "live" : "scheduled");
+  }
 }
 
 function renderDetails() {
@@ -366,97 +377,110 @@ function drawMap() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // base ground
-  ctx.fillStyle = "#161812";
+  // ground
+  ctx.fillStyle = "#141610";
   ctx.fillRect(0, 0, w, h);
 
-  // streets (horizontal + vertical grid roads)
-  ctx.strokeStyle = "#2a2c26";
-  ctx.lineWidth = 10;
-  // main roads
-  ctx.beginPath(); ctx.moveTo(0, h * 0.35); ctx.lineTo(w, h * 0.35); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, h * 0.68); ctx.lineTo(w, h * 0.68); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.28, 0); ctx.lineTo(w * 0.28, h); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(w * 0.62, 0); ctx.lineTo(w * 0.62, h); ctx.stroke();
-  // road edge lines
-  ctx.strokeStyle = "#3a3c34";
+  // subtle grid
+  ctx.strokeStyle = "#1e2018";
   ctx.lineWidth = 1;
-  ctx.setLineDash([4, 6]);
-  ctx.beginPath(); ctx.moveTo(0, h * 0.35); ctx.lineTo(w, h * 0.35); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, h * 0.68); ctx.lineTo(w, h * 0.68); ctx.stroke();
+  for (let i = 0; i <= 12; i++) {
+    const x = (i / 12) * w, y = (i / 12) * h;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // asphalt roads
+  ctx.fillStyle = "#1c1e18";
+  ctx.fillRect(0, h * 0.32, w, h * 0.08);
+  ctx.fillRect(0, h * 0.62, w, h * 0.08);
+  ctx.fillRect(w * 0.24, 0, w * 0.08, h);
+  ctx.fillRect(w * 0.58, 0, w * 0.08, h);
+
+  // road center dashed yellow
+  ctx.strokeStyle = "rgba(212,184,74,0.35)";
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 8]);
+  ctx.beginPath(); ctx.moveTo(0, h * 0.36); ctx.lineTo(w, h * 0.36); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, h * 0.66); ctx.lineTo(w, h * 0.66); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(w * 0.28, 0); ctx.lineTo(w * 0.28, h); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(w * 0.62, 0); ctx.lineTo(w * 0.62, h); ctx.stroke();
   ctx.setLineDash([]);
 
-  // buildings / obstacles blocks
+  // buildings
   const buildings = [
-    { x: 0.04, y: 0.06, w: 0.18, h: 0.22, label: "SETOR A" },
-    { x: 0.36, y: 0.05, w: 0.20, h: 0.24, label: "" },
-    { x: 0.70, y: 0.08, w: 0.24, h: 0.20, label: "SETOR B" },
-    { x: 0.05, y: 0.42, w: 0.16, h: 0.18, label: "" },
-    { x: 0.36, y: 0.42, w: 0.18, h: 0.16, label: "" },
-    { x: 0.70, y: 0.44, w: 0.22, h: 0.16, label: "" },
-    { x: 0.08, y: 0.76, w: 0.14, h: 0.18, label: "" },
-    { x: 0.38, y: 0.78, w: 0.16, h: 0.16, label: "" },
-    { x: 0.72, y: 0.74, w: 0.20, h: 0.20, label: "" }
+    { x: 0.03, y: 0.04, w: 0.18, h: 0.24, label: "GALPÃO A" },
+    { x: 0.36, y: 0.04, w: 0.18, h: 0.22, label: "" },
+    { x: 0.70, y: 0.05, w: 0.26, h: 0.22, label: "GALPÃO B" },
+    { x: 0.03, y: 0.44, w: 0.17, h: 0.14, label: "" },
+    { x: 0.36, y: 0.44, w: 0.18, h: 0.14, label: "" },
+    { x: 0.70, y: 0.44, w: 0.24, h: 0.14, label: "" },
+    { x: 0.04, y: 0.74, w: 0.16, h: 0.20, label: "" },
+    { x: 0.36, y: 0.76, w: 0.17, h: 0.18, label: "" },
+    { x: 0.70, y: 0.74, w: 0.24, h: 0.20, label: "" }
   ];
   buildings.forEach(b => {
     const bx = b.x * w, by = b.y * h, bw = b.w * w, bh = b.h * h;
-    ctx.fillStyle = "#1c1e18";
+    ctx.fillStyle = "#1a1c16";
     ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#3a3c34";
+    ctx.strokeStyle = "#3a3c30";
     ctx.lineWidth = 1.5;
     ctx.strokeRect(bx, by, bw, bh);
-    // inner detail
-    ctx.strokeStyle = "#2a2c26";
-    ctx.strokeRect(bx + 4, by + 4, bw - 8, bh - 8);
+    ctx.strokeStyle = "#2a2c24";
+    ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
     if (b.label) {
-      ctx.fillStyle = "#5a584e";
-      ctx.font = "9px sans-serif";
+      ctx.fillStyle = "#6a6858";
+      ctx.font = "bold 8px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(b.label, bx + bw / 2, by + bh / 2 + 3);
     }
   });
 
-  // sector markers alfa / bravo
-  ctx.fillStyle = "rgba(196,184,150,0.15)";
-  ctx.strokeStyle = "rgba(196,184,150,0.4)";
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(w * 0.15, h * 0.18, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.beginPath(); ctx.arc(w * 0.82, h * 0.18, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = "#8a7e62";
-  ctx.font = "bold 8px sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("A", w * 0.15, h * 0.18 + 3);
-  ctx.fillText("B", w * 0.82, h * 0.18 + 3);
+  // sector rings
+  [[0.12, 0.16, "A"], [0.83, 0.16, "B"]].forEach(([x, y, lab]) => {
+    ctx.beginPath();
+    ctx.arc(x * w, y * h, 12, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(212,184,74,0.12)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(212,184,74,0.5)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#d4b84a";
+    ctx.font = "bold 9px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(lab, x * w, y * h + 3);
+  });
 
   // mines
-  state.map.mines.forEach(m => {
+  (state.map.mines || []).forEach(m => {
     if (!m.active) return;
     const mx = m.x * w, my = m.y * h;
-    ctx.fillStyle = "#8a7e62";
-    ctx.fillRect(mx - 4, my - 4, 8, 8);
-    ctx.strokeStyle = "#c4b896";
-    ctx.strokeRect(mx - 4, my - 4, 8, 8);
+    ctx.fillStyle = "#9a8a3a";
+    ctx.beginPath();
+    ctx.moveTo(mx, my - 5); ctx.lineTo(mx + 5, my + 4); ctx.lineTo(mx - 5, my + 4);
+    ctx.closePath(); ctx.fill();
   });
 
   // friends
-  state.map.friends.forEach(f => {
+  (state.map.friends || []).forEach(f => {
     ctx.beginPath();
     ctx.arc(f.x * w, f.y * h, 5, 0, Math.PI * 2);
     ctx.fillStyle = "#5a7a9a";
     ctx.fill();
+    ctx.strokeStyle = "#8ab0d0";
+    ctx.lineWidth = 1;
+    ctx.stroke();
   });
 
   // enemies
-  state.map.enemies.forEach(e => {
+  (state.map.enemies || []).forEach(e => {
     if (!e.alive) return;
     if (!e.visible && !state.map.revealed) return;
     ctx.beginPath();
     ctx.arc(e.x * w, e.y * h, 6, 0, Math.PI * 2);
     ctx.fillStyle = "#9a5050";
     ctx.fill();
-    ctx.strokeStyle = "#c07070";
+    ctx.strokeStyle = "#d08080";
     ctx.lineWidth = 1;
     ctx.stroke();
   });
@@ -465,19 +489,18 @@ function drawMap() {
   const px = state.map.playerPos.x * w;
   const py = state.map.playerPos.y * h;
   ctx.beginPath();
-  ctx.arc(px, py, 8, 0, Math.PI * 2);
-  ctx.fillStyle = "#c4b896";
+  ctx.arc(px, py, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "#d4b84a";
   ctx.fill();
-  ctx.strokeStyle = "#e6e4dc";
+  ctx.strokeStyle = "#f0e8c0";
   ctx.lineWidth = 2;
   ctx.stroke();
-  // direction
   ctx.beginPath();
   ctx.moveTo(px, py);
-  ctx.lineTo(px + 12, py - 5);
-  ctx.lineTo(px + 12, py + 5);
+  ctx.lineTo(px + 11, py - 5);
+  ctx.lineTo(px + 11, py + 5);
   ctx.closePath();
-  ctx.fillStyle = "rgba(196,184,150,0.35)";
+  ctx.fillStyle = "rgba(212,184,74,0.4)";
   ctx.fill();
 }
 
@@ -633,7 +656,7 @@ function readOrg() {
   state.match.map = val("#oMap") || "Complexo Industrial";
   state.match.mode = val("#oMode") || "Simulação";
   state.match.duration = Number(val("#oDuration")) || 60;
-  state.match.checkIn = val("#oCheckIn");
+  state.match.checkIn = val("#oCheckIn") || "";
   state.org.briefTitle = val("#oBriefTitle") || "Briefing da Operação";
   state.org.briefText = val("#oBriefText") || "";
   state.org.objective = val("#oObjective") || "";
@@ -641,39 +664,53 @@ function readOrg() {
   state.org.blueLimit = Number(val("#oBlueLimit")) || 20;
   state.org.redName = val("#oRedName") || "Equipe Vermelha";
   state.org.redLimit = Number(val("#oRedLimit")) || 20;
-  state.org.participates = !!$("#oParticipates")?.checked;
-  state.modules.medical = !!$("#modMedical")?.checked;
-  state.modules.zone = !!$("#modZone")?.checked;
-  state.modules.score = !!$("#modScore")?.checked;
-  state.modules.tracking = !!$("#modTrack")?.checked;
-  state.modules.objectives = !!$("#modObj")?.checked;
-  state.modules.events = !!$("#modEvents")?.checked;
+  state.org.participates = true; // padrão
 }
 
-function saveMatch() {
+function prepareMatch() {
   readOrg();
-  if (!state.match.name.trim()) return toast("Informe o nome da partida.");
-  state.match.exists = true;
-  if (state.match.status === "none" || state.match.status === "ended") {
-    state.match.status = "scheduled";
-    state.match.elapsed = 0;
-    state.match.startedAt = null;
+  if (!state.match.name.trim()) {
+    toast("Informe o nome da partida.");
+    return false;
   }
-  state.player.presence = false;
+  state.match.exists = true;
+  state.match.elapsed = 0;
+  state.match.startedAt = null;
+  state.org.participates = true;
+  state.player.presence = true; // org já está dentro
   state.player.entry = false;
-  state.player.briefAck = false;
+  state.player.briefAck = true;
   state.player.alive = true;
   state.player.kills = 0;
   state.map.enemies = [];
   state.map.mines = [];
   state.map.droneReady = false;
   state.map.revealed = false;
+  return true;
+}
+
+function scheduleMatch() {
+  if (!prepareMatch()) return;
+  state.match.status = "scheduled";
+  state.role = "organizer";
   save();
   render();
-  const modal = $("#saveModal");
-  if (modal) modal.classList.remove("hidden");
-  else toast("Partida salva.");
+  show("lobby");
+  toast("Partida agendada. Envie o link.");
 }
+
+function startNow() {
+  if (!prepareMatch()) return;
+  state.match.status = "scheduled"; // lobby first, then live
+  state.role = "organizer";
+  save();
+  render();
+  show("lobby");
+  toast("Lobby aberto. Aguarde presenças ou inicie.");
+}
+
+function saveMatch() { scheduleMatch(); }
+
 
 function startMatch() {
   if (!state.match.exists) return toast("Salve a partida primeiro.");
@@ -830,14 +867,13 @@ if (ptt) {
     ptt.classList.add("transmitting");
     setText("#radioStatus", "TRANSMITINDO");
     $("#radioStatus")?.classList.add("tx");
-    updateVu(true); // barras só enquanto segura PTT
+    startMicMeter();
   };
   const endTx = () => {
-    window._pttActive = false;
+    stopMicMeter();
     ptt.classList.remove("transmitting");
     setText("#radioStatus", "PRONTO");
     $("#radioStatus")?.classList.remove("tx");
-    updateVu(false);
   };
   ptt.addEventListener("pointerdown", startTx);
   ptt.addEventListener("pointerup", endTx);
@@ -918,9 +954,60 @@ $("#devAsOrg")?.addEventListener("click", () => {
 });
 
 
+
+$("#oSchedule")?.addEventListener("click", scheduleMatch);
+$("#oStartNow")?.addEventListener("click", startNow);
+$("#lobbyCopy")?.addEventListener("click", async () => {
+  const input = $("#lobbyLink");
+  if (!input) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    toast("Link copiado.");
+  } catch {
+    input.select();
+    toast("Selecione e copie o link.");
+  }
+});
+$("#lobbyStart")?.addEventListener("click", () => {
+  startMatch();
+  show("tactical");
+});
+$("#lobbyCancel")?.addEventListener("click", () => {
+  state.match.status = "ended";
+  state.match.exists = false;
+  save();
+  show("organizer");
+  toast("Partida cancelada.");
+});
+
+// Join link: ?join=1 → player mode
+(function handleJoinLink() {
+  const params = new URLSearchParams(location.search);
+  if (params.get("join") === "1") {
+    state.role = "player";
+    state.player.presence = false;
+    state.player.entry = false;
+    state.player.briefAck = false;
+    if (params.get("m") && !state.match.name) {
+      state.match.name = params.get("m");
+      state.match.exists = true;
+      state.match.status = state.match.status === "none" ? "scheduled" : state.match.status;
+    }
+    save();
+  }
+})();
+
 function boot() {
-  if (localStorage.getItem(KEY)) {
-    show(state.role === "organizer" ? "organizer" : "player", false);
+  const params = new URLSearchParams(location.search);
+  if (params.get("join") === "1") {
+    state.role = "player";
+    show("player", false);
+  } else if (localStorage.getItem(KEY)) {
+    if (state.role === "organizer" && state.match.exists && state.match.status === "scheduled") {
+      show("lobby", false);
+    } else {
+      show(state.role === "organizer" ? "organizer" : "player", false);
+    }
   } else {
     show("role", false);
   }
