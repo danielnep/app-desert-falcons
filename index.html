@@ -14,7 +14,7 @@
     <header class="app-header">
       <div class="brand">
         <div class="brand-mark">
-          <img src="logo.png" alt="Desert Falcons" width="44" height="44">
+          <img src="grok_1789444507207.png" alt="Desert Falcons" width="44" height="44">
         </div>
         <div class="brand-text">
           <span class="brand-title">DESERT FALCONS</span>
@@ -136,49 +136,62 @@
 
       <!-- TACTICAL -->
       <section class="screen" data-screen="tactical">
-        <div class="tactical-top">
-          <div>
+        <div class="tac-bar">
+          <div class="tac-bar-left">
             <p class="kicker">PAINEL TÁTICO</p>
             <h2 id="tacMatchName">—</h2>
           </div>
-          <div class="tac-timer-wrap">
-            <span class="kicker">TEMPO</span>
+          <div class="tac-bar-right">
+            <span id="tacLivePill" class="state-pill live">ATIVO</span>
             <div id="tacTimer" class="timer">00:00</div>
           </div>
         </div>
 
-        <!-- MAPA TÁTICO -->
-        <article class="card map-card">
-          <div class="card-head">
-            <p class="kicker">MAPA TÁTICO</p>
+        <div class="tac-top-actions">
+          <button type="button" class="btn danger btn-sm" id="btnHit">HIT</button>
+          <button type="button" class="btn danger btn-sm" id="tacLeave">ABANDONAR</button>
+          <button type="button" class="btn secondary btn-sm" id="tacLockBtn">BLOQUEAR</button>
+          <button type="button" class="btn danger btn-sm hidden" id="tacEnd">ENCERRAR</button>
+        </div>
+
+        <div class="score-row">
+          <div class="score-box">
+            <span>AZUL</span>
+            <strong id="scoreBlue">0</strong>
+          </div>
+          <div class="score-mid">
+            <span class="kicker">PLACAR</span>
+            <span id="scoreKills">0 ELIM</span>
+          </div>
+          <div class="score-box red">
+            <span>VERMELHA</span>
+            <strong id="scoreRed">0</strong>
+          </div>
+        </div>
+
+        <article class="card map-card compact-map">
+          <div class="card-head tight">
+            <p class="kicker">MAPA</p>
             <span id="mapStatus" class="state-pill">GPS</span>
           </div>
           <div class="map-viewport" id="mapViewport">
-            <canvas id="tacMap" width="400" height="280"></canvas>
-            <div class="map-legend">
-              <span class="leg you">VOCÊ</span>
-              <span class="leg friend">ALIADO</span>
-              <span class="leg enemy">INIMIGO</span>
-              <span class="leg mine">MINA</span>
-            </div>
+            <canvas id="tacMap" width="400" height="220"></canvas>
           </div>
           <div class="map-intel">
-            <span id="killCount">ELIMINAÇÕES: 0/3</span>
-            <span id="droneStatus">DRONE: STANDBY</span>
+            <span id="killCount">ELIM 0/3</span>
+            <span id="droneStatus">DRONE STANDBY</span>
           </div>
         </article>
 
-        <div class="tac-grid">
-          <article class="card radio-card">
-            <div class="card-head">
-              <p class="kicker">RÁDIO</p>
+        <div class="tac-bottom">
+          <div class="sectors mini-sectors">
+            <div class="sector"><span>ALFA</span><strong id="secAlfa">NEUTRO</strong></div>
+            <div class="sector"><span>BRAVO</span><strong id="secBravo">NEUTRO</strong></div>
+          </div>
+
+          <article class="card radio-card radio-compact">
+            <div class="radio-row">
               <button type="button" id="radioToggle" class="radio-toggle on">ON</button>
-            </div>
-            <div class="vu-meter" id="vuMeter" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span><span></span>
-            </div>
-            <div class="radio-meta">
               <div class="channel-ctrl">
                 <button type="button" id="chDown" class="ch-btn">−</button>
                 <span id="chDisplay">CH 01</span>
@@ -186,39 +199,20 @@
               </div>
               <span id="radioStatus" class="radio-status">PRONTO</span>
             </div>
-            <label class="vol-line"><span>VOLUME</span>
-              <input type="range" id="radioVol" min="0" max="100" value="70">
-            </label>
+            <div class="vu-meter" id="vuMeter" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+            </div>
             <button type="button" id="pttBtn" class="ptt-btn">SEGURE PARA FALAR</button>
           </article>
-
-          <article class="card">
-            <p class="kicker">SETORES</p>
-            <div class="sectors">
-              <div class="sector"><span>ALFA</span><strong id="secAlfa">NEUTRO</strong></div>
-              <div class="sector"><span>BRAVO</span><strong id="secBravo">NEUTRO</strong></div>
-            </div>
-          </article>
         </div>
 
-        <!-- AÇÕES DE COMBATE -->
-        <div class="combat-actions">
-          <button type="button" id="btnHit" class="btn danger wide hit-btn">HIT / OUT</button>
-          <button type="button" id="btnKill" class="btn accent wide">REGISTRAR ELIMINAÇÃO</button>
-        </div>
-
-        <div class="tac-actions">
-          <button type="button" class="btn secondary" id="tacLockBtn">BLOQUEAR PAINEL</button>
-          <button type="button" class="btn secondary" id="tacLeave">ABANDONAR PARTIDA</button>
-          <button type="button" class="btn danger hidden" id="tacEnd">ENCERRAR PARTIDA</button>
-        </div>
-
-        <!-- LOCK OVERLAY -->
         <div id="tacLock" class="tac-lock">
           <div class="lock-content">
+            <div class="lock-icon">▣</div>
             <p class="kicker">CONTROLES PROTEGIDOS</p>
             <h3>PAINEL BLOQUEADO</h3>
-            <p>Segure o botão por 1,5s para liberar.<br>Evita toque acidental e suor.</p>
+            <p>Segure 1,5s para liberar.</p>
             <button type="button" id="unlockBtn" class="unlock-btn">SEGURAR PARA DESBLOQUEAR</button>
             <div class="unlock-progress"><div id="unlockBar"></div></div>
           </div>
@@ -229,74 +223,83 @@
       <section class="screen" data-screen="organizer">
         <div class="screen-head">
           <div>
-            <p class="kicker">MODO ORGANIZADOR</p>
-            <h2>CONTROLE</h2>
+            <p class="kicker">ORGANIZADOR</p>
+            <h2>PARTIDA</h2>
           </div>
           <span id="orgStatus" class="state-pill">SEM PARTIDA</span>
         </div>
+
         <article class="card">
-          <p class="kicker">01 · PARTIDA</p>
-          <div class="form-grid">
-            <label class="field"><span>NOME</span><input id="oName" type="text" placeholder="Operação..." autocomplete="off"></label>
+          <p class="kicker">DADOS</p>
+          <div class="form-grid org-form">
+            <label class="field field-wide"><span>NOME</span><input id="oName" type="text" placeholder="Operação..." autocomplete="off"></label>
             <label class="field"><span>DATA</span><input id="oDate" type="date"></label>
             <label class="field"><span>HORÁRIO</span><input id="oTime" type="time"></label>
-            <label class="field"><span>LOCAL</span><input id="oLocation" type="text" placeholder="Campo..." autocomplete="off"></label>
-            <label class="field"><span>MAPA</span><input id="oMap" type="text" placeholder="Complexo..." autocomplete="off"></label>
+            <label class="field"><span>LOCAL</span><input id="oLocation" type="text" placeholder="Campo" autocomplete="off"></label>
+            <label class="field"><span>MAPA</span><input id="oMap" type="text" placeholder="Complexo" autocomplete="off"></label>
             <label class="field"><span>MODO</span><input id="oMode" type="text" placeholder="Simulação" autocomplete="off"></label>
-            <label class="field"><span>DURAÇÃO (min)</span><input id="oDuration" type="number" min="10" max="480" value="60"></label>
-            <label class="field"><span>CHECK-IN</span><input id="oCheckIn" type="time"></label>
+            <label class="field"><span>MIN</span><input id="oDuration" type="number" min="10" max="480" value="60"></label>
           </div>
         </article>
+
         <article class="card">
-          <p class="kicker">02 · BRIEFING</p>
-          <label class="field"><span>TÍTULO</span><input id="oBriefTitle" type="text" autocomplete="off"></label>
-          <label class="field"><span>TEXTO</span><textarea id="oBriefText" rows="4" placeholder="Regras, objetivo..."></textarea></label>
-          <label class="field"><span>OBJETIVO</span><input id="oObjective" type="text" autocomplete="off"></label>
-        </article>
-        <article class="card">
-          <p class="kicker">03 · EQUIPES</p>
-          <div class="team-row">
+          <p class="kicker">EQUIPES</p>
+          <div class="team-row compact-teams">
             <div class="team-box blue">
               <span>AZUL</span>
-              <input id="oBlueName" type="text" placeholder="Equipe Azul">
-              <input id="oBlueLimit" type="number" min="1" max="100" value="20">
+              <input id="oBlueName" type="text" placeholder="Azul" value="Equipe Azul">
+              <input id="oBlueLimit" type="number" min="1" max="100" value="20" title="Limite">
             </div>
             <div class="team-box red">
               <span>VERMELHA</span>
-              <input id="oRedName" type="text" placeholder="Equipe Vermelha">
-              <input id="oRedLimit" type="number" min="1" max="100" value="20">
+              <input id="oRedName" type="text" placeholder="Vermelha" value="Equipe Vermelha">
+              <input id="oRedLimit" type="number" min="1" max="100" value="20" title="Limite">
             </div>
           </div>
-          <label class="check-line" style="margin-top:12px">
-            <input type="checkbox" id="oParticipates">
-            <span>Organizador também participa</span>
-          </label>
         </article>
+
         <article class="card">
-          <p class="kicker">04 · MÓDULOS</p>
-          <div class="module-grid">
-            <label class="module-opt"><input type="checkbox" id="modMedical" checked><span>ATENDIMENTO</span></label>
-            <label class="module-opt"><input type="checkbox" id="modZone" checked><span>ZONAS</span></label>
-            <label class="module-opt"><input type="checkbox" id="modScore"><span>PONTUAÇÃO</span></label>
-            <label class="module-opt"><input type="checkbox" id="modTrack"><span>POSICIONAMENTO</span></label>
-            <label class="module-opt"><input type="checkbox" id="modObj" checked><span>OBJETIVOS</span></label>
-            <label class="module-opt"><input type="checkbox" id="modEvents"><span>EVENTOS</span></label>
+          <p class="kicker">BRIEFING</p>
+          <label class="field field-wide"><span>OBJETIVO</span><input id="oObjective" type="text" placeholder="Objetivo principal" autocomplete="off"></label>
+          <label class="field field-wide"><span>TEXTO</span><textarea id="oBriefText" rows="2" placeholder="Regras e orientações"></textarea></label>
+          <input type="hidden" id="oBriefTitle" value="Briefing da Operação">
+          <input type="hidden" id="oCheckIn" value="">
+        </article>
+
+        <div class="org-actions">
+          <button type="button" class="btn primary wide" id="oSchedule">AGENDAR PARTIDA</button>
+          <button type="button" class="btn accent wide" id="oStartNow">INICIAR AGORA</button>
+          <button type="button" class="btn danger wide hidden" id="oEnd">ENCERRAR PARTIDA</button>
+          <button type="button" class="btn secondary wide" id="oLeave">SAIR</button>
+        </div>
+      </section>
+
+      <!-- LOBBY (org waiting) -->
+      <section class="screen" data-screen="lobby">
+        <div class="screen-head">
+          <div>
+            <p class="kicker">LOBBY</p>
+            <h2 id="lobbyMatchName">—</h2>
+          </div>
+          <span id="lobbyStatus" class="state-pill scheduled">AGUARDANDO</span>
+        </div>
+        <article class="card">
+          <p class="kicker">PRESENÇA</p>
+          <p id="lobbyPresence" class="intro">Aguardando jogadores confirmarem.</p>
+          <div class="lobby-count">
+            <strong id="lobbyCount">0</strong>
+            <span>confirmados</span>
           </div>
         </article>
         <article class="card">
-          <p class="kicker">05 · PRESENÇA</p>
-          <p id="orgPresenceText" class="intro">Nenhum jogador confirmado.</p>
-        </article>
-        <article class="card">
-          <p class="kicker">06 · MINAS (SIMULADAS)</p>
-          <p class="intro" style="margin-bottom:10px">Toque no mapa do painel tático para posicionar. Máx 6.</p>
-          <button type="button" class="btn secondary wide" id="oClearMines">LIMPAR MINAS</button>
+          <p class="kicker">LINK PARA A EQUIPE</p>
+          <p class="intro" style="margin-bottom:8px">Envie este link. Quem abrir entra como jogador.</p>
+          <input id="lobbyLink" type="text" readonly class="link-input">
+          <button type="button" class="btn accent wide" id="lobbyCopy">COPIAR LINK</button>
         </article>
         <div class="org-actions">
-          <button type="button" class="btn primary wide" id="oSave">SALVAR PARTIDA</button>
-          <button type="button" class="btn accent wide hidden" id="oStart">INICIAR PARTIDA</button>
-          <button type="button" class="btn danger wide hidden" id="oEnd">ENCERRAR PARTIDA</button>
-          <button type="button" class="btn secondary wide" id="oLeave">SAIR DO MODO ORGANIZADOR</button>
+          <button type="button" class="btn primary wide" id="lobbyStart">INICIAR PARTIDA</button>
+          <button type="button" class="btn danger wide" id="lobbyCancel">CANCELAR</button>
         </div>
       </section>
 
