@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
-  <meta name="theme-color" content="#0e0b09">
+  <meta name="theme-color" content="#0a0a0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Desert Falcons — Terminal</title>
   <link rel="stylesheet" href="style.css">
@@ -186,6 +186,9 @@
               </div>
               <span id="radioStatus" class="radio-status">PRONTO</span>
             </div>
+            <label class="vol-line"><span>VOLUME</span>
+              <input type="range" id="radioVol" min="0" max="100" value="70">
+            </label>
             <button type="button" id="pttBtn" class="ptt-btn">SEGURE PARA FALAR</button>
           </article>
 
@@ -205,6 +208,7 @@
         </div>
 
         <div class="tac-actions">
+          <button type="button" class="btn secondary" id="tacLockBtn">BLOQUEAR PAINEL</button>
           <button type="button" class="btn secondary" id="tacLeave">ABANDONAR PARTIDA</button>
           <button type="button" class="btn danger hidden" id="tacEnd">ENCERRAR PARTIDA</button>
         </div>
@@ -240,6 +244,7 @@
             <label class="field"><span>MAPA</span><input id="oMap" type="text" placeholder="Complexo..." autocomplete="off"></label>
             <label class="field"><span>MODO</span><input id="oMode" type="text" placeholder="Simulação" autocomplete="off"></label>
             <label class="field"><span>DURAÇÃO (min)</span><input id="oDuration" type="number" min="10" max="480" value="60"></label>
+            <label class="field"><span>CHECK-IN</span><input id="oCheckIn" type="time"></label>
           </div>
         </article>
         <article class="card">
@@ -262,9 +267,28 @@
               <input id="oRedLimit" type="number" min="1" max="100" value="20">
             </div>
           </div>
+          <label class="check-line" style="margin-top:12px">
+            <input type="checkbox" id="oParticipates">
+            <span>Organizador também participa</span>
+          </label>
         </article>
         <article class="card">
-          <p class="kicker">04 · MINAS (SIMULADAS)</p>
+          <p class="kicker">04 · MÓDULOS</p>
+          <div class="module-grid">
+            <label class="module-opt"><input type="checkbox" id="modMedical" checked><span>ATENDIMENTO</span></label>
+            <label class="module-opt"><input type="checkbox" id="modZone" checked><span>ZONAS</span></label>
+            <label class="module-opt"><input type="checkbox" id="modScore"><span>PONTUAÇÃO</span></label>
+            <label class="module-opt"><input type="checkbox" id="modTrack"><span>POSICIONAMENTO</span></label>
+            <label class="module-opt"><input type="checkbox" id="modObj" checked><span>OBJETIVOS</span></label>
+            <label class="module-opt"><input type="checkbox" id="modEvents"><span>EVENTOS</span></label>
+          </div>
+        </article>
+        <article class="card">
+          <p class="kicker">05 · PRESENÇA</p>
+          <p id="orgPresenceText" class="intro">Nenhum jogador confirmado.</p>
+        </article>
+        <article class="card">
+          <p class="kicker">06 · MINAS (SIMULADAS)</p>
           <p class="intro" style="margin-bottom:10px">Toque no mapa do painel tático para posicionar. Máx 6.</p>
           <button type="button" class="btn secondary wide" id="oClearMines">LIMPAR MINAS</button>
         </article>
@@ -292,10 +316,26 @@
             <button type="button" class="dev-seg" data-status="live">AO VIVO</button>
             <button type="button" class="dev-seg" data-status="ended">ENCERRADA</button>
           </div>
+          <label class="field field-wide" style="margin-bottom:12px">
+            <span>JOGADORES SIMULADOS / EQUIPE</span>
+            <input id="devPlayersPerTeam" type="number" min="0" max="200" value="0">
+          </label>
+          <div class="dev-team-preview" id="devPreview">
+            <span><strong id="devBlueCount">0</strong> AZUL</span>
+            <span>×</span>
+            <span><strong id="devRedCount">0</strong> VERMELHA</span>
+            <span>=</span>
+            <span><strong id="devTotalCount">0</strong> TOTAL</span>
+          </div>
+          <button type="button" class="btn secondary wide" id="devApplyPlayers" style="margin-bottom:10px">APLICAR SIMULAÇÃO</button>
           <div class="dev-actions">
             <button type="button" class="btn secondary" id="devGen">GERAR PARTIDA</button>
             <button type="button" class="btn primary" id="devStart">INICIAR</button>
             <button type="button" class="btn danger" id="devEnd">ENCERRAR</button>
+          </div>
+          <div class="dev-actions" style="margin-top:8px">
+            <button type="button" class="btn secondary" id="devAsPlayer">VIRAR JOGADOR</button>
+            <button type="button" class="btn secondary" id="devAsOrg">VIRAR ORGANIZADOR</button>
           </div>
           <button type="button" class="btn outline-danger wide" id="devReset">RESET TOTAL</button>
         </article>
@@ -310,19 +350,55 @@
           </div>
           <button type="button" class="ghost-btn" data-back="player">VOLTAR</button>
         </div>
-        <article class="card">
-          <div class="info-grid">
-            <div class="info"><span>ID</span><strong id="dId">DF-001</strong></div>
-            <div class="info"><span>NOME</span><strong id="dName">DANI</strong></div>
-            <div class="info"><span>CLASSE</span><strong id="dClass">Assalto</strong></div>
-            <div class="info"><span>EQUIPE</span><strong id="dTeam">—</strong></div>
-            <div class="info"><span>RÁDIO</span><strong id="dRadio">ON</strong></div>
-            <div class="info"><span>CANAL</span><strong id="dChannel">01</strong></div>
-          </div>
-        </article>
+        <div class="tab-row">
+          <button type="button" class="tab-btn active" data-tab="inicio">INÍCIO</button>
+          <button type="button" class="tab-btn" data-tab="briefing">BRIEFING</button>
+          <button type="button" class="tab-btn" data-tab="perfil">PERFIL</button>
+        </div>
+        <div id="tabInicio" class="tab-panel">
+          <article class="card">
+            <div class="info-grid">
+              <div class="info"><span>PARTIDA</span><strong id="dMatchName">—</strong></div>
+              <div class="info"><span>STATUS</span><strong id="dMatchStatus">—</strong></div>
+              <div class="info"><span>MAPA</span><strong id="dMatchMap">—</strong></div>
+              <div class="info"><span>MODO</span><strong id="dMatchMode">—</strong></div>
+            </div>
+          </article>
+        </div>
+        <div id="tabBriefing" class="tab-panel hidden">
+          <article class="card">
+            <h3 id="dBriefTitle">—</h3>
+            <p id="dBriefText" class="briefing-text">—</p>
+            <p class="objective-line"><span>OBJETIVO</span> <strong id="dObjective">—</strong></p>
+          </article>
+        </div>
+        <div id="tabPerfil" class="tab-panel hidden">
+          <article class="card">
+            <div class="info-grid">
+              <div class="info"><span>ID</span><strong id="dId">DF-001</strong></div>
+              <div class="info"><span>NOME</span><strong id="dName">DANI</strong></div>
+              <div class="info"><span>CLASSE</span><strong id="dClass">Assalto</strong></div>
+              <div class="info"><span>EQUIPE</span><strong id="dTeam">—</strong></div>
+              <div class="info"><span>RÁDIO</span><strong id="dRadio">ON</strong></div>
+              <div class="info"><span>CANAL</span><strong id="dChannel">01</strong></div>
+            </div>
+          </article>
+        </div>
       </section>
 
     </main>
+    <div id="saveModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-window">
+        <p class="kicker">CONFIGURAÇÃO SALVA</p>
+        <h2>PARTIDA REGISTRADA</h2>
+        <p id="saveModalText">A partida foi salva e já está disponível.</p>
+        <div class="modal-actions">
+          <button type="button" class="btn secondary" id="saveModalContinue">CONTINUAR ORGANIZANDO</button>
+          <button type="button" class="btn primary" id="saveModalEnter">ENTRAR NO JOGO</button>
+        </div>
+      </div>
+    </div>
     <div id="toast" class="toast" aria-live="polite"></div>
   </div>
   <script src="app.js"></script>
