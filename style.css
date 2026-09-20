@@ -1,587 +1,187 @@
-/* Desert Falcons v3 — mapa tático estilo jogo + GPS */
-const KEY = "df_v3";
-const $ = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-
-const OBJ_LABELS = {
-  rouba_bandeira: "Rouba bandeira",
-  bomba: "Bomba",
-  captura: "Captura de pontos",
-  eliminacao: "Eliminação + respawn"
-};
-
-function initial() {
-  return {
-    role: null,
-    match: {
-      exists: false,
-      status: "none",
-      name: "",
-      location: "",
-      duration: 60,
-      objective: "rouba_bandeira",
-      terrain: null, // {seed, buildings, roads}
-      marks: [],
-      startedAt: null,
-      elapsed: 0
-    },
-    player: { presence: false, alive: true },
-    tool: "point",
-    gps: { lat: null, lng: null, ok: false },
-    // map view in normalized 0-1 space centered on player when GPS on
-    view: { cx: 0.5, cy: 0.5 }
-  };
+:root {
+  --bg: #e8e6e2;
+  --surface: #f5f4f1;
+  --surface-2: #ffffff;
+  --border: #c8c4bc;
+  --border-soft: #ddd9d2;
+  --text: #2a2622;
+  --text-dim: #6a6560;
+  --text-mute: #9a958e;
+  --brown: #8b6b4a;
+  --brown-dark: #6a5238;
+  --brown-soft: rgba(139, 107, 74, 0.15);
+  --danger: #a04848;
+  --danger-bg: #f5e8e8;
+  --live: #4a7a4a;
+  --live-bg: #e8f0e8;
+  --radius: 4px;
+  --fast: 150ms;
 }
-
-let state = initial();
-let timerId = null;
-let gpsWatch = null;
-let prevScreen = "role";
-let animFrame = null;
-
-function load() {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return;
-    const s = JSON.parse(raw);
-    state = {
-      ...initial(),
-      ...s,
-      match: { ...initial().match, ...(s.match || {}) },
-      player: { ...initial().player, ...(s.player || {}) },
-      view: { ...initial().view, ...(s.view || {}) }
-    };
-  } catch (_) {}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px; color: var(--text); background: var(--bg);
+  -webkit-font-smoothing: antialiased;
 }
-function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {}
+#app {
+  height: 100dvh; max-width: 420px; margin: 0 auto;
+  display: flex; flex-direction: column; background: var(--bg);
 }
-function toast(msg) {
-  const el = $("#toast");
-  if (!el) return;
-  el.textContent = msg;
-  el.classList.add("show");
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove("show"), 2200);
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
 }
-function show(name) {
-  $$(".screen").forEach(s => s.classList.toggle("active", s.dataset.screen === name));
-  if (name !== "dev") prevScreen = name;
-  render();
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand img {
+  width: 36px; height: 36px; border-radius: 3px;
+  border: 1px solid var(--border); object-fit: cover;
 }
-function fmtTimer(sec) {
-  const m = Math.floor(sec / 60), s = sec % 60;
-  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+.brand-text strong {
+  display: block; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase;
 }
-
-/* ── Terrain generator (estilo minimapa de jogo) ── */
-function seeded(seed) {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return () => (s = s * 16807 % 2147483647) / 2147483647;
+.brand-text span {
+  font-size: 9px; letter-spacing: 0.1em; color: var(--text-mute); text-transform: uppercase;
 }
-function generateTerrain(seed = Date.now()) {
-  const rnd = seeded(seed);
-  const buildings = [];
-  const n = 8 + Math.floor(rnd() * 5);
-  for (let i = 0; i < n; i++) {
-    buildings.push({
-      x: 0.05 + rnd() * 0.7,
-      y: 0.05 + rnd() * 0.7,
-      w: 0.1 + rnd() * 0.16,
-      h: 0.08 + rnd() * 0.14
-    });
-  }
-  const roads = [
-    { x1: 0, y1: 0.35, x2: 1, y2: 0.35, thick: 0.06 },
-    { x1: 0, y1: 0.7, x2: 1, y2: 0.72, thick: 0.05 },
-    { x1: 0.3, y1: 0, x2: 0.32, y2: 1, thick: 0.055 },
-    { x1: 0.65, y1: 0, x2: 0.68, y2: 1, thick: 0.05 }
-  ];
-  const cover = [];
-  for (let i = 0; i < 12; i++) {
-    cover.push({ x: rnd(), y: rnd(), r: 0.015 + rnd() * 0.02 });
-  }
-  return { seed, buildings, roads, cover };
+.header-actions { display: flex; align-items: center; gap: 6px; }
+.pill {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-dim); background: var(--surface);
 }
-
-/* ── Draw tactical map ── */
-function drawTerrain(ctx, w, h, terrain) {
-  // ground
-  ctx.fillStyle = "#2a3228";
-  ctx.fillRect(0, 0, w, h);
-  // grid
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 1;
-  const step = Math.max(16, w / 16);
-  for (let x = 0; x < w; x += step) {
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-  }
-  for (let y = 0; y < h; y += step) {
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-  }
-  if (!terrain) return;
-  // roads
-  terrain.roads.forEach(r => {
-    ctx.strokeStyle = "#3a4238";
-    ctx.lineWidth = r.thick * Math.min(w, h);
-    ctx.lineCap = "butt";
-    ctx.beginPath();
-    ctx.moveTo(r.x1 * w, r.y1 * h);
-    ctx.lineTo(r.x2 * w, r.y2 * h);
-    ctx.stroke();
-    // center line
-    ctx.strokeStyle = "rgba(200,180,80,0.25)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 8]);
-    ctx.beginPath();
-    ctx.moveTo(r.x1 * w, r.y1 * h);
-    ctx.lineTo(r.x2 * w, r.y2 * h);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  });
-  // buildings
-  terrain.buildings.forEach(b => {
-    const bx = b.x * w, by = b.y * h, bw = b.w * w, bh = b.h * h;
-    ctx.fillStyle = "#1e241c";
-    ctx.fillRect(bx, by, bw, bh);
-    ctx.strokeStyle = "#8b9a6a";
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(bx, by, bw, bh);
-    ctx.strokeStyle = "rgba(139,154,106,0.3)";
-    ctx.strokeRect(bx + 3, by + 3, Math.max(0, bw - 6), Math.max(0, bh - 6));
-  });
-  // cover dots
-  (terrain.cover || []).forEach(c => {
-    ctx.beginPath();
-    ctx.arc(c.x * w, c.y * h, c.r * Math.min(w, h), 0, Math.PI * 2);
-    ctx.fillStyle = "#3a4a32";
-    ctx.fill();
-  });
+.pill.live { color: var(--live); border-color: var(--live); background: var(--live-bg); }
+.pill.wait { color: var(--brown); border-color: var(--brown); background: var(--brown-soft); }
+.dev-btn {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: transparent; color: var(--text-mute); cursor: pointer;
 }
-
-function drawMarks(ctx, w, h, marks) {
-  (marks || []).forEach(mk => {
-    const x = mk.x * w, y = mk.y * h;
-    if (mk.type === "zone") {
-      const rad = (mk.r || 0.08) * Math.min(w, h);
-      ctx.beginPath();
-      ctx.arc(x, y, rad, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(139,107,74,0.25)";
-      ctx.fill();
-      ctx.strokeStyle = "#c4a06a";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    } else if (mk.type === "base") {
-      const s = 12;
-      ctx.fillStyle = "rgba(74,122,74,0.35)";
-      ctx.strokeStyle = "#6aba6a";
-      ctx.lineWidth = 2;
-      ctx.fillRect(x - s, y - s, s * 2, s * 2);
-      ctx.strokeRect(x - s, y - s, s * 2, s * 2);
-    } else if (mk.type === "flag") {
-      ctx.fillStyle = "#d4b84a";
-      ctx.fillRect(x - 2, y - 14, 3, 18);
-      ctx.beginPath();
-      ctx.moveTo(x + 1, y - 14);
-      ctx.lineTo(x + 12, y - 9);
-      ctx.lineTo(x + 1, y - 4);
-      ctx.closePath();
-      ctx.fill();
-    } else if (mk.type === "bomb") {
-      ctx.beginPath();
-      ctx.arc(x, y, 9, 0, Math.PI * 2);
-      ctx.fillStyle = "#a04848";
-      ctx.fill();
-      ctx.strokeStyle = "#f0a0a0";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 9px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("B", x, y + 3);
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = "#c4a06a";
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-  });
+#main { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+.screen {
+  display: none; position: absolute; inset: 0; padding: 12px;
+  overflow-y: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
-
-function drawPlayerDot(ctx, w, h, nx, ny) {
-  const x = nx * w, y = ny * h;
-  const t = Date.now() / 400;
-  const pulse = 0.6 + 0.4 * Math.sin(t);
-  ctx.beginPath();
-  ctx.arc(x, y, 16 * pulse, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(212,184,74,${0.15 * pulse})`;
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(x, y, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "#f0e8c0";
-  ctx.shadowColor = "#d4b84a";
-  ctx.shadowBlur = 12;
-  ctx.fill();
-  ctx.shadowBlur = 0;
-  ctx.strokeStyle = "#8b6b4a";
-  ctx.lineWidth = 2;
-  ctx.stroke();
+.screen::-webkit-scrollbar { display: none; }
+.screen.active { display: block; }
+.kicker {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--text-mute); margin-bottom: 2px;
 }
-
-function sizeCanvas(canvas, wrap) {
-  if (!canvas || !wrap) return { w: 0, h: 0 };
-  const r = wrap.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.floor(r.width * dpr));
-  canvas.height = Math.max(1, Math.floor(r.height * dpr));
-  canvas.style.width = r.width + "px";
-  canvas.style.height = r.height + "px";
-  return { w: canvas.width, h: canvas.height };
+h1, h2 { font-size: 18px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 8px; }
+.intro { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; line-height: 1.4; }
+.card {
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--radius); padding: 12px; margin-bottom: 10px;
 }
-
-function paintOrgMap() {
-  const canvas = $("#mapCanvas");
-  const wrap = $("#orgMapWrap");
-  if (!canvas) return;
-  const { w, h } = sizeCanvas(canvas, wrap);
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, w, h);
-  drawTerrain(ctx, w, h, state.match.terrain);
-  drawMarks(ctx, w, h, state.match.marks);
+.card.compact { padding: 10px 12px; }
+.card h3 {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; margin-bottom: 8px; color: var(--brown-dark);
 }
-
-function paintPlayerMap() {
-  const canvas = $("#playerMapCanvas");
-  const wrap = $("#playerMapWrap");
-  if (!canvas) return;
-  const { w, h } = sizeCanvas(canvas, wrap);
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, w, h);
-  drawTerrain(ctx, w, h, state.match.terrain);
-  drawMarks(ctx, w, h, state.match.marks);
-  // player position: GPS maps to view center if available, else center
-  let px = state.view.cx, py = state.view.cy;
-  if (state.gps.ok) {
-    // mild drift simulation from GPS noise for feel — position sticks near center when calibrated
-    px = 0.5 + (state.gps.lat ? ((state.gps.lat % 0.001) / 0.001 - 0.5) * 0.08 : 0);
-    py = 0.5 + (state.gps.lng ? ((state.gps.lng % 0.001) / 0.001 - 0.5) * 0.08 : 0);
-    px = Math.max(0.08, Math.min(0.92, px));
-    py = Math.max(0.08, Math.min(0.92, py));
-  }
-  drawPlayerDot(ctx, w, h, px, py);
+.btn {
+  display: flex; align-items: center; justify-content: center; width: 100%;
+  padding: 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; border-radius: var(--radius); border: 1px solid transparent;
+  cursor: pointer; font-family: inherit; margin-bottom: 8px;
+  transition: transform var(--fast), background var(--fast);
 }
-
-function startPlayerAnim() {
-  stopPlayerAnim();
-  const loop = () => {
-    if (state.match.status === "live" && document.querySelector('.screen.active')?.dataset.screen === "player") {
-      paintPlayerMap();
-    }
-    animFrame = requestAnimationFrame(loop);
-  };
-  animFrame = requestAnimationFrame(loop);
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.btn.primary { background: var(--brown); color: #fff; border-color: var(--brown-dark); }
+.btn.secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn.danger { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+.btn.ghost { background: transparent; color: var(--text-dim); border-color: var(--border); }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field span, .field-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-mute);
 }
-function stopPlayerAnim() {
-  if (animFrame) cancelAnimationFrame(animFrame);
-  animFrame = null;
+.field-label { margin-bottom: 6px; display: block; }
+.field input {
+  padding: 10px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 14px; font-family: inherit; background: var(--surface); color: var(--text); outline: none;
 }
-
-/* ── GPS ── */
-function startGps() {
-  if (!navigator.geolocation) {
-    toast("GPS indisponível neste aparelho");
-    return;
-  }
-  if (gpsWatch != null) return;
-  gpsWatch = navigator.geolocation.watchPosition(
-    (pos) => {
-      state.gps.lat = pos.coords.latitude;
-      state.gps.lng = pos.coords.longitude;
-      state.gps.ok = true;
-      const el = $("#pGps");
-      if (el) el.textContent = "ATIVO · " + pos.coords.accuracy.toFixed(0) + "m";
-    },
-    () => {
-      state.gps.ok = false;
-      const el = $("#pGps");
-      if (el) el.textContent = "SEM SINAL";
-    },
-    { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
-  );
+.field input:focus { border-color: var(--brown); }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.obj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 4px; }
+.obj-btn {
+  padding: 10px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+  text-align: center; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit;
 }
-function stopGps() {
-  if (gpsWatch != null) {
-    navigator.geolocation.clearWatch(gpsWatch);
-    gpsWatch = null;
-  }
+.obj-btn.active {
+  border-color: var(--brown); background: var(--brown-soft); color: var(--brown-dark);
 }
-
-/* ── Render ── */
-function renderHeader() {
-  const pill = $("#statusPill");
-  if (!pill) return;
-  const st = state.match.status;
-  if (st === "live") { pill.textContent = "AO VIVO"; pill.className = "pill live"; }
-  else if (st === "open") { pill.textContent = "ABERTA"; pill.className = "pill wait"; }
-  else { pill.textContent = "SEM PARTIDA"; pill.className = "pill"; }
+.obj-btn.disabled, .obj-btn:disabled {
+  opacity: 0.55; cursor: not-allowed; font-weight: 500; font-size: 10px;
 }
-
-function renderPlayer() {
-  const m = state.match;
-  const wait = $("#playerWait"), ready = $("#playerReady"), live = $("#playerLive");
-  if (!m.exists || m.status === "none" || m.status === "ended") {
-    wait?.classList.remove("hidden");
-    ready?.classList.add("hidden");
-    live?.classList.add("hidden");
-    stopGps();
-    return;
-  }
-  if (m.status === "live" && state.player.presence) {
-    wait?.classList.add("hidden");
-    ready?.classList.add("hidden");
-    live?.classList.remove("hidden");
-    $("#pLiveObj").textContent = OBJ_LABELS[m.objective] || m.objective || "—";
-    $("#pAlive").textContent = state.player.alive ? "ATIVO" : "OUT";
-    $("#pTimer").textContent = fmtTimer(m.elapsed);
-    startGps();
-    paintPlayerMap();
-    startPlayerAnim();
-    return;
-  }
-  wait?.classList.add("hidden");
-  ready?.classList.remove("hidden");
-  live?.classList.add("hidden");
-  $("#pName").textContent = m.name || "—";
-  $("#pLoc").textContent = m.location || "—";
-  $("#pObj").textContent = OBJ_LABELS[m.objective] || m.objective || "—";
-  $("#pDur").textContent = (m.duration || 60) + " min";
-  const st = $("#pStatus");
-  if (st) {
-    st.textContent = m.status === "live" ? "AO VIVO" : "ABERTA";
-    st.className = "value " + (m.status === "live" ? "live" : "wait");
-  }
-  $("#btnConfirm")?.classList.toggle("hidden", state.player.presence);
-  const ent = $("#btnEnter");
-  if (ent) {
-    ent.classList.toggle("hidden", !state.player.presence);
-    ent.textContent = m.status === "live" ? "ENTRAR NO JOGO" : "AGUARDAR INÍCIO";
-  }
+.obj-btn em {
+  display: block; font-style: normal; font-size: 8px;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-mute); margin-top: 2px;
 }
-
-function fillOrgForm() {
-  const m = state.match;
-  $("#oName").value = m.name || "";
-  $("#oLoc").value = m.location || "";
-  $("#oDur").value = m.duration || 60;
-  $$(".obj-btn").forEach(b => {
-    if (b.disabled) return;
-    b.classList.toggle("active", b.dataset.obj === m.objective);
-  });
-  $("#btnStart")?.classList.toggle("hidden", !(m.exists && m.status === "open"));
-  $("#btnEnd")?.classList.toggle("hidden", m.status !== "live");
-  if (!m.terrain) {
-    state.match.terrain = generateTerrain();
-    save();
-  }
-  paintOrgMap();
+.role-list { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.role-card {
+  display: flex; align-items: center; gap: 12px; padding: 14px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; text-align: left; width: 100%; font-family: inherit; color: var(--text);
 }
-
-function readOrgForm() {
-  state.match.name = ($("#oName")?.value || "").trim();
-  state.match.location = ($("#oLoc")?.value || "").trim();
-  state.match.duration = Number($("#oDur")?.value) || 60;
+.role-card:active { background: var(--brown-soft); border-color: var(--brown); }
+.role-num { font-size: 14px; font-weight: 700; color: var(--brown); min-width: 28px; }
+.role-card strong { display: block; font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase; }
+.role-card small { font-size: 11px; color: var(--text-dim); }
+.wait-box { text-align: center; padding: 40px 16px; }
+.wait-box .icon { font-size: 32px; margin-bottom: 12px; color: var(--brown); }
+.wait-box p { color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+.map-wrap {
+  position: relative; background: #1a1e18; border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; margin-bottom: 8px;
+  height: 36vh; min-height: 160px;
 }
-
-function render() {
-  renderHeader();
-  const screen = document.querySelector(".screen.active")?.dataset.screen;
-  if (screen === "player") renderPlayer();
-  if (screen === "organizer") fillOrgForm();
-  if (screen !== "player") stopPlayerAnim();
+.map-wrap.tall { height: 40vh; min-height: 200px; }
+.map-wrap canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none;
 }
-
-/* ── Actions ── */
-function saveAndOpen() {
-  readOrgForm();
-  if (!state.match.name) return toast("Informe o nome.");
-  if (!state.match.terrain) state.match.terrain = generateTerrain();
-  state.match.exists = true;
-  state.match.status = "open";
-  state.match.startedAt = null;
-  state.match.elapsed = 0;
-  state.player.presence = false;
-  state.player.alive = true;
-  save();
-  render();
-  toast("Partida aberta para jogadores.");
+.map-tools { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.tool-btn {
+  flex: 1; min-width: 56px; padding: 8px 4px; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface-2); color: var(--text-dim);
+  cursor: pointer; font-family: inherit;
 }
-function startMatch() {
-  if (!state.match.exists) return toast("Salve antes.");
-  state.match.status = "live";
-  state.match.startedAt = Date.now();
-  state.match.elapsed = 0;
-  save();
-  startTimer();
-  render();
-  toast("Partida iniciada.");
+.tool-btn.active {
+  border-color: var(--brown); color: var(--brown-dark); background: var(--brown-soft);
 }
-function endMatch() {
-  state.match.status = "ended";
-  stopTimer();
-  stopGps();
-  save();
-  render();
-  toast("Partida encerrada.");
+.map-hint { font-size: 11px; color: var(--text-mute); margin-bottom: 8px; line-height: 1.35; }
+.info-line {
+  display: flex; justify-content: space-between; padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft); font-size: 13px;
 }
-function confirmPresence() {
-  state.player.presence = true;
-  save();
-  render();
-  toast("Presença confirmada.");
+.info-line:last-child { border-bottom: none; }
+.info-line span { color: var(--text-mute); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+.info-line strong { color: var(--text); font-weight: 600; }
+.status-big {
+  text-align: center; padding: 14px; margin-bottom: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
 }
-function enterGame() {
-  if (!state.player.presence) return toast("Confirme presença.");
-  if (state.match.status !== "live") return toast("Aguarde o início.");
-  state.player.alive = true;
-  save();
-  render();
+.status-big .label {
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute);
 }
-function hitOut() {
-  state.player.alive = false;
-  save();
-  render();
-  toast("HIT — OUT.");
+.status-big .value {
+  font-size: 22px; font-weight: 700; letter-spacing: 0.06em; margin-top: 4px;
 }
-function abandon() {
-  state.player.presence = false;
-  state.player.alive = true;
-  stopGps();
-  save();
-  show("player");
-  toast("Você saiu.");
+.status-big .value.live { color: var(--live); }
+.status-big .value.wait { color: var(--brown); }
+.hit-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.hit-row .btn { margin: 0; }
+.dev-list { display: flex; flex-direction: column; gap: 8px; }
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: var(--text); color: #fff; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; padding: 10px 16px;
+  border-radius: var(--radius); opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s; z-index: 100;
+  max-width: calc(100% - 24px); text-align: center;
 }
-function startTimer() {
-  stopTimer();
-  timerId = setInterval(() => {
-    if (state.match.status !== "live") return;
-    const start = state.match.startedAt || Date.now();
-    state.match.elapsed = Math.floor((Date.now() - start) / 1000);
-    const max = (state.match.duration || 60) * 60;
-    if (state.match.elapsed >= max) { endMatch(); return; }
-    const t = $("#pTimer");
-    if (t) t.textContent = fmtTimer(state.match.elapsed);
-    save();
-  }, 1000);
-}
-function stopTimer() {
-  if (timerId) clearInterval(timerId);
-  timerId = null;
-}
-
-/* ── Map pointer (org) ── */
-function canvasPos(e, canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const t = e.touches ? e.touches[0] : e;
-  return {
-    x: (t.clientX - rect.left) / rect.width,
-    y: (t.clientY - rect.top) / rect.height
-  };
-}
-function onOrgMapPointer(e) {
-  e.preventDefault();
-  const canvas = $("#mapCanvas");
-  if (!canvas) return;
-  const p = canvasPos(e, canvas);
-  if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return;
-  if (state.tool === "erase") {
-    state.match.marks = (state.match.marks || []).filter(mk => Math.hypot(mk.x - p.x, mk.y - p.y) > 0.05);
-  } else if (state.tool === "zone") {
-    state.match.marks.push({ type: "zone", x: p.x, y: p.y, r: 0.09 });
-  } else if (state.tool === "base") {
-    state.match.marks.push({ type: "base", x: p.x, y: p.y });
-  } else if (state.tool === "flag") {
-    state.match.marks.push({ type: "flag", x: p.x, y: p.y });
-  } else if (state.tool === "bomb") {
-    state.match.marks.push({ type: "bomb", x: p.x, y: p.y });
-  } else {
-    state.match.marks.push({ type: "point", x: p.x, y: p.y });
-  }
-  save();
-  paintOrgMap();
-}
-
-/* ── Events ── */
-document.addEventListener("click", (e) => {
-  const role = e.target.closest("[data-role]");
-  if (role) {
-    state.role = role.dataset.role;
-    save();
-    show(state.role === "organizer" ? "organizer" : "player");
-    return;
-  }
-  const tool = e.target.closest("[data-tool]");
-  if (tool) {
-    state.tool = tool.dataset.tool;
-    $$(".tool-btn[data-tool]").forEach(b => b.classList.toggle("active", b.dataset.tool === state.tool));
-    return;
-  }
-  const obj = e.target.closest(".obj-btn:not(:disabled)");
-  if (obj) {
-    state.match.objective = obj.dataset.obj;
-    $$(".obj-btn:not(:disabled)").forEach(b => b.classList.toggle("active", b === obj));
-    save();
-  }
-});
-
-$("#devBtn")?.addEventListener("click", () => show("dev"));
-$("#devBack")?.addEventListener("click", () => show(prevScreen || "role"));
-$("#devPlayer")?.addEventListener("click", () => { state.role = "player"; save(); show("player"); toast("Jogador"); });
-$("#devOrg")?.addEventListener("click", () => { state.role = "organizer"; save(); show("organizer"); toast("Operador"); });
-$("#devReset")?.addEventListener("click", () => {
-  if (!confirm("Apagar tudo?")) return;
-  localStorage.removeItem(KEY);
-  state = initial();
-  stopTimer(); stopGps(); stopPlayerAnim();
-  show("role");
-  toast("Reset");
-});
-
-$("#btnSave")?.addEventListener("click", saveAndOpen);
-$("#btnStart")?.addEventListener("click", startMatch);
-$("#btnEnd")?.addEventListener("click", endMatch);
-$("#btnOrgBack")?.addEventListener("click", () => show("role"));
-$("#btnConfirm")?.addEventListener("click", confirmPresence);
-$("#btnEnter")?.addEventListener("click", enterGame);
-$("#btnHit")?.addEventListener("click", hitOut);
-$("#btnLeave")?.addEventListener("click", abandon);
-
-$("#btnGenMap")?.addEventListener("click", () => {
-  state.match.terrain = generateTerrain(Date.now());
-  state.match.marks = [];
-  save();
-  paintOrgMap();
-  toast("Novo mapa tático");
-});
-$("#btnClearMap")?.addEventListener("click", () => {
-  state.match.marks = [];
-  save();
-  paintOrgMap();
-  toast("Marcas limpas");
-});
-
-$("#mapCanvas")?.addEventListener("pointerdown", onOrgMapPointer);
-window.addEventListener("resize", () => {
-  paintOrgMap();
-  if (state.match.status === "live") paintPlayerMap();
-});
-
-load();
-if (state.role === "player") show("player");
-else if (state.role === "organizer") show("organizer");
-else show("role");
-if (state.match.status === "live") startTimer();
-render();
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.hidden { display: none !important; }
