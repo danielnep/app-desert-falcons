@@ -183,3 +183,58 @@ h1, h2 { font-size: 18px; font-weight: 700; letter-spacing: .04em; margin-bottom
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .hidden { display: none !important; }
+
+/* Crop / Delimitar mapa */
+.crop-modal {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(42,38,34,.94);
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+}
+.crop-modal.hidden { display: none; }
+.crop-panel {
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 14px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 92dvh;
+  overflow-y: auto;
+}
+.crop-panel h2 { font-size: 16px; margin-bottom: 6px; }
+.crop-stage {
+  position: relative;
+  width: 100%;
+  height: 50vh;
+  min-height: 220px;
+  background: #1a1e18;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 12px;
+  touch-action: none;
+  user-select: none;
+}
+.crop-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.crop-box {
+  position: absolute;
+  border: 2px solid #d4b84a;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.45);
+  cursor: move;
+  min-width: 40px;
+  min-height: 40px;
+}
+.crop-box::after {
+  content: "";
+  position: absolute;
+  right: -6px; bottom: -6px;
+  width: 16px; height: 16px;
+  background: #d4b84a;
+  border-radius: 2px;
+  cursor: nwse-resize;
+}
