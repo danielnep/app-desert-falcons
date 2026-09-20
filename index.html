@@ -10,6 +10,17 @@
 </head>
 <body>
   <div id="app">
+    <!-- GPS BLOCK -->
+    <div id="gpsGate" class="gps-gate hidden">
+      <div class="gps-box">
+        <p class="kicker">LOCALIZAÇÃO</p>
+        <h2>Acesso obrigatório</h2>
+        <p>Para usar o aplicativo, permita o acesso à localização.</p>
+        <button type="button" class="btn primary" id="gpsRetry">OK — PERMITIR</button>
+        <button type="button" class="btn danger" id="gpsDeny">NÃO</button>
+      </div>
+    </div>
+
     <header class="header">
       <div class="brand">
         <img src="logo.png" alt="DF" width="36" height="36" onerror="this.style.display='none'">
@@ -25,38 +36,29 @@
     </header>
 
     <main id="main">
-      <!-- ROLE -->
       <section class="screen active" data-screen="role">
         <p class="kicker">ACESSO</p>
         <h1>Quem é você?</h1>
-        <p class="intro">Escolha uma vez. O resto é automático.</p>
+        <p class="intro">Escolha uma vez.</p>
         <div class="role-list">
           <button type="button" class="role-card" data-role="player">
             <span class="role-num">01</span>
-            <div>
-              <strong>Jogador</strong>
-              <small>GPS no mapa · confirma e entra</small>
-            </div>
+            <div><strong>Jogador</strong><small>GPS · confirma · entra</small></div>
           </button>
           <button type="button" class="role-card" data-role="organizer">
             <span class="role-num">02</span>
-            <div>
-              <strong>Operador</strong>
-              <small>Mapa tático · objetivo · inicia</small>
-            </div>
+            <div><strong>Operador</strong><small>Mapa · objetivo · inicia</small></div>
           </button>
         </div>
       </section>
 
-      <!-- PLAYER -->
       <section class="screen" data-screen="player">
         <div id="playerWait" class="wait-box">
           <div class="icon">◉</div>
           <p class="kicker">AGUARDANDO</p>
           <h2>Sem partida</h2>
-          <p>O operador ainda não abriu a operação.<br>Fique nesta tela.</p>
+          <p>O operador ainda não abriu a operação.</p>
         </div>
-
         <div id="playerReady" class="hidden">
           <div class="status-big">
             <div class="label">Status</div>
@@ -71,7 +73,6 @@
           <button type="button" class="btn primary" id="btnConfirm">CONFIRMAR PRESENÇA</button>
           <button type="button" class="btn primary hidden" id="btnEnter">ENTRAR NO JOGO</button>
         </div>
-
         <div id="playerLive" class="hidden">
           <div class="status-big">
             <div class="label">Em operação</div>
@@ -82,73 +83,82 @@
             <div class="info-line"><span>Estado</span><strong id="pAlive">ATIVO</strong></div>
             <div class="info-line"><span>GPS</span><strong id="pGps">—</strong></div>
           </div>
-          <p class="map-hint" id="calibHint">Ative a localização. A bolinha é você no mapa.</p>
           <div class="map-wrap tall" id="playerMapWrap">
+            <img id="playerMapImg" class="map-bg" alt="">
             <canvas id="playerMapCanvas"></canvas>
+          </div>
+          <div class="legend">
+            <span class="leg leg-you">Você</span>
+            <span class="leg leg-point">Ponto</span>
+            <span class="leg leg-zone">Zona</span>
+            <span class="leg leg-base">Base</span>
+            <span class="leg leg-flag">Bandeira</span>
+            <span class="leg leg-bomb">Bomba</span>
           </div>
           <div class="hit-row">
             <button type="button" class="btn danger" id="btnHit">HIT / OUT</button>
             <button type="button" class="btn secondary" id="btnLeave">ABANDONAR</button>
           </div>
+          <button type="button" class="btn ghost hidden" id="btnOrgFromGame">VOLTAR AO PAINEL</button>
+          <button type="button" class="btn danger hidden" id="btnEndFromGame">ENCERRAR PARTIDA</button>
         </div>
       </section>
 
-      <!-- ORGANIZER -->
       <section class="screen" data-screen="organizer">
         <p class="kicker">OPERADOR</p>
         <h2>Partida</h2>
-
         <div class="card">
-          <div class="field">
-            <span>Nome</span>
-            <input id="oName" type="text" placeholder="Operação..." autocomplete="off">
-          </div>
+          <div class="field"><span>Nome</span><input id="oName" type="text" placeholder="Operação..." autocomplete="off"></div>
           <div class="grid-2">
             <label class="field"><span>Local</span><input id="oLoc" type="text" placeholder="Campo"></label>
             <label class="field"><span>Minutos</span><input id="oDur" type="number" value="60" min="10" max="480"></label>
           </div>
-
           <p class="field-label">Objetivo</p>
           <div class="obj-grid" id="objGrid">
             <button type="button" class="obj-btn active" data-obj="rouba_bandeira">Rouba bandeira</button>
             <button type="button" class="obj-btn" data-obj="bomba">Bomba</button>
-            <button type="button" class="obj-btn disabled" data-obj="captura" disabled>Captura de pontos <em>em breve</em></button>
-            <button type="button" class="obj-btn disabled" data-obj="eliminacao" disabled>Eliminação + respawn <em>em breve</em></button>
+            <button type="button" class="obj-btn disabled" disabled>Captura de pontos <em>em breve</em></button>
+            <button type="button" class="obj-btn disabled" disabled>Eliminação + respawn <em>em breve</em></button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Mapa tático</h3>
-          <p class="map-hint">Mapa estilo operação (não satélite). Gere, ajuste e marque.</p>
-          <div class="map-tools">
-            <button type="button" class="tool-btn" id="btnGenMap">GERAR MAPA</button>
-            <button type="button" class="tool-btn" id="btnClearMap">LIMPAR</button>
+          <h3>Mapa</h3>
+          <p class="map-hint" id="mapStepHint">1) Envie a imagem do mapa. 2) Depois marque pontos, zonas, bomba…</p>
+          <label class="file-btn" id="uploadLabel">
+            ENVIAR MAPA
+            <input type="file" id="mapFile" accept="image/*" capture="environment">
+          </label>
+          <button type="button" class="btn secondary" id="btnGenMap">OU GERAR MAPA TÁTICO</button>
+
+          <div id="markPanel" class="hidden">
+            <p class="map-hint">Mapa pronto. Toque para marcar:</p>
+            <div class="map-tools">
+              <button type="button" class="tool-btn active" data-tool="point">● Ponto</button>
+              <button type="button" class="tool-btn" data-tool="zone">○ Zona</button>
+              <button type="button" class="tool-btn" data-tool="base">■ Base</button>
+              <button type="button" class="tool-btn" data-tool="flag">⚑ Bandeira</button>
+              <button type="button" class="tool-btn" data-tool="bomb">◉ Bomba</button>
+              <button type="button" class="tool-btn" data-tool="erase">✕ Apagar</button>
+            </div>
           </div>
-          <div class="map-tools">
-            <button type="button" class="tool-btn active" data-tool="point">Ponto</button>
-            <button type="button" class="tool-btn" data-tool="zone">Zona</button>
-            <button type="button" class="tool-btn" data-tool="base">Base</button>
-            <button type="button" class="tool-btn" data-tool="flag">Bandeira</button>
-            <button type="button" class="tool-btn" data-tool="bomb">Bomba</button>
-            <button type="button" class="tool-btn" data-tool="erase">Apagar</button>
-          </div>
+
           <div class="map-wrap" id="orgMapWrap">
+            <img id="mapImg" class="map-bg" alt="">
             <canvas id="mapCanvas"></canvas>
           </div>
-          <p class="map-hint">Toque no mapa para marcar. Gerar cria terreno tático novo.</p>
+          <button type="button" class="btn ghost" id="btnClearMarks">LIMPAR MARCAS</button>
         </div>
 
-        <button type="button" class="btn primary" id="btnSave">SALVAR E ABRIR</button>
-        <button type="button" class="btn primary hidden" id="btnStart">INICIAR PARTIDA</button>
-        <button type="button" class="btn danger hidden" id="btnEnd">ENCERRAR</button>
+        <button type="button" class="btn primary" id="btnSaveEnter">SALVAR E ENTRAR NO JOGO</button>
+        <button type="button" class="btn secondary" id="btnSaveOnly">SÓ SALVAR / ABRIR</button>
+        <button type="button" class="btn danger hidden" id="btnEnd">ENCERRAR PARTIDA</button>
         <button type="button" class="btn ghost" id="btnOrgBack">VOLTAR</button>
       </section>
 
-      <!-- DEV -->
       <section class="screen" data-screen="dev">
         <p class="kicker">DEV</p>
         <h2>Alternar patente</h2>
-        <p class="intro">Só troca o papel. Não apaga a partida.</p>
         <div class="dev-list">
           <button type="button" class="btn secondary" id="devPlayer">VIRAR JOGADOR</button>
           <button type="button" class="btn secondary" id="devOrg">VIRAR OPERADOR</button>
