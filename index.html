@@ -124,15 +124,18 @@
 
         <div class="card">
           <h3>Mapa</h3>
-          <p class="map-hint" id="mapStepHint">1) Envie a imagem do mapa. 2) Depois marque pontos, zonas, bomba…</p>
+          <p class="map-hint" id="mapStepHint">Escolha um arquivo de imagem (PNG, JPEG…). Depois delimite a área útil do mapa.</p>
           <label class="file-btn" id="uploadLabel">
-            ENVIAR MAPA
-            <input type="file" id="mapFile" accept="image/*" capture="environment">
+            ENVIAR ARQUIVO DE MAPA
+            <input type="file" id="mapFile" accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.bmp">
           </label>
           <button type="button" class="btn secondary" id="btnGenMap">OU GERAR MAPA TÁTICO</button>
 
           <div id="markPanel" class="hidden">
-            <p class="map-hint">Mapa pronto. Toque para marcar:</p>
+            <p class="map-hint" id="markHint">
+              Agora coloque as características do mapa: toque onde fica cada coisa —
+              base, zona, bandeira, bomba ou ponto de referência.
+            </p>
             <div class="map-tools">
               <button type="button" class="tool-btn active" data-tool="point">● Ponto</button>
               <button type="button" class="tool-btn" data-tool="zone">○ Zona</button>
@@ -148,6 +151,21 @@
             <canvas id="mapCanvas"></canvas>
           </div>
           <button type="button" class="btn ghost" id="btnClearMarks">LIMPAR MARCAS</button>
+        </div>
+
+        <!-- Crop / Delimitar -->
+        <div id="cropModal" class="crop-modal hidden">
+          <div class="crop-panel">
+            <p class="kicker">EDITOR</p>
+            <h2>Delimitar mapa</h2>
+            <p class="map-hint">Arraste os cantos ou a área para recortar só o pedaço útil do mapa (sem barra do celular, menus, etc.).</p>
+            <div class="crop-stage" id="cropStage">
+              <canvas id="cropCanvas"></canvas>
+              <div id="cropBox" class="crop-box"></div>
+            </div>
+            <button type="button" class="btn primary" id="cropOk">OK — USAR ESTA ÁREA</button>
+            <button type="button" class="btn ghost" id="cropCancel">CANCELAR</button>
+          </div>
         </div>
 
         <button type="button" class="btn primary" id="btnSaveEnter">SALVAR E ENTRAR NO JOGO</button>
