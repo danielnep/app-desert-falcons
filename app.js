@@ -285,10 +285,10 @@ function updateMarkPanel() {
   const hint = $("#mapStepHint");
   if (hasMap()) {
     panel?.classList.remove("hidden");
-    if (hint) hint.textContent = "Mapa carregado. Toque para marcar bomba, zona, base…";
+    if (hint) hint.textContent = "Mapa delimitado. Agora coloque as características: base, zona, bandeira, bomba…";
   } else {
     panel?.classList.add("hidden");
-    if (hint) hint.textContent = "1) Envie a imagem do mapa. 2) Depois marque pontos, zonas, bomba…";
+    if (hint) hint.textContent = "Escolha um arquivo de imagem (PNG, JPEG…). Depois delimite a área útil.";
   }
 }
 
@@ -499,20 +499,165 @@ document.addEventListener("click", (e) => {
   }
 });
 
+/* ── Crop / Delimitar ── */
+let cropImg = null;
+let cropRect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }; // normalized in stage
+let cropDrag = null;
+
+function openCropEditor(dataUrl) {
+  const modal = $("#cropModal");
+  if (!modal) return;
+  modal.classList.remove("hidden");
+  cropImg = new Image();
+  cropImg.onload = () => {
+    drawCropStage();
+    // default crop almost full
+    cropRect = { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
+    placeCropBox();
+  };
+  cropImg.src = dataUrl;
+}
+
+function drawCropStage() {
+  const canvas = $("#cropCanvas");
+  const stage = $("#cropStage");
+  if (!canvas || !stage || !cropImg) return;
+  const r = stage.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(r.width * dpr);
+  canvas.height = Math.floor(r.height * dpr);
+  canvas.style.width = r.width + "px";
+  canvas.style.height = r.height + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // fit image
+  const ir = cropImg.width / cropImg.height;
+  const sr = canvas.width / canvas.height;
+  let dw, dh, dx, dy;
+  if (ir > sr) {
+    dw = canvas.width; dh = dw / ir; dx = 0; dy = (canvas.height - dh) / 2;
+  } else {
+    dh = canvas.height; dw = dh * ir; dy = 0; dx = (canvas.width - dw) / 2;
+  }
+  canvas._imgLayout = { dx, dy, dw, dh };
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(cropImg, dx, dy, dw, dh);
+}
+
+function placeCropBox() {
+  const box = $("#cropBox");
+  const stage = $("#cropStage");
+  if (!box || !stage) return;
+  const r = stage.getBoundingClientRect();
+  box.style.left = (cropRect.x * r.width) + "px";
+  box.style.top = (cropRect.y * r.height) + "px";
+  box.style.width = (cropRect.w * r.width) + "px";
+  box.style.height = (cropRect.h * r.height) + "px";
+}
+
+function applyCrop() {
+  if (!cropImg) return;
+  const canvas = $("#cropCanvas");
+  const layout = canvas?._imgLayout;
+  if (!layout) return;
+  // cropRect is in stage space; map to image pixels
+  const stage = $("#cropStage").getBoundingClientRect();
+  const sx = cropRect.x * stage.width;
+  const sy = cropRect.y * stage.height;
+  const sw = cropRect.w * stage.width;
+  const sh = cropRect.h * stage.height;
+  // layout is in canvas pixel space; convert stage CSS px to canvas px
+  const scaleX = canvas.width / stage.width;
+  const scaleY = canvas.height / stage.height;
+  const cx = sx * scaleX, cy = sy * scaleY, cw = sw * scaleX, ch = sh * scaleY;
+  // intersect with drawn image area
+  const ix = Math.max(cx, layout.dx);
+  const iy = Math.max(cy, layout.dy);
+  const ix2 = Math.min(cx + cw, layout.dx + layout.dw);
+  const iy2 = Math.min(cy + ch, layout.dy + layout.dh);
+  if (ix2 <= ix || iy2 <= iy) return toast("Área inválida");
+  // map to source image pixels
+  const relX = (ix - layout.dx) / layout.dw;
+  const relY = (iy - layout.dy) / layout.dh;
+  const relW = (ix2 - ix) / layout.dw;
+  const relH = (iy2 - iy) / layout.dh;
+  const srcX = relX * cropImg.width;
+  const srcY = relY * cropImg.height;
+  const srcW = relW * cropImg.width;
+  const srcH = relH * cropImg.height;
+  const out = document.createElement("canvas");
+  out.width = Math.max(1, Math.round(srcW));
+  out.height = Math.max(1, Math.round(srcH));
+  out.getContext("2d").drawImage(cropImg, srcX, srcY, srcW, srcH, 0, 0, out.width, out.height);
+  state.match.mapImage = out.toDataURL("image/jpeg", 0.92);
+  state.match.terrain = null;
+  state.match.marks = [];
+  save();
+  $("#cropModal")?.classList.add("hidden");
+  updateMarkPanel();
+  paintOrg();
+  toast("Mapa delimitado. Agora marque base, zona, bomba…");
+}
+
 $("#mapFile")?.addEventListener("change", (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
+  if (!file.type.startsWith("image/") && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name)) {
+    return toast("Escolha um arquivo de imagem.");
+  }
   const reader = new FileReader();
-  reader.onload = () => {
-    state.match.mapImage = reader.result;
-    state.match.terrain = null;
-    save();
-    updateMarkPanel();
-    paintOrg();
-    toast("Mapa enviado. Agora marque os pontos.");
-  };
+  reader.onload = () => openCropEditor(reader.result);
   reader.readAsDataURL(file);
+  e.target.value = "";
 });
+
+$("#cropOk")?.addEventListener("click", applyCrop);
+$("#cropCancel")?.addEventListener("click", () => {
+  $("#cropModal")?.classList.add("hidden");
+  cropImg = null;
+});
+
+// drag crop box
+(function setupCropDrag() {
+  const box = $("#cropBox");
+  const stage = $("#cropStage");
+  if (!box || !stage) return;
+  let mode = null; // move | resize
+  let start = null;
+  const onDown = (e) => {
+    e.preventDefault();
+    const t = e.touches ? e.touches[0] : e;
+    const br = box.getBoundingClientRect();
+    const nearBR = t.clientX > br.right - 20 && t.clientY > br.bottom - 20;
+    mode = nearBR ? "resize" : "move";
+    start = { x: t.clientX, y: t.clientY, rect: { ...cropRect } };
+  };
+  const onMove = (e) => {
+    if (!mode || !start) return;
+    e.preventDefault();
+    const t = e.touches ? e.touches[0] : e;
+    const sr = stage.getBoundingClientRect();
+    const dx = (t.clientX - start.x) / sr.width;
+    const dy = (t.clientY - start.y) / sr.height;
+    if (mode === "move") {
+      cropRect.x = Math.max(0, Math.min(1 - start.rect.w, start.rect.x + dx));
+      cropRect.y = Math.max(0, Math.min(1 - start.rect.h, start.rect.y + dy));
+    } else {
+      cropRect.w = Math.max(0.15, Math.min(1 - start.rect.x, start.rect.w + dx));
+      cropRect.h = Math.max(0.15, Math.min(1 - start.rect.y, start.rect.h + dy));
+    }
+    placeCropBox();
+  };
+  const onUp = () => { mode = null; start = null; };
+  box.addEventListener("pointerdown", onDown);
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  box.addEventListener("touchstart", onDown, { passive: false });
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("touchend", onUp);
+})();
+
 
 $("#btnGenMap")?.addEventListener("click", () => {
   state.match.terrain = generateTerrain(Date.now());
