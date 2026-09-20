@@ -35,14 +35,14 @@
             <span class="role-num">01</span>
             <div>
               <strong>Jogador</strong>
-              <small>Confirma presença e entra no jogo</small>
+              <small>GPS no mapa · confirma e entra</small>
             </div>
           </button>
           <button type="button" class="role-card" data-role="organizer">
             <span class="role-num">02</span>
             <div>
               <strong>Operador</strong>
-              <small>Cria o mapa e inicia a partida</small>
+              <small>Mapa tático · objetivo · inicia</small>
             </div>
           </button>
         </div>
@@ -54,20 +54,19 @@
           <div class="icon">◉</div>
           <p class="kicker">AGUARDANDO</p>
           <h2>Sem partida</h2>
-          <p>O operador ainda não abriu a operação.<br>Fique nesta tela — quando liberar, você entra.</p>
+          <p>O operador ainda não abriu a operação.<br>Fique nesta tela.</p>
         </div>
 
         <div id="playerReady" class="hidden">
           <div class="status-big">
             <div class="label">Status</div>
-            <div class="value wait" id="pStatus">AGENDADA</div>
+            <div class="value wait" id="pStatus">ABERTA</div>
           </div>
           <div class="card">
             <h3 id="pName">—</h3>
             <div class="info-line"><span>Local</span><strong id="pLoc">—</strong></div>
-            <div class="info-line"><span>Modo</span><strong id="pMode">—</strong></div>
-            <div class="info-line"><span>Duração</span><strong id="pDur">—</strong></div>
             <div class="info-line"><span>Objetivo</span><strong id="pObj">—</strong></div>
+            <div class="info-line"><span>Duração</span><strong id="pDur">—</strong></div>
           </div>
           <button type="button" class="btn primary" id="btnConfirm">CONFIRMAR PRESENÇA</button>
           <button type="button" class="btn primary hidden" id="btnEnter">ENTRAR NO JOGO</button>
@@ -78,13 +77,13 @@
             <div class="label">Em operação</div>
             <div class="value live" id="pTimer">00:00</div>
           </div>
-          <div class="card">
-            <h3 id="pLiveName">—</h3>
+          <div class="card compact">
             <div class="info-line"><span>Objetivo</span><strong id="pLiveObj">—</strong></div>
             <div class="info-line"><span>Estado</span><strong id="pAlive">ATIVO</strong></div>
+            <div class="info-line"><span>GPS</span><strong id="pGps">—</strong></div>
           </div>
-          <div class="map-wrap" id="playerMapWrap">
-            <img id="playerMapImg" alt="Mapa">
+          <p class="map-hint" id="calibHint">Ative a localização. A bolinha é você no mapa.</p>
+          <div class="map-wrap tall" id="playerMapWrap">
             <canvas id="playerMapCanvas"></canvas>
           </div>
           <div class="hit-row">
@@ -97,7 +96,7 @@
       <!-- ORGANIZER -->
       <section class="screen" data-screen="organizer">
         <p class="kicker">OPERADOR</p>
-        <h2>Nova partida</h2>
+        <h2>Partida</h2>
 
         <div class="card">
           <div class="field">
@@ -108,37 +107,38 @@
             <label class="field"><span>Local</span><input id="oLoc" type="text" placeholder="Campo"></label>
             <label class="field"><span>Minutos</span><input id="oDur" type="number" value="60" min="10" max="480"></label>
           </div>
-          <div class="field">
-            <span>Modo</span>
-            <input id="oMode" type="text" placeholder="Simulação / CQB / Campo">
-          </div>
-          <div class="field">
-            <span>Objetivo</span>
-            <input id="oObj" type="text" placeholder="Ex: dominar setor A">
+
+          <p class="field-label">Objetivo</p>
+          <div class="obj-grid" id="objGrid">
+            <button type="button" class="obj-btn active" data-obj="rouba_bandeira">Rouba bandeira</button>
+            <button type="button" class="obj-btn" data-obj="bomba">Bomba</button>
+            <button type="button" class="obj-btn disabled" data-obj="captura" disabled>Captura de pontos <em>em breve</em></button>
+            <button type="button" class="obj-btn disabled" data-obj="eliminacao" disabled>Eliminação + respawn <em>em breve</em></button>
           </div>
         </div>
 
         <div class="card">
-          <h3>Mapa real</h3>
-          <p class="map-hint">Suba foto/satélite do campo. Depois marque zonas no desenho.</p>
-          <label class="file-btn">
-            SUBIR IMAGEM DO MAPA
-            <input type="file" id="mapFile" accept="image/*">
-          </label>
+          <h3>Mapa tático</h3>
+          <p class="map-hint">Mapa estilo operação (não satélite). Gere, ajuste e marque.</p>
+          <div class="map-tools">
+            <button type="button" class="tool-btn" id="btnGenMap">GERAR MAPA</button>
+            <button type="button" class="tool-btn" id="btnClearMap">LIMPAR</button>
+          </div>
           <div class="map-tools">
             <button type="button" class="tool-btn active" data-tool="point">Ponto</button>
             <button type="button" class="tool-btn" data-tool="zone">Zona</button>
             <button type="button" class="tool-btn" data-tool="base">Base</button>
+            <button type="button" class="tool-btn" data-tool="flag">Bandeira</button>
+            <button type="button" class="tool-btn" data-tool="bomb">Bomba</button>
             <button type="button" class="tool-btn" data-tool="erase">Apagar</button>
           </div>
           <div class="map-wrap" id="orgMapWrap">
-            <img id="mapImg" alt="Mapa">
             <canvas id="mapCanvas"></canvas>
           </div>
-          <button type="button" class="btn ghost" id="btnClearMarks">LIMPAR MARCAS</button>
+          <p class="map-hint">Toque no mapa para marcar. Gerar cria terreno tático novo.</p>
         </div>
 
-        <button type="button" class="btn primary" id="btnSave">SALVAR E ABRIR PARA JOGADORES</button>
+        <button type="button" class="btn primary" id="btnSave">SALVAR E ABRIR</button>
         <button type="button" class="btn primary hidden" id="btnStart">INICIAR PARTIDA</button>
         <button type="button" class="btn danger hidden" id="btnEnd">ENCERRAR</button>
         <button type="button" class="btn ghost" id="btnOrgBack">VOLTAR</button>
@@ -157,7 +157,6 @@
         <button type="button" class="btn ghost" id="devBack">VOLTAR</button>
       </section>
     </main>
-
     <div id="toast" class="toast"></div>
   </div>
   <script src="app.js"></script>
