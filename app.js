@@ -1,7 +1,16 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-database.js";
+import {
+  getDatabase,
+  ref,
+  set,
+  onValue,
+  remove
+} from "https://www.gstatic.com/firebasejs/10.10.0/firebase-database.js";
 
-// --- CONFIGURAÇÃO DO FIREBASE ---
+// ============================================================
+// FIREBASE
+// ============================================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyAQK1aQR9Et8uWofokz3xTGRfwdb2XK37Q",
   authDomain: "deseart-falcons-airsof.firebaseapp.com",
@@ -14,18 +23,27 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
 const matchRef = ref(db, "match");
 const playersRef = ref(db, "players");
 
-// Identificação única do Jogador no aparelho
+// ============================================================
+// IDENTIDADE DO JOGADOR
+// ============================================================
+
 let myId = localStorage.getItem("df_player_id");
+
 if (!myId) {
-  myId = "p_" + Math.random().toString(36).substr(2, 9);
+  myId = "p_" + Math.random().toString(36).substring(2, 11);
   localStorage.setItem("df_player_id", myId);
 }
+
 const myRef = ref(db, "players/" + myId);
 
-// --- UTILIDADES ---
+// ============================================================
+// UTILIDADES
+// ============================================================
+
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -37,6 +55,7 @@ const OBJ_LABELS = {
 function initial() {
   return {
     role: null,
+
     match: {
       exists: false,
       status: "none",
@@ -49,6 +68,7 @@ function initial() {
       terrain: null,
       marks: [],
       startedAt: null,
+
       bomb: {
         planted: false,
         plantedAt: null,
@@ -56,12 +76,16 @@ function initial() {
         exploded: false
       }
     },
+
     player: {
       presence: false,
       alive: true
     },
+
     otherPlayers: {},
+
     tool: "point",
+
     gps: {
       lat: null,
       lng: null,
@@ -72,41 +96,87 @@ function initial() {
 }
 
 let state = initial();
+
 let timerId = null;
 let gpsWatch = null;
 let animFrame = null;
 let prevScreen = "role";
 
+// ============================================================
+// TOAST
+// ============================================================
+
 function toast(msg) {
   const el = $("#toast");
+
   if (!el) return;
 
   el.textContent = msg;
   el.classList.add("show");
 
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove("show"), 2200);
+
+  el._t = setTimeout(() => {
+    el.classList.remove("show");
+  }, 2200);
 }
 
+// ============================================================
+// NAVEGAÇÃO
+// ============================================================
+
 function show(name) {
-  $(".screen").forEach(s =>
-    s.classList.toggle("active", s.dataset.screen === name)
+  const screens = $$(".screen");
+
+  if (!screens.length) {
+    console.error("Nenhuma .screen encontrada.");
+    return;
+  }
+
+  const target = screens.find(
+    s => s.dataset.screen === name
   );
 
-  if (name !== "dev") prevScreen = name;
+  if (!target) {
+    console.error("Tela não encontrada:", name);
+    toast("Tela não encontrada: " + name);
+    return;
+  }
+
+  screens.forEach(screen => {
+    screen.classList.toggle(
+      "active",
+      screen === target
+    );
+  });
+
+  if (name !== "dev") {
+    prevScreen = name;
+  }
 
   render();
 }
 
-// --- CONEXÃO FIREBASE (REAL-TIME) ---
+// ============================================================
+// FIREBASE REAL-TIME
+// ============================================================
+
 function load() {
   state.role = localStorage.getItem("df_role") || null;
 
-  onValue(matchRef, (snap) => {
+  onValue(matchRef, snap => {
     const data = snap.val();
 
     if (data) {
-      state.match = data;
+      state.match = {
+        ...initial().match,
+        ...data,
+        bomb: {
+          ...initial().match.bomb,
+          ...(data.bomb || {})
+        },
+        marks: data.marks || []
+      };
     } else {
       state.match = initial().match;
     }
@@ -122,14 +192,10 @@ function load() {
     render();
   });
 
-  onValue(playersRef, (snap) => {
+  onValue(playersRef, snap => {
     const data = snap.val();
 
-    if (data) {
-      state.otherPlayers = data;
-    } else {
-      state.otherPlayers = {};
-    }
+    state.otherPlayers = data || {};
 
     if (state.match.status === "live") {
       paintPlayer();
@@ -137,32 +203,50 @@ function load() {
   });
 }
 
+// ============================================================
+// FIREBASE SAVE
+// ============================================================
+
 function saveMatchData() {
-  if (state.role === "organizer") {
-    set(matchRef, state.match);
-  }
+  if (state.role !== "organizer") return;
+
+  set(matchRef, state.match).catch(err => {
+    console.error("Erro ao salvar partida:", err);
+    toast("Erro ao salvar partida.");
+  });
 }
 
 function savePlayerData() {
-  if (state.role === "player") {
-    set(myRef, {
-      presence: state.player.presence,
-      alive: state.player.alive,
-      lat: state.gps.lat,
-      lng: state.gps.lng,
-      ts: Date.now()
-    });
-  }
+  if (state.role !== "player") return;
+
+  set(myRef, {
+    presence: state.player.presence,
+    alive: state.player.alive,
+    lat: state.gps.lat,
+    lng: state.gps.lng,
+    ts: Date.now()
+  }).catch(err => {
+    console.error("Erro ao salvar jogador:", err);
+  });
 }
 
 function saveRole() {
-  localStorage.setItem("df_role", state.role || "");
+  localStorage.setItem(
+    "df_role",
+    state.role || ""
+  );
 }
 
-function checkInvite() {
-  const urlParams = new URLSearchParams(window.location.search);
+// ============================================================
+// CONVITE
+// ============================================================
 
-  if (urlParams.get("join")) {
+function checkInvite() {
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  if (params.get("join")) {
     state.role = "player";
     saveRole();
 
@@ -174,7 +258,10 @@ function checkInvite() {
   }
 }
 
-// --- GPS OBRIGATÓRIO ---
+// ============================================================
+// GPS
+// ============================================================
+
 function showGpsGate() {
   $("#gpsGate")?.classList.remove("hidden");
 }
@@ -185,82 +272,128 @@ function hideGpsGate() {
 
 function requestGps() {
   if (!navigator.geolocation) {
+    state.gps.denied = true;
     showGpsGate();
-    toast("GPS indisponível");
+    toast("GPS indisponível neste aparelho.");
     return;
   }
 
   navigator.geolocation.getCurrentPosition(
-    (pos) => {
+    pos => {
       state.gps.lat = pos.coords.latitude;
       state.gps.lng = pos.coords.longitude;
       state.gps.ok = true;
       state.gps.denied = false;
 
       hideGpsGate();
-      savePlayerData();
+
+      if (state.role === "player") {
+        savePlayerData();
+      }
+
       startGpsWatch();
 
-      toast("Localização ativa");
+      toast("Localização ativa.");
+
       render();
     },
-    () => {
+
+    err => {
+      console.warn("GPS:", err);
+
       state.gps.ok = false;
       state.gps.denied = true;
+
       showGpsGate();
     },
+
     {
       enableHighAccuracy: true,
-      timeout: 12000
+      timeout: 12000,
+      maximumAge: 0
     }
   );
 }
 
 function startGpsWatch() {
-  if (gpsWatch != null || !navigator.geolocation) return;
+  if (
+    gpsWatch !== null ||
+    !navigator.geolocation
+  ) {
+    return;
+  }
 
-  gpsWatch = navigator.geolocation.watchPosition(
-    (pos) => {
-      state.gps.lat = pos.coords.latitude;
-      state.gps.lng = pos.coords.longitude;
-      state.gps.ok = true;
+  gpsWatch =
+    navigator.geolocation.watchPosition(
+      pos => {
+        state.gps.lat =
+          pos.coords.latitude;
 
-      const el = $("#pGps");
+        state.gps.lng =
+          pos.coords.longitude;
 
-      if (el) {
-        el.textContent =
-          "ATIVO · " + Math.round(pos.coords.accuracy) + "m";
+        state.gps.ok = true;
+        state.gps.denied = false;
+
+        const el = $("#pGps");
+
+        if (el) {
+          el.textContent =
+            "ATIVO · " +
+            Math.round(pos.coords.accuracy) +
+            "m";
+        }
+
+        if (
+          state.role === "player" &&
+          state.player.presence
+        ) {
+          savePlayerData();
+        }
+      },
+
+      err => {
+        console.warn("GPS watch:", err);
+
+        state.gps.ok = false;
+        state.gps.denied = true;
+
+        showGpsGate();
+      },
+
+      {
+        enableHighAccuracy: true,
+        maximumAge: 2000,
+        timeout: 10000
       }
-
-      if (state.role === "player" && state.player.presence) {
-        savePlayerData();
-      }
-    },
-    () => {
-      state.gps.ok = false;
-      showGpsGate();
-    },
-    {
-      enableHighAccuracy: true,
-      maximumAge: 2000,
-      timeout: 10000
-    }
-  );
+    );
 }
 
-// --- TERRENO E DESENHOS NO MAPA ---
+// ============================================================
+// MAPA
+// ============================================================
+
 function drawMarks(ctx, w, h, marks) {
-  (marks || []).forEach((mk) => {
+  (marks || []).forEach(mk => {
     const x = mk.x * w;
     const y = mk.y * h;
 
     if (mk.type === "zone") {
-      const rad = (mk.r || 0.09) * Math.min(w, h);
+      const rad =
+        (mk.r || 0.09) *
+        Math.min(w, h);
 
       ctx.beginPath();
-      ctx.arc(x, y, rad, 0, Math.PI * 2);
+      ctx.arc(
+        x,
+        y,
+        rad,
+        0,
+        Math.PI * 2
+      );
 
-      ctx.fillStyle = "rgba(196,160,106,0.28)";
+      ctx.fillStyle =
+        "rgba(196,160,106,0.28)";
       ctx.fill();
 
       ctx.strokeStyle = "#c4a06a";
@@ -268,23 +401,46 @@ function drawMarks(ctx, w, h, marks) {
       ctx.stroke();
 
       ctx.fillStyle = "#c4a06a";
-      ctx.font = "bold 11px system-ui";
+      ctx.font =
+        "bold 11px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText("Z", x, y + 4);
+      ctx.fillText(
+        "Z",
+        x,
+        y + 4
+      );
+
     } else if (mk.type === "base") {
       const s = 24;
 
-      ctx.fillStyle = "rgba(74,154,74,0.4)";
-      ctx.fillRect(x - s, y - s, s * 2, s * 2);
+      ctx.fillStyle =
+        "rgba(74,154,74,0.4)";
+      ctx.fillRect(
+        x - s,
+        y - s,
+        s * 2,
+        s * 2
+      );
 
       ctx.strokeStyle = "#4a9a4a";
       ctx.lineWidth = 3;
-      ctx.strokeRect(x - s, y - s, s * 2, s * 2);
+      ctx.strokeRect(
+        x - s,
+        y - s,
+        s * 2,
+        s * 2
+      );
 
       ctx.fillStyle = "#4a9a4a";
-      ctx.font = "bold 14px system-ui";
+      ctx.font =
+        "bold 14px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText("BASE", x, y + 5);
+      ctx.fillText(
+        "BASE",
+        x,
+        y + 5
+      );
+
     } else if (mk.type === "flag") {
       ctx.strokeStyle = "#d4b84a";
       ctx.lineWidth = 2.5;
@@ -302,9 +458,16 @@ function drawMarks(ctx, w, h, marks) {
       ctx.lineTo(x, y - 2);
       ctx.closePath();
       ctx.fill();
+
     } else if (mk.type === "bomb") {
       ctx.beginPath();
-      ctx.arc(x, y, 11, 0, Math.PI * 2);
+      ctx.arc(
+        x,
+        y,
+        11,
+        0,
+        Math.PI * 2
+      );
 
       ctx.fillStyle = "#c04040";
       ctx.fill();
@@ -314,12 +477,24 @@ function drawMarks(ctx, w, h, marks) {
       ctx.stroke();
 
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 11px system-ui";
+      ctx.font =
+        "bold 11px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText("💣", x, y + 4);
+      ctx.fillText(
+        "💣",
+        x,
+        y + 4
+      );
+
     } else {
       ctx.beginPath();
-      ctx.arc(x, y, 7, 0, Math.PI * 2);
+      ctx.arc(
+        x,
+        y,
+        7,
+        0,
+        Math.PI * 2
+      );
 
       ctx.fillStyle = "#5b8def";
       ctx.fill();
@@ -331,20 +506,45 @@ function drawMarks(ctx, w, h, marks) {
   });
 }
 
-function drawYou(ctx, w, h, nx, ny) {
+function drawYou(
+  ctx,
+  w,
+  h,
+  nx,
+  ny
+) {
   const x = nx * w;
   const y = ny * h;
 
-  const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 350);
+  const pulse =
+    0.55 +
+    0.45 *
+      Math.sin(
+        Date.now() / 350
+      );
 
   ctx.beginPath();
-  ctx.arc(x, y, 18 * pulse, 0, Math.PI * 2);
+  ctx.arc(
+    x,
+    y,
+    18 * pulse,
+    0,
+    Math.PI * 2
+  );
 
-  ctx.fillStyle = `rgba(240,232,192,${0.18 * pulse})`;
+  ctx.fillStyle =
+    `rgba(240,232,192,${0.18 * pulse})`;
+
   ctx.fill();
 
   ctx.beginPath();
-  ctx.arc(x, y, 8, 0, Math.PI * 2);
+  ctx.arc(
+    x,
+    y,
+    8,
+    0,
+    Math.PI * 2
+  );
 
   ctx.fillStyle = "#f0e8c0";
   ctx.shadowColor = "#d4b84a";
@@ -352,24 +552,53 @@ function drawYou(ctx, w, h, nx, ny) {
   ctx.fill();
 
   ctx.shadowBlur = 0;
+
   ctx.strokeStyle = "#8b6b4a";
   ctx.lineWidth = 2;
   ctx.stroke();
 }
 
-function sizeCanvas(canvas, wrap) {
+function sizeCanvas(
+  canvas,
+  wrap
+) {
   if (!canvas || !wrap) {
-    return { w: 0, h: 0 };
+    return {
+      w: 0,
+      h: 0
+    };
   }
 
-  const r = wrap.getBoundingClientRect();
-  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const r =
+    wrap.getBoundingClientRect();
 
-  canvas.width = Math.max(1, Math.floor(r.width * dpr));
-  canvas.height = Math.max(1, Math.floor(r.height * dpr));
+  const dpr =
+    Math.min(
+      window.devicePixelRatio || 1,
+      2
+    );
 
-  canvas.style.width = r.width + "px";
-  canvas.style.height = r.height + "px";
+  canvas.width =
+    Math.max(
+      1,
+      Math.floor(
+        r.width * dpr
+      )
+    );
+
+  canvas.height =
+    Math.max(
+      1,
+      Math.floor(
+        r.height * dpr
+      )
+    );
+
+  canvas.style.width =
+    r.width + "px";
+
+  canvas.style.height =
+    r.height + "px";
 
   return {
     w: canvas.width,
@@ -387,25 +616,48 @@ function paintOrg() {
 
   if (!canvas) return;
 
-  const { w, h } = sizeCanvas(canvas, wrap);
-  const ctx = canvas.getContext("2d");
+  const { w, h } =
+    sizeCanvas(
+      canvas,
+      wrap
+    );
 
-  ctx.clearRect(0, 0, w, h);
+  const ctx =
+    canvas.getContext("2d");
+
+  ctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
 
   const img = $("#mapImg");
 
-  if (state.match.mapImage && img) {
-    img.src = state.match.mapImage;
+  if (
+    state.match.mapImage &&
+    img
+  ) {
+    img.src =
+      state.match.mapImage;
+
     img.classList.add("show");
   } else {
     img?.classList.remove("show");
 
     ctx.fillStyle = "#2a3228";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(
+      0,
+      0,
+      w,
+      h
+    );
 
     ctx.fillStyle = "#8b9a6a";
-    ctx.font = "13px system-ui";
+    ctx.font =
+      "13px system-ui";
     ctx.textAlign = "center";
+
     ctx.fillText(
       "Envie um mapa tático",
       w / 2,
@@ -413,54 +665,115 @@ function paintOrg() {
     );
   }
 
-  drawMarks(ctx, w, h, state.match.marks);
+  drawMarks(
+    ctx,
+    w,
+    h,
+    state.match.marks
+  );
 }
 
 function paintPlayer() {
-  const canvas = $("#playerMapCanvas");
-  const wrap = $("#playerMapWrap");
+  const canvas =
+    $("#playerMapCanvas");
+
+  const wrap =
+    $("#playerMapWrap");
 
   if (!canvas) return;
 
-  const { w, h } = sizeCanvas(canvas, wrap);
-  const ctx = canvas.getContext("2d");
+  const { w, h } =
+    sizeCanvas(
+      canvas,
+      wrap
+    );
 
-  ctx.clearRect(0, 0, w, h);
+  const ctx =
+    canvas.getContext("2d");
 
-  const img = $("#playerMapImg");
+  ctx.clearRect(
+    0,
+    0,
+    w,
+    h
+  );
 
-  if (state.match.mapImage && img) {
-    img.src = state.match.mapImage;
+  const img =
+    $("#playerMapImg");
+
+  if (
+    state.match.mapImage &&
+    img
+  ) {
+    img.src =
+      state.match.mapImage;
+
     img.classList.add("show");
   } else {
     img?.classList.remove("show");
 
     ctx.fillStyle = "#2a3228";
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(
+      0,
+      0,
+      w,
+      h
+    );
   }
 
-  drawMarks(ctx, w, h, state.match.marks);
+  drawMarks(
+    ctx,
+    w,
+    h,
+    state.match.marks
+  );
 
-  Object.keys(state.otherPlayers).forEach((key) => {
-    const p = state.otherPlayers[key];
+  Object.keys(
+    state.otherPlayers
+  ).forEach(key => {
+    const p =
+      state.otherPlayers[key];
 
     if (
       key !== myId &&
-      p.lat &&
-      p.lng &&
+      p.lat != null &&
+      p.lng != null &&
       p.alive &&
       p.presence
     ) {
       let ox =
         0.5 +
-        ((p.lat % 0.001) / 0.001 - 0.5) * 0.1;
+        (
+          (p.lat % 0.001) /
+          0.001 -
+          0.5
+        ) *
+        0.1;
 
       let oy =
         0.5 +
-        ((p.lng % 0.001) / 0.001 - 0.5) * 0.1;
+        (
+          (p.lng % 0.001) /
+          0.001 -
+          0.5
+        ) *
+        0.1;
 
-      ox = Math.max(0.1, Math.min(0.9, ox));
-      oy = Math.max(0.1, Math.min(0.9, oy));
+      ox = Math.max(
+        0.1,
+        Math.min(
+          0.9,
+          ox
+        )
+      );
+
+      oy = Math.max(
+        0.1,
+        Math.min(
+          0.9,
+          oy
+        )
+      );
 
       ctx.beginPath();
       ctx.arc(
@@ -482,37 +795,79 @@ function paintPlayer() {
   let px = 0.5;
   let py = 0.5;
 
-  if (state.gps.ok && state.gps.lat != null) {
+  if (
+    state.gps.ok &&
+    state.gps.lat != null &&
+    state.gps.lng != null
+  ) {
     px =
       0.5 +
-      ((state.gps.lat % 0.001) / 0.001 - 0.5) *
-        0.1;
+      (
+        (state.gps.lat % 0.001) /
+        0.001 -
+        0.5
+      ) *
+      0.1;
 
     py =
       0.5 +
-      ((state.gps.lng % 0.001) / 0.001 - 0.5) *
-        0.1;
+      (
+        (state.gps.lng % 0.001) /
+        0.001 -
+        0.5
+      ) *
+      0.1;
 
-    px = Math.max(0.1, Math.min(0.9, px));
-    py = Math.max(0.1, Math.min(0.9, py));
+    px = Math.max(
+      0.1,
+      Math.min(
+        0.9,
+        px
+      )
+    );
+
+    py = Math.max(
+      0.1,
+      Math.min(
+        0.9,
+        py
+      )
+    );
   }
 
-  drawYou(ctx, w, h, px, py);
+  drawYou(
+    ctx,
+    w,
+    h,
+    px,
+    py
+  );
 }
 
+// ============================================================
+// PAINEL DE MAPA
+// ============================================================
+
 function updateMarkPanel() {
-  const panel = $("#markPanel");
-  const hint = $("#mapStepHint");
+  const panel =
+    $("#markPanel");
+
+  const hint =
+    $("#mapStepHint");
 
   if (hasMap()) {
-    panel?.classList.remove("hidden");
+    panel?.classList.remove(
+      "hidden"
+    );
 
     if (hint) {
       hint.textContent =
         "Mapa delimitado. Agora coloque as características: base, zona, bandeira, bomba…";
     }
   } else {
-    panel?.classList.add("hidden");
+    panel?.classList.add(
+      "hidden"
+    );
 
     if (hint) {
       hint.textContent =
@@ -521,134 +876,239 @@ function updateMarkPanel() {
   }
 }
 
-// --- RENDERIZAÇÃO DA INTERFACE ---
+// ============================================================
+// HEADER
+// ============================================================
+
 function renderHeader() {
-  const pill = $("#statusPill");
+  const pill =
+    $("#statusPill");
 
   if (!pill) return;
 
-  const st = state.match.status;
+  const st =
+    state.match.status;
 
   if (st === "live") {
-    pill.textContent = "AO VIVO";
-    pill.className = "pill live";
+    pill.textContent =
+      "AO VIVO";
+
+    pill.className =
+      "pill live";
+
   } else if (st === "open") {
-    pill.textContent = "ABERTA";
-    pill.className = "pill wait";
+    pill.textContent =
+      "ABERTA";
+
+    pill.className =
+      "pill wait";
+
   } else {
-    pill.textContent = "SEM PARTIDA";
-    pill.className = "pill";
+    pill.textContent =
+      "SEM PARTIDA";
+
+    pill.className =
+      "pill";
   }
 }
 
-function renderPlayer() {
-  const m = state.match;
+// ============================================================
+// PLAYER
+// ============================================================
 
-  const wait = $("#playerWait");
-  const ready = $("#playerReady");
-  const live = $("#playerLive");
+function renderPlayer() {
+  const m =
+    state.match;
+
+  const wait =
+    $("#playerWait");
+
+  const ready =
+    $("#playerReady");
+
+  const live =
+    $("#playerLive");
 
   if (
     !m.exists ||
     m.status === "none" ||
     m.status === "ended"
   ) {
-    wait?.classList.remove("hidden");
-    ready?.classList.add("hidden");
-    live?.classList.add("hidden");
+    wait?.classList.remove(
+      "hidden"
+    );
+
+    ready?.classList.add(
+      "hidden"
+    );
+
+    live?.classList.add(
+      "hidden"
+    );
+
     return;
   }
 
-  if (m.status === "live" && state.player.presence) {
-    wait?.classList.add("hidden");
-    ready?.classList.add("hidden");
-    live?.classList.remove("hidden");
+  if (
+    m.status === "live" &&
+    state.player.presence
+  ) {
+    wait?.classList.add(
+      "hidden"
+    );
+
+    ready?.classList.add(
+      "hidden"
+    );
+
+    live?.classList.remove(
+      "hidden"
+    );
 
     $("#pLiveObj").textContent =
-      OBJ_LABELS[m.objective] || m.objective;
+      OBJ_LABELS[m.objective] ||
+      m.objective;
 
     $("#pAlive").textContent =
-      state.player.alive ? "ATIVO" : "OUT";
+      state.player.alive
+        ? "ATIVO"
+        : "OUT";
 
-    const isOrg = state.role === "organizer";
+    const isOrg =
+      state.role === "organizer";
 
-    $("#btnOrgFromGame")?.classList.toggle(
-      "hidden",
-      !isOrg
-    );
+    $("#btnOrgFromGame")
+      ?.classList.toggle(
+        "hidden",
+        !isOrg
+      );
 
-    $("#btnEndFromGame")?.classList.toggle(
-      "hidden",
-      !isOrg
-    );
+    $("#btnEndFromGame")
+      ?.classList.toggle(
+        "hidden",
+        !isOrg
+      );
 
-    const bombModule = $("#bombModule");
+    const bombModule =
+      $("#bombModule");
 
-    if (m.objective === "bomba") {
-      bombModule?.classList.remove("hidden");
+    if (
+      m.objective === "bomba"
+    ) {
+      bombModule?.classList.remove(
+        "hidden"
+      );
 
       if (m.bomb.exploded) {
-        $("#bombTimerUI").textContent = "BOOM!";
+        $("#bombTimerUI").textContent =
+          "BOOM!";
+
         $("#bombStatusText").textContent =
           "ÁREA DESTRUÍDA";
 
-        $("#btnPlantBomb").classList.add("hidden");
-        $("#btnDefuseBomb").classList.add("hidden");
+        $("#btnPlantBomb")
+          ?.classList.add(
+            "hidden"
+          );
+
+        $("#btnDefuseBomb")
+          ?.classList.add(
+            "hidden"
+          );
+
       } else if (m.bomb.defused) {
-        $("#bombTimerUI").textContent = "00:00";
+        $("#bombTimerUI").textContent =
+          "00:00";
+
         $("#bombStatusText").textContent =
           "BOMBA DESARMADA";
 
         $("#bombStatusText").style.color =
           "var(--live)";
 
-        $("#btnPlantBomb").classList.add("hidden");
-        $("#btnDefuseBomb").classList.add("hidden");
+        $("#btnPlantBomb")
+          ?.classList.add(
+            "hidden"
+          );
+
+        $("#btnDefuseBomb")
+          ?.classList.add(
+            "hidden"
+          );
+
       } else if (m.bomb.planted) {
         $("#bombStatusText").textContent =
           "ARMADA - CORRA!";
 
-        $("#btnPlantBomb").classList.add("hidden");
-        $("#btnDefuseBomb").classList.remove(
-          "hidden"
-        );
+        $("#btnPlantBomb")
+          ?.classList.add(
+            "hidden"
+          );
+
+        $("#btnDefuseBomb")
+          ?.classList.remove(
+            "hidden"
+          );
+
       } else {
-        $("#bombTimerUI").textContent = "10:00";
+        $("#bombTimerUI").textContent =
+          "10:00";
+
         $("#bombStatusText").textContent =
           "AGUARDANDO PLANT";
 
-        $("#btnPlantBomb").classList.remove(
-          "hidden"
-        );
+        $("#btnPlantBomb")
+          ?.classList.remove(
+            "hidden"
+          );
 
-        $("#btnDefuseBomb").classList.add(
-          "hidden"
-        );
+        $("#btnDefuseBomb")
+          ?.classList.add(
+            "hidden"
+          );
       }
+
     } else {
-      bombModule?.classList.add("hidden");
+      bombModule?.classList.add(
+        "hidden"
+      );
     }
 
     paintPlayer();
     startAnim();
+
     return;
   }
 
-  wait?.classList.add("hidden");
-  ready?.classList.remove("hidden");
-  live?.classList.add("hidden");
+  wait?.classList.add(
+    "hidden"
+  );
 
-  $("#pName").textContent = m.name || "—";
-  $("#pLoc").textContent = m.location || "—";
+  ready?.classList.remove(
+    "hidden"
+  );
+
+  live?.classList.add(
+    "hidden"
+  );
+
+  $("#pName").textContent =
+    m.name || "—";
+
+  $("#pLoc").textContent =
+    m.location || "—";
+
   $("#pObj").textContent =
     OBJ_LABELS[m.objective] ||
     m.objective ||
     "—";
 
   $("#pDur").textContent =
-    (m.duration || 60) + " min";
+    (m.duration || 60) +
+    " min";
 
-  const st = $("#pStatus");
+  const st =
+    $("#pStatus");
 
   if (st) {
     st.textContent =
@@ -658,17 +1118,21 @@ function renderPlayer() {
 
     st.className =
       "value " +
-      (m.status === "live"
-        ? "live"
-        : "wait");
+      (
+        m.status === "live"
+          ? "live"
+          : "wait"
+      );
   }
 
-  $("#btnConfirm")?.classList.toggle(
-    "hidden",
-    !!state.player.presence
-  );
+  $("#btnConfirm")
+    ?.classList.toggle(
+      "hidden",
+      !!state.player.presence
+    );
 
-  const ent = $("#btnEnter");
+  const ent =
+    $("#btnEnter");
 
   if (ent) {
     ent.classList.toggle(
@@ -683,41 +1147,55 @@ function renderPlayer() {
   }
 }
 
+// ============================================================
+// OPERADOR
+// ============================================================
+
 function fillOrg() {
-  const m = state.match;
+  const m =
+    state.match;
 
   if ($("#oName")) {
-    $("#oName").value = m.name || "";
+    $("#oName").value =
+      m.name || "";
   }
 
   if ($("#oLoc")) {
-    $("#oLoc").value = m.location || "";
+    $("#oLoc").value =
+      m.location || "";
   }
 
   if ($("#oDur")) {
-    $("#oDur").value = m.duration || 60;
+    $("#oDur").value =
+      m.duration || 60;
   }
 
   if ($("#oBriefing")) {
-    $("#oBriefing").value = m.briefing || "";
+    $("#oBriefing").value =
+      m.briefing || "";
   }
 
-  $(".obj-btn:not(:disabled)").forEach((b) => {
-    b.classList.toggle(
-      "active",
-      b.dataset.obj === m.objective
+  $(".obj-btn:not(:disabled)").forEach(
+    b => {
+      b.classList.toggle(
+        "active",
+        b.dataset.obj ===
+          m.objective
+      );
+    }
+  );
+
+  $("#btnEnd")
+    ?.classList.toggle(
+      "hidden",
+      m.status !== "live"
     );
-  });
 
-  $("#btnEnd")?.classList.toggle(
-    "hidden",
-    m.status !== "live"
-  );
-
-  $("#btnCopyInvite")?.classList.toggle(
-    "hidden",
-    !m.exists
-  );
+  $("#btnCopyInvite")
+    ?.classList.toggle(
+      "hidden",
+      !m.exists
+    );
 
   updateMarkPanel();
   paintOrg();
@@ -725,21 +1203,33 @@ function fillOrg() {
 
 function readOrg() {
   state.match.name =
-    ($("#oName")?.value || "").trim();
+    ($("#oName")?.value || "")
+      .trim();
 
   state.match.location =
-    ($("#oLoc")?.value || "").trim();
+    ($("#oLoc")?.value || "")
+      .trim();
 
   state.match.duration =
-    Number($("#oDur")?.value) || 60;
+    Number(
+      $("#oDur")?.value
+    ) || 60;
 
   state.match.briefing =
-    ($("#oBriefing")?.value || "").trim();
+    ($("#oBriefing")?.value || "")
+      .trim();
 }
 
+// ============================================================
+// TIMER
+// ============================================================
+
 function fmt(sec) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
+  const m =
+    Math.floor(sec / 60);
+
+  const s =
+    sec % 60;
 
   return (
     String(m).padStart(2, "0") +
@@ -748,49 +1238,72 @@ function fmt(sec) {
   );
 }
 
-function render() {
-  if (!state.gps.ok) {
-    showGpsGate();
-    return;
-  }
+// ============================================================
+// RENDER
+// ============================================================
 
-  hideGpsGate();
+function render() {
   renderHeader();
 
-  const sc =
-    document.querySelector(".screen.active")
-      ?.dataset.screen;
+  const active =
+    $(".screen.active");
 
-  if (sc === "player") {
+  const screen =
+    active?.dataset.screen;
+
+  if (screen === "player") {
     renderPlayer();
   }
 
-  if (sc === "organizer") {
+  if (screen === "organizer") {
     fillOrg();
   }
 
-  if (sc !== "player") {
+  if (screen !== "player") {
     stopAnim();
+  }
+
+  // O GPS bloqueia as funções do app,
+  // mas NÃO bloqueia a navegação das telas.
+  if (!state.gps.ok) {
+    showGpsGate();
+  } else {
+    hideGpsGate();
   }
 }
 
-// --- AÇÕES DO JOGO ---
+// ============================================================
+// PARTIDA
+// ============================================================
+
 function initMatch(enter) {
+  if (state.role !== "organizer") {
+    toast("Somente o operador pode criar a partida.");
+    return;
+  }
+
   readOrg();
 
   if (!state.match.name) {
-    return toast("Informe o nome da operação.");
+    toast("Informe o nome da operação.");
+    return;
   }
 
   if (!hasMap()) {
-    return toast("Envie um mapa antes.");
+    toast("Envie um mapa antes.");
+    return;
   }
 
   state.match.exists = true;
-  state.match.status = enter ? "live" : "open";
+
+  state.match.status =
+    enter
+      ? "live"
+      : "open";
 
   if (enter) {
-    state.match.startedAt = Date.now();
+    state.match.startedAt =
+      Date.now();
 
     state.match.bomb = {
       planted: false,
@@ -803,6 +1316,7 @@ function initMatch(enter) {
     state.player.alive = true;
 
     savePlayerData();
+
   } else {
     state.match.startedAt = null;
   }
@@ -811,82 +1325,137 @@ function initMatch(enter) {
 
   if (enter) {
     show("player");
-    toast("Partida iniciada — você entrou.");
+
+    toast(
+      "Partida iniciada — você entrou."
+    );
   } else {
     render();
-    toast("Partida aberta no lobby.");
+
+    toast(
+      "Partida aberta no lobby."
+    );
   }
 }
 
 function endMatch() {
-  state.match.status = "ended";
+  if (state.role !== "organizer") {
+    return;
+  }
+
+  state.match.status =
+    "ended";
 
   saveMatchData();
+
   stopTimer();
+
   render();
 
-  toast("Partida encerrada.");
+  toast(
+    "Partida encerrada."
+  );
 }
+
+// ============================================================
+// TIMER DA PARTIDA
+// ============================================================
 
 function startTimer() {
   stopTimer();
 
-  timerId = setInterval(() => {
-    if (state.match.status !== "live") {
-      return;
-    }
-
-    const now = Date.now();
-
-    const elapsed = Math.floor(
-      (now - (state.match.startedAt || now)) /
-        1000
-    );
-
-    if (
-      state.match.objective === "bomba" &&
-      state.match.bomb.planted &&
-      !state.match.bomb.defused &&
-      !state.match.bomb.exploded
-    ) {
-      const bombElapsed = Math.floor(
-        (now - state.match.bomb.plantedAt) /
-          1000
-      );
-
-      const timeLeft = 600 - bombElapsed;
-
-      if (timeLeft <= 0) {
-        if (state.role === "organizer") {
-          state.match.bomb.exploded = true;
-          saveMatchData();
-        }
-      } else {
-        const el = $("#bombTimerUI");
-
-        if (el) {
-          el.textContent = fmt(timeLeft);
-        }
-      }
-    }
-
-    const max =
-      (state.match.duration || 60) * 60;
-
-    if (elapsed >= max) {
-      if (state.role === "organizer") {
-        endMatch();
+  timerId =
+    setInterval(() => {
+      if (
+        state.match.status !==
+        "live"
+      ) {
+        return;
       }
 
-      return;
-    }
+      const now =
+        Date.now();
 
-    const t = $("#pTimer");
+      const elapsed =
+        Math.floor(
+          (
+            now -
+            (
+              state.match.startedAt ||
+              now
+            )
+          ) / 1000
+        );
 
-    if (t) {
-      t.textContent = fmt(elapsed);
-    }
-  }, 1000);
+      if (
+        state.match.objective ===
+          "bomba" &&
+        state.match.bomb.planted &&
+        !state.match.bomb.defused &&
+        !state.match.bomb.exploded
+      ) {
+        const bombElapsed =
+          Math.floor(
+            (
+              now -
+              state.match.bomb.plantedAt
+            ) / 1000
+          );
+
+        const timeLeft =
+          600 - bombElapsed;
+
+        if (
+          timeLeft <= 0
+        ) {
+          if (
+            state.role ===
+            "organizer"
+          ) {
+            state.match.bomb.exploded =
+              true;
+
+            saveMatchData();
+          }
+        } else {
+          const el =
+            $("#bombTimerUI");
+
+          if (el) {
+            el.textContent =
+              fmt(timeLeft);
+          }
+        }
+      }
+
+      const max =
+        (
+          state.match.duration ||
+          60
+        ) * 60;
+
+      if (
+        elapsed >= max
+      ) {
+        if (
+          state.role ===
+          "organizer"
+        ) {
+          endMatch();
+        }
+
+        return;
+      }
+
+      const t =
+        $("#pTimer");
+
+      if (t) {
+        t.textContent =
+          fmt(elapsed);
+      }
+
+    }, 1000);
 }
 
 function stopTimer() {
@@ -896,41 +1465,67 @@ function stopTimer() {
   }
 }
 
+// ============================================================
+// ANIMAÇÃO
+// ============================================================
+
 function startAnim() {
   stopAnim();
 
   const loop = () => {
-    if (state.match.status === "live") {
+    if (
+      state.match.status ===
+      "live"
+    ) {
       paintPlayer();
     }
 
-    animFrame = requestAnimationFrame(loop);
+    animFrame =
+      requestAnimationFrame(
+        loop
+      );
   };
 
-  animFrame = requestAnimationFrame(loop);
+  animFrame =
+    requestAnimationFrame(
+      loop
+    );
 }
 
 function stopAnim() {
   if (animFrame) {
-    cancelAnimationFrame(animFrame);
+    cancelAnimationFrame(
+      animFrame
+    );
+
     animFrame = null;
   }
 }
+
+// ============================================================
+// MAPA — CLIQUE
+// ============================================================
 
 function onMapTap(e) {
   e.preventDefault();
 
   if (!hasMap()) {
-    return toast("Envie o mapa primeiro.");
+    toast("Envie o mapa primeiro.");
+    return;
   }
 
-  const canvas = $("#mapCanvas");
+  const canvas =
+    $("#mapCanvas");
 
-  const rect = canvas.getBoundingClientRect();
+  if (!canvas) return;
 
-  const t = e.touches
-    ? e.touches[0]
-    : e;
+  const rect =
+    canvas.getBoundingClientRect();
+
+  const t =
+    e.touches
+      ? e.touches[0]
+      : e;
 
   const x =
     (t.clientX - rect.left) /
@@ -949,40 +1544,62 @@ function onMapTap(e) {
     return;
   }
 
-  if (state.tool === "erase") {
+  if (
+    state.tool ===
+    "erase"
+  ) {
     state.match.marks =
-      (state.match.marks || []).filter(
-        (m) =>
+      (
+        state.match.marks || []
+      ).filter(
+        m =>
           Math.hypot(
             m.x - x,
             m.y - y
           ) > 0.05
       );
-  } else if (state.tool === "zone") {
+
+  } else if (
+    state.tool ===
+    "zone"
+  ) {
     state.match.marks.push({
       type: "zone",
       x,
       y,
       r: 0.09
     });
-  } else if (state.tool === "base") {
+
+  } else if (
+    state.tool ===
+    "base"
+  ) {
     state.match.marks.push({
       type: "base",
       x,
       y
     });
-  } else if (state.tool === "flag") {
+
+  } else if (
+    state.tool ===
+    "flag"
+  ) {
     state.match.marks.push({
       type: "flag",
       x,
       y
     });
-  } else if (state.tool === "bomb") {
+
+  } else if (
+    state.tool ===
+    "bomb"
+  ) {
     state.match.marks.push({
       type: "bomb",
       x,
       y
     });
+
   } else {
     state.match.marks.push({
       type: "point",
@@ -995,64 +1612,121 @@ function onMapTap(e) {
   paintOrg();
 }
 
-// --- CLICKS GERAIS ---
-$("#gpsRetry")?.addEventListener(
-  "click",
-  () => requestGps()
-);
+// ============================================================
+// GPS BUTTONS
+// ============================================================
 
-$("#gpsDeny")?.addEventListener(
-  "click",
-  () => {
-    showGpsGate();
-    toast(
-      "Sem localização o app não funciona."
-    );
-  }
-);
+$("#gpsRetry")
+  ?.addEventListener(
+    "click",
+    () => {
+      requestGps();
+    }
+  );
+
+$("#gpsDeny")
+  ?.addEventListener(
+    "click",
+    () => {
+      showGpsGate();
+
+      toast(
+        "A localização é obrigatória."
+      );
+    }
+  );
+
+// ============================================================
+// NAVEGAÇÃO PRINCIPAL
+// ============================================================
 
 document.addEventListener(
   "click",
-  (e) => {
+  e => {
+
+    // ------------------------------
+    // PAPEL
+    // ------------------------------
+
     const role =
-      e.target.closest("[data-role]");
+      e.target.closest(
+        "[data-role]"
+      );
 
     if (role) {
-      if (!state.gps.ok) {
-        showGpsGate();
+      const selectedRole =
+        role.dataset.role;
+
+      if (
+        selectedRole !==
+          "player" &&
+        selectedRole !==
+          "organizer"
+      ) {
         return;
       }
 
       state.role =
-        role.dataset.role;
+        selectedRole;
 
       saveRole();
 
-      show(
-        state.role === "organizer"
-          ? "organizer"
-          : "player"
-      );
+      if (
+        selectedRole ===
+        "player"
+      ) {
+        show("player");
 
-      return;
+        if (!state.gps.ok) {
+          showGpsGate();
+        }
+
+        return;
+      }
+
+      if (
+        selectedRole ===
+        "organizer"
+      ) {
+        show("organizer");
+
+        if (!state.gps.ok) {
+          showGpsGate();
+        }
+
+        return;
+      }
     }
+
+    // ------------------------------
+    // FERRAMENTA DO MAPA
+    // ------------------------------
 
     const tool =
-      e.target.closest("[data-tool]");
+      e.target.closest(
+        "[data-tool]"
+      );
 
     if (tool) {
-      state.tool = tool.dataset.tool;
+      state.tool =
+        tool.dataset.tool;
 
-      $(".tool-btn[data-tool]").forEach(
-        (b) =>
-          b.classList.toggle(
-            "active",
-            b === tool
-          )
-      );
+      $(".tool-btn[data-tool]")
+        .forEach(
+          b => {
+            b.classList.toggle(
+              "active",
+              b === tool
+            );
+          }
+        );
 
       return;
     }
+
+    // ------------------------------
+    // OBJETIVO
+    // ------------------------------
 
     const obj =
       e.target.closest(
@@ -1066,28 +1740,40 @@ document.addEventListener(
       state.match.objective =
         obj.dataset.obj;
 
-      $(".obj-btn:not(:disabled)").forEach(
-        (b) =>
-          b.classList.toggle(
-            "active",
-            b === obj
-          )
-      );
+      $(".obj-btn:not(:disabled)")
+        .forEach(
+          b => {
+            b.classList.toggle(
+              "active",
+              b === obj
+            );
+          }
+        );
 
-      saveMatchData();
+      if (
+        state.role ===
+        "organizer"
+      ) {
+        saveMatchData();
+      }
 
       toast(
         "Objetivo: " +
-          (OBJ_LABELS[
+        (
+          OBJ_LABELS[
             obj.dataset.obj
           ] ||
-            obj.dataset.obj)
+          obj.dataset.obj
+        )
       );
     }
   }
 );
 
-// --- CROP MAPA (CORTE IMAGEM) ---
+// ============================================================
+// CROP
+// ============================================================
+
 let cropImg = null;
 
 let cropRect = {
@@ -1097,18 +1783,22 @@ let cropRect = {
   h: 0.8
 };
 
-function openCropEditor(dataUrl) {
-  const modal = $("#cropModal");
+function openCropEditor(
+  dataUrl
+) {
+  const modal =
+    $("#cropModal");
 
   if (!modal) return;
 
-  modal.classList.remove("hidden");
+  modal.classList.remove(
+    "hidden"
+  );
 
-  cropImg = new Image();
+  cropImg =
+    new Image();
 
   cropImg.onload = () => {
-    drawCropStage();
-
     cropRect = {
       x: 0.08,
       y: 0.08,
@@ -1116,15 +1806,20 @@ function openCropEditor(dataUrl) {
       h: 0.84
     };
 
+    drawCropStage();
     placeCropBox();
   };
 
-  cropImg.src = dataUrl;
+  cropImg.src =
+    dataUrl;
 }
 
 function drawCropStage() {
-  const canvas = $("#cropCanvas");
-  const stage = $("#cropStage");
+  const canvas =
+    $("#cropCanvas");
+
+  const stage =
+    $("#cropStage");
 
   if (
     !canvas ||
@@ -1138,13 +1833,20 @@ function drawCropStage() {
     stage.getBoundingClientRect();
 
   const dpr =
-    Math.min(devicePixelRatio || 1, 2);
+    Math.min(
+      window.devicePixelRatio || 1,
+      2
+    );
 
   canvas.width =
-    Math.floor(r.width * dpr);
+    Math.floor(
+      r.width * dpr
+    );
 
   canvas.height =
-    Math.floor(r.height * dpr);
+    Math.floor(
+      r.height * dpr
+    );
 
   canvas.style.width =
     r.width + "px";
@@ -1180,13 +1882,19 @@ function drawCropStage() {
     dh = dw / ir;
     dx = 0;
     dy =
-      (canvas.height - dh) / 2;
+      (
+        canvas.height -
+        dh
+      ) / 2;
   } else {
     dh = canvas.height;
     dw = dh * ir;
     dy = 0;
     dx =
-      (canvas.width - dw) / 2;
+      (
+        canvas.width -
+        dw
+      ) / 2;
   }
 
   canvas._imgLayout = {
@@ -1215,12 +1923,13 @@ function drawCropStage() {
 }
 
 function placeCropBox() {
-  const box = $("#cropBox");
-  const stage = $("#cropStage");
+  const box =
+    $("#cropBox");
 
-  if (!box || !stage) {
-    return;
-  }
+  const stage =
+    $("#cropStage");
+
+  if (!box || !stage) return;
 
   const r =
     stage.getBoundingClientRect();
@@ -1327,9 +2036,11 @@ function applyCrop() {
     ix2 <= ix ||
     iy2 <= iy
   ) {
-    return toast(
+    toast(
       "Área inválida"
     );
+
+    return;
   }
 
   const relX =
@@ -1406,165 +2117,217 @@ function applyCrop() {
   saveMatchData();
 
   $("#cropModal")
-    ?.classList.add("hidden");
+    ?.classList.add(
+      "hidden"
+    );
 
   updateMarkPanel();
   paintOrg();
 
-  toast("Mapa delimitado.");
+  toast(
+    "Mapa delimitado."
+  );
 }
 
-$("#mapFile")?.addEventListener(
-  "change",
-  (e) => {
-    const file =
-      e.target.files?.[0];
+// ============================================================
+// UPLOAD MAPA
+// ============================================================
 
-    if (!file) return;
+$("#mapFile")
+  ?.addEventListener(
+    "change",
+    e => {
+      const file =
+        e.target.files?.[0];
 
-    if (
-      !file.type.startsWith("image/") &&
-      !/\.(png|jpe?g|webp|gif|bmp)$/i.test(
-        file.name
-      )
-    ) {
-      return toast(
-        "Escolha uma imagem."
+      if (!file) return;
+
+      if (
+        !file.type.startsWith(
+          "image/"
+        ) &&
+        !/\.(png|jpe?g|webp|gif|bmp)$/i
+          .test(file.name)
+      ) {
+        toast(
+          "Escolha uma imagem."
+        );
+
+        return;
+      }
+
+      const reader =
+        new FileReader();
+
+      reader.onload = () => {
+        openCropEditor(
+          reader.result
+        );
+      };
+
+      reader.readAsDataURL(
+        file
       );
+
+      e.target.value = "";
     }
+  );
 
-    const reader =
-      new FileReader();
+$("#cropOk")
+  ?.addEventListener(
+    "click",
+    applyCrop
+  );
 
-    reader.onload = () =>
-      openCropEditor(
-        reader.result
-      );
+$("#cropCancel")
+  ?.addEventListener(
+    "click",
+    () => {
+      $("#cropModal")
+        ?.classList.add(
+          "hidden"
+        );
 
-    reader.readAsDataURL(file);
+      cropImg = null;
+    }
+  );
 
-    e.target.value = "";
-  }
-);
-
-$("#cropOk")?.addEventListener(
-  "click",
-  applyCrop
-);
-
-$("#cropCancel")?.addEventListener(
-  "click",
-  () => {
-    $("#cropModal")
-      ?.classList.add("hidden");
-
-    cropImg = null;
-  }
-);
+// ============================================================
+// DRAG DO CROP
+// ============================================================
 
 (function setupCropDrag() {
-  const box = $("#cropBox");
-  const stage = $("#cropStage");
+  const box =
+    $("#cropBox");
+
+  const stage =
+    $("#cropStage");
 
   if (!box || !stage) return;
 
   let mode = null;
   let start = null;
 
-  const onDown = (e) => {
-    e.preventDefault();
+  const onDown =
+    e => {
+      e.preventDefault();
 
-    const t = e.touches
-      ? e.touches[0]
-      : e;
+      const t =
+        e.touches
+          ? e.touches[0]
+          : e;
 
-    const br =
-      box.getBoundingClientRect();
+      const br =
+        box.getBoundingClientRect();
 
-    const nearBR =
-      t.clientX >
-        br.right - 20 &&
-      t.clientY >
-        br.bottom - 20;
+      const nearBR =
+        t.clientX >
+          br.right - 20 &&
+        t.clientY >
+          br.bottom - 20;
 
-    mode = nearBR
-      ? "resize"
-      : "move";
+      mode =
+        nearBR
+          ? "resize"
+          : "move";
 
-    start = {
-      x: t.clientX,
-      y: t.clientY,
-      rect: {
-        ...cropRect
-      }
+      start = {
+        x: t.clientX,
+        y: t.clientY,
+        rect: {
+          ...cropRect
+        }
+      };
     };
-  };
 
-  const onMove = (e) => {
-    if (!mode || !start) return;
+  const onMove =
+    e => {
+      if (
+        !mode ||
+        !start
+      ) {
+        return;
+      }
 
-    e.preventDefault();
+      e.preventDefault();
 
-    const t = e.touches
-      ? e.touches[0]
-      : e;
+      const t =
+        e.touches
+          ? e.touches[0]
+          : e;
 
-    const sr =
-      stage.getBoundingClientRect();
+      const sr =
+        stage.getBoundingClientRect();
 
-    const dx =
-      (t.clientX - start.x) /
-      sr.width;
+      const dx =
+        (
+          t.clientX -
+          start.x
+        ) / sr.width;
 
-    const dy =
-      (t.clientY - start.y) /
-      sr.height;
+      const dy =
+        (
+          t.clientY -
+          start.y
+        ) / sr.height;
 
-    if (mode === "move") {
-      cropRect.x =
-        Math.max(
-          0,
-          Math.min(
-            1 - start.rect.w,
-            start.rect.x + dx
-          )
-        );
+      if (
+        mode === "move"
+      ) {
+        cropRect.x =
+          Math.max(
+            0,
+            Math.min(
+              1 -
+                start.rect.w,
+              start.rect.x +
+                dx
+            )
+          );
 
-      cropRect.y =
-        Math.max(
-          0,
-          Math.min(
-            1 - start.rect.h,
-            start.rect.y + dy
-          )
-        );
-    } else {
-      cropRect.w =
-        Math.max(
-          0.15,
-          Math.min(
-            1 - start.rect.x,
-            start.rect.w + dx
-          )
-        );
+        cropRect.y =
+          Math.max(
+            0,
+            Math.min(
+              1 -
+                start.rect.h,
+              start.rect.y +
+                dy
+            )
+          );
 
-      cropRect.h =
-        Math.max(
-          0.15,
-          Math.min(
-            1 - start.rect.y,
-            start.rect.h + dy
-          )
-        );
-    }
+      } else {
+        cropRect.w =
+          Math.max(
+            0.15,
+            Math.min(
+              1 -
+                start.rect.x,
+              start.rect.w +
+                dx
+            )
+          );
 
-    placeCropBox();
-  };
+        cropRect.h =
+          Math.max(
+            0.15,
+            Math.min(
+              1 -
+                start.rect.y,
+              start.rect.h +
+                dy
+            )
+          );
+      }
 
-  const onUp = () => {
-    mode = null;
-    start = null;
-  };
+      placeCropBox();
+    };
+
+  const onUp =
+    () => {
+      mode = null;
+      start = null;
+    };
 
   box.addEventListener(
     "pointerdown",
@@ -1580,315 +2343,433 @@ $("#cropCancel")?.addEventListener(
     "pointerup",
     onUp
   );
-
-  box.addEventListener(
-    "touchstart",
-    onDown,
-    { passive: false }
-  );
-
-  window.addEventListener(
-    "touchmove",
-    onMove,
-    { passive: false }
-  );
-
-  window.addEventListener(
-    "touchend",
-    onUp
-  );
 })();
 
-// --- EVENTOS DE BOTÕES ---
-$("#btnGenMap")?.addEventListener(
-  "click",
-  () => {
-    state.match.mapImage = null;
-    state.match.marks = [];
+// ============================================================
+// BOTÕES DO MAPA
+// ============================================================
 
-    saveMatchData();
-    updateMarkPanel();
-    paintOrg();
+$("#btnGenMap")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.match.mapImage =
+        null;
 
-    toast(
-      "Limpou mapa anterior."
-    );
-  }
-);
+      state.match.marks = [];
 
-$("#btnClearMarks")?.addEventListener(
-  "click",
-  () => {
-    state.match.marks = [];
+      saveMatchData();
 
-    saveMatchData();
-    paintOrg();
+      updateMarkPanel();
+      paintOrg();
 
-    toast("Marcas limpas");
-  }
-);
+      toast(
+        "Limpou mapa anterior."
+      );
+    }
+  );
 
-$("#mapCanvas")?.addEventListener(
-  "pointerdown",
-  onMapTap
-);
+$("#btnClearMarks")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.match.marks = [];
 
-// Botões Org
-$("#btnSaveEnter")?.addEventListener(
-  "click",
-  () => initMatch(true)
-);
+      saveMatchData();
+      paintOrg();
 
-$("#btnSaveOnly")?.addEventListener(
-  "click",
-  () => initMatch(false)
-);
+      toast(
+        "Marcas limpas."
+      );
+    }
+  );
 
-$("#btnCopyInvite")?.addEventListener(
-  "click",
-  () => {
-    const link =
-      window.location.origin +
-      window.location.pathname +
-      "?join=1";
+$("#mapCanvas")
+  ?.addEventListener(
+    "pointerdown",
+    onMapTap
+  );
 
-    navigator.clipboard
-      .writeText(link)
-      .then(() =>
-        toast(
-          "Link copiado pro clipboard!"
+// ============================================================
+// BOTÕES DO OPERADOR
+// ============================================================
+
+$("#btnSaveEnter")
+  ?.addEventListener(
+    "click",
+    () => {
+      initMatch(true);
+    }
+  );
+
+$("#btnSaveOnly")
+  ?.addEventListener(
+    "click",
+    () => {
+      initMatch(false);
+    }
+  );
+
+$("#btnCopyInvite")
+  ?.addEventListener(
+    "click",
+    () => {
+      const link =
+        window.location.origin +
+        window.location.pathname +
+        "?join=1";
+
+      navigator.clipboard
+        .writeText(link)
+        .then(
+          () =>
+            toast(
+              "Link copiado!"
+            )
         )
-      )
-      .catch(() =>
+        .catch(
+          () =>
+            toast(
+              "Erro ao copiar link."
+            )
+        );
+    }
+  );
+
+$("#btnEnd")
+  ?.addEventListener(
+    "click",
+    endMatch
+  );
+
+$("#btnOrgBack")
+  ?.addEventListener(
+    "click",
+    () => {
+      show("role");
+    }
+  );
+
+// ============================================================
+// BOTÕES DO JOGADOR
+// ============================================================
+
+$("#btnConfirm")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.player.presence =
+        true;
+
+      savePlayerData();
+      render();
+
+      toast(
+        "Presença confirmada."
+      );
+    }
+  );
+
+$("#btnEnter")
+  ?.addEventListener(
+    "click",
+    () => {
+      if (
+        !state.player.presence
+      ) {
         toast(
-          "Erro ao copiar link"
+          "Confirme presença."
+        );
+
+        return;
+      }
+
+      if (
+        state.match.status !==
+        "live"
+      ) {
+        toast(
+          "Aguarde o início."
+        );
+
+        return;
+      }
+
+      state.player.alive =
+        true;
+
+      savePlayerData();
+      render();
+    }
+  );
+
+$("#btnHit")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.player.alive =
+        false;
+
+      savePlayerData();
+      render();
+
+      toast(
+        "HIT — OUT"
+      );
+    }
+  );
+
+$("#btnLeave")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.player.presence =
+        false;
+
+      state.player.alive =
+        true;
+
+      savePlayerData();
+
+      show("player");
+
+      toast(
+        "Abandonou a operação."
+      );
+    }
+  );
+
+$("#btnEndFromGame")
+  ?.addEventListener(
+    "click",
+    endMatch
+  );
+
+$("#btnOrgFromGame")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.role =
+        "organizer";
+
+      saveRole();
+
+      show("organizer");
+    }
+  );
+
+// ============================================================
+// BRIEFING
+// ============================================================
+
+$("#btnShowBriefing")
+  ?.addEventListener(
+    "click",
+    () => {
+      $("#bName").textContent =
+        state.match.name ||
+        "—";
+
+      $("#bLoc").textContent =
+        state.match.location ||
+        "—";
+
+      $("#bObj").textContent =
+        OBJ_LABELS[
+          state.match.objective
+        ] ||
+        state.match.objective ||
+        "—";
+
+      $("#bDur").textContent =
+        (
+          state.match.duration ||
+          60
+        ) +
+        " min";
+
+      $("#bText").textContent =
+        state.match.briefing ||
+        "Nenhuma instrução adicional.";
+
+      $("#briefingModal")
+        ?.classList.remove(
+          "hidden"
+        );
+    }
+  );
+
+$("#btnCloseBriefing")
+  ?.addEventListener(
+    "click",
+    () => {
+      $("#briefingModal")
+        ?.classList.add(
+          "hidden"
+        );
+    }
+  );
+
+// ============================================================
+// BOMBA
+// ============================================================
+
+$("#btnPlantBomb")
+  ?.addEventListener(
+    "click",
+    () => {
+      if (
+        state.match.objective !==
+        "bomba"
+      ) {
+        return;
+      }
+
+      state.match.bomb.planted =
+        true;
+
+      state.match.bomb.plantedAt =
+        Date.now();
+
+      state.match.bomb.defused =
+        false;
+
+      state.match.bomb.exploded =
+        false;
+
+      saveMatchData();
+
+      toast(
+        "BOMBA ARMADA! 10 MINUTOS!"
+      );
+    }
+  );
+
+$("#btnDefuseBomb")
+  ?.addEventListener(
+    "click",
+    () => {
+      if (
+        state.match.objective !==
+        "bomba"
+      ) {
+        return;
+      }
+
+      state.match.bomb.defused =
+        true;
+
+      saveMatchData();
+
+      toast(
+        "BOMBA DESARMADA!"
+      );
+    }
+  );
+
+// ============================================================
+// DEV
+// ============================================================
+
+$("#devBtn")
+  ?.addEventListener(
+    "click",
+    () => {
+      show("dev");
+    }
+  );
+
+$("#devBack")
+  ?.addEventListener(
+    "click",
+    () => {
+      show(
+        prevScreen ||
+        "role"
+      );
+    }
+  );
+
+$("#devPlayer")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.role =
+        "player";
+
+      saveRole();
+
+      show("player");
+    }
+  );
+
+$("#devOrg")
+  ?.addEventListener(
+    "click",
+    () => {
+      state.role =
+        "organizer";
+
+      saveRole();
+
+      show("organizer");
+    }
+  );
+
+$("#devReset")
+  ?.addEventListener(
+    "click",
+    async () => {
+      if (
+        !confirm(
+          "Apagar tudo e limpar banco de dados?"
         )
+      ) {
+        return;
+      }
+
+      localStorage.removeItem(
+        "df_role"
       );
-  }
-);
 
-$("#btnEnd")?.addEventListener(
-  "click",
-  endMatch
-);
-
-$("#btnOrgBack")?.addEventListener(
-  "click",
-  () => show("role")
-);
-
-// Botões Player
-$("#btnConfirm")?.addEventListener(
-  "click",
-  () => {
-    state.player.presence = true;
-
-    savePlayerData();
-    render();
-
-    toast(
-      "Presença confirmada"
-    );
-  }
-);
-
-$("#btnEnter")?.addEventListener(
-  "click",
-  () => {
-    if (!state.player.presence) {
-      return toast(
-        "Confirme presença"
+      localStorage.removeItem(
+        "df_player_id"
       );
-    }
 
-    if (
-      state.match.status !== "live"
-    ) {
-      return toast(
-        "Aguarde o início"
+      try {
+        await remove(
+          matchRef
+        );
+
+        await remove(
+          playersRef
+        );
+      } catch (err) {
+        console.error(
+          "Erro no reset:",
+          err
+        );
+      }
+
+      state =
+        initial();
+
+      stopTimer();
+      stopAnim();
+
+      show("role");
+
+      requestGps();
+
+      toast(
+        "Sistema resetado."
       );
     }
+  );
 
-    state.player.alive = true;
-
-    savePlayerData();
-    render();
-  }
-);
-
-$("#btnHit")?.addEventListener(
-  "click",
-  () => {
-    state.player.alive = false;
-
-    savePlayerData();
-    render();
-
-    toast("HIT — OUT");
-  }
-);
-
-$("#btnLeave")?.addEventListener(
-  "click",
-  () => {
-    state.player.presence = false;
-    state.player.alive = true;
-
-    savePlayerData();
-    show("player");
-
-    toast(
-      "Abandonou a operação"
-    );
-  }
-);
-
-$("#btnEndFromGame")?.addEventListener(
-  "click",
-  endMatch
-);
-
-$("#btnOrgFromGame")?.addEventListener(
-  "click",
-  () => {
-    state.role = "organizer";
-    saveRole();
-    show("organizer");
-  }
-);
-
-// Briefing Player
-$("#btnShowBriefing")?.addEventListener(
-  "click",
-  () => {
-    $("#bName").textContent =
-      state.match.name || "—";
-
-    $("#bLoc").textContent =
-      state.match.location || "—";
-
-    $("#bObj").textContent =
-      OBJ_LABELS[
-        state.match.objective
-      ] ||
-      state.match.objective ||
-      "—";
-
-    $("#bDur").textContent =
-      (state.match.duration || 60) +
-      " min";
-
-    $("#bText").textContent =
-      state.match.briefing ||
-      "Nenhuma instrução adicional.";
-
-    $("#briefingModal")
-      ?.classList.remove("hidden");
-  }
-);
-
-$("#btnCloseBriefing")?.addEventListener(
-  "click",
-  () => {
-    $("#briefingModal")
-      ?.classList.add("hidden");
-  }
-);
-
-// Bomba Player e Operador
-$("#btnPlantBomb")?.addEventListener(
-  "click",
-  () => {
-    state.match.bomb.planted = true;
-    state.match.bomb.plantedAt =
-      Date.now();
-
-    saveMatchData();
-
-    toast(
-      "BOMBA ARMADA! 10 MINUTOS!"
-    );
-  }
-);
-
-$("#btnDefuseBomb")?.addEventListener(
-  "click",
-  () => {
-    state.match.bomb.defused = true;
-
-    saveMatchData();
-
-    toast(
-      "BOMBA DESARMADA!"
-    );
-  }
-);
-
-// Dev Mode (Zerar tudo)
-$("#devBtn")?.addEventListener(
-  "click",
-  () => show("dev")
-);
-
-$("#devBack")?.addEventListener(
-  "click",
-  () =>
-    show(
-      prevScreen || "role"
-    )
-);
-
-$("#devPlayer")?.addEventListener(
-  "click",
-  () => {
-    state.role = "player";
-    saveRole();
-    show("player");
-  }
-);
-
-$("#devOrg")?.addEventListener(
-  "click",
-  () => {
-    state.role = "organizer";
-    saveRole();
-    show("organizer");
-  }
-);
-
-$("#devReset")?.addEventListener(
-  "click",
-  () => {
-    if (
-      !confirm(
-        "Apagar tudo e limpar banco de dados?"
-      )
-    ) {
-      return;
-    }
-
-    localStorage.removeItem(
-      "df_role"
-    );
-
-    localStorage.removeItem(
-      "df_player_id"
-    );
-
-    remove(matchRef);
-    remove(playersRef);
-
-    state = initial();
-
-    stopTimer();
-    stopAnim();
-
-    show("role");
-    requestGps();
-
-    toast("Sistema resetado.");
-  }
-);
+// ============================================================
+// RESIZE
+// ============================================================
 
 window.addEventListener(
   "resize",
@@ -1896,26 +2777,36 @@ window.addEventListener(
     paintOrg();
 
     if (
-      state.match.status === "live"
+      state.match.status ===
+      "live"
     ) {
       paintPlayer();
     }
   }
 );
 
-// --- BOOT ---
+// ============================================================
+// BOOT
+// ============================================================
+
 checkInvite();
 load();
-requestGps();
 
-if (state.role === "player") {
+if (
+  state.role ===
+  "player"
+) {
   show("player");
+
 } else if (
-  state.role === "organizer"
+  state.role ===
+  "organizer"
 ) {
   show("organizer");
+
 } else {
   show("role");
 }
 
+requestGps();
 render();
