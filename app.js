@@ -1,4 +1,4 @@
-nst STORAGE_KEY = 'df_airsoft_state_v7';
+const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
 const MODE_DEFS = {
@@ -7,19 +7,16 @@ const MODE_DEFS = {
     icon: '⚑',
     help: 'Bandeiras e bases.'
   },
-
   bomb: {
     label: 'Bomba',
     icon: '◉',
     help: 'Portador, armamento, localização, desarme e explosão.'
   },
-
   zone: {
     label: 'Controle de Zonas',
     icon: '◎',
     help: 'Zonas numeradas e captura por permanência.'
   },
-
   respawn: {
     label: 'Eliminação + Respawn',
     icon: '↻',
@@ -33,19 +30,16 @@ const TOOLS = {
     icon: '◎',
     help: 'Zona numerada de captura.'
   },
-
   base: {
     label: 'Base',
     icon: '■',
     help: 'Base quadrada de objetivo ou respawn.'
   },
-
   flag: {
     label: 'Bandeira',
     icon: '⚑',
     help: 'Objetivo de captura de bandeira.'
   },
-
   bomb: {
     label: 'Área da bomba',
     icon: '◉',
@@ -141,20 +135,14 @@ const DEFAULT_STATE = {
 };
 
 let state = loadState();
-
 let draft = deepClone(state.match);
-
-let appliedSnapshot =
-  deepClone(draft);
+let appliedSnapshot = deepClone(draft);
 
 let activeScreen = 'role';
-
 let currentGpsWatch = null;
 
 let pendingAction = null;
-
 let toastTimer = null;
-
 let confirmCallback = null;
 
 let cropImage = null;
@@ -169,7 +157,6 @@ let cropRect = {
 let cropBoxDrag = null;
 
 let audioContext = null;
-
 let lastBeep = 0;
 
 const imageCache = new Map();
@@ -189,15 +176,62 @@ const playerViewer = {
   panY: 0
 };
 
-const $ = id =>
-  document.getElementById(id);
+const $ = id => document.getElementById(id);
 
-const $$ = (
-  selector,
-  root = document
-) =>
+const $$ = (selector, root = document) =>
   [...root.querySelectorAll(selector)];
 
+/* =========================
+   EVENTOS SEGUROS
+========================= */
+
+function on(id, eventName, handler, options) {
+  const element = $(id);
+
+  if (!element) {
+    console.warn(
+      `[DF] Elemento #${id} não encontrado para ${eventName}.`
+    );
+    return false;
+  }
+
+  element.addEventListener(
+    eventName,
+    handler,
+    options
+  );
+
+  return true;
+}
+
+function onSelector(selector, eventName, handler) {
+  $$(selector).forEach(element => {
+    element.addEventListener(
+      eventName,
+      handler
+    );
+  });
+}
+
+function setText(id, value) {
+  const element = $(id);
+
+  if (element) {
+    element.textContent =
+      value;
+  }
+}
+
+function toggleHidden(id, hidden) {
+  const element = $(id);
+
+  if (element) {
+    element.classList.toggle(
+      'hidden',
+      hidden
+    );
+  }
+}
 
 /* =========================
    GENERAL
@@ -223,10 +257,7 @@ function esc(value) {
   );
 }
 
-function mergeDefaults(
-  target,
-  source
-) {
+function mergeDefaults(target, source) {
   if (
     !source ||
     typeof source !== 'object'
@@ -235,8 +266,7 @@ function mergeDefaults(
   }
 
   for (
-    const [key, value] of
-    Object.entries(source)
+    const [key, value] of Object.entries(source)
   ) {
     if (
       value &&
@@ -245,8 +275,7 @@ function mergeDefaults(
     ) {
       if (
         !target[key] ||
-        typeof target[key] !==
-          'object' ||
+        typeof target[key] !== 'object' ||
         Array.isArray(target[key])
       ) {
         target[key] = {};
@@ -278,9 +307,7 @@ function loadState() {
 
     const merged =
       mergeDefaults(
-        deepClone(
-          DEFAULT_STATE
-        ),
+        deepClone(DEFAULT_STATE),
         saved
       );
 
@@ -290,8 +317,7 @@ function loadState() {
       ) ||
       !merged.match.modes.length
     ) {
-      merged.match.modes =
-        ['flag'];
+      merged.match.modes = ['flag'];
     }
 
     merged.match.players =
@@ -301,7 +327,12 @@ function loadState() {
       );
 
     return merged;
-  } catch (_) {
+  } catch (error) {
+    console.error(
+      '[DF] Falha ao carregar estado:',
+      error
+    );
+
     return deepClone(
       DEFAULT_STATE
     );
@@ -314,7 +345,12 @@ function saveState() {
       STORAGE_KEY,
       JSON.stringify(state)
     );
-  } catch (_) {}
+  } catch (error) {
+    console.warn(
+      '[DF] Não foi possível salvar:',
+      error
+    );
+  }
 }
 
 function role() {
@@ -360,25 +396,10 @@ function formatTime(seconds) {
     seconds % 60;
 
   if (h > 0) {
-    return `${String(h).padStart(
-      2,
-      '0'
-    )}:${String(m).padStart(
-      2,
-      '0'
-    )}:${String(s).padStart(
-      2,
-      '0'
-    )}`;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   }
 
-  return `${String(m).padStart(
-    2,
-    '0'
-  )}:${String(s).padStart(
-    2,
-    '0'
-  )}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function clamp(
@@ -464,9 +485,11 @@ function closeOverlay(id) {
   );
 }
 
-function showScreen(
-  name
-) {
+/* =========================
+   SCREENS
+========================= */
+
+function showScreen(name) {
   $$('.screen').forEach(
     screen => {
       screen.classList.toggle(
@@ -482,21 +505,15 @@ function showScreen(
 
   updateHeader();
 
-  if (
-    name === 'player'
-  ) {
+  if (name === 'player') {
     renderPlayer();
   }
 
-  if (
-    name === 'organizer'
-  ) {
+  if (name === 'organizer') {
     renderOperatorMenu();
   }
 
-  if (
-    name === 'control'
-  ) {
+  if (name === 'control') {
     renderControl();
   }
 }
@@ -522,18 +539,14 @@ function updateHeader() {
     pill.classList.add(
       'live'
     );
-  } else if (
-    status === 'open'
-  ) {
+  } else if (status === 'open') {
     pill.textContent =
       'ABERTA';
 
     pill.classList.add(
       'wait'
     );
-  } else if (
-    status === 'ended'
-  ) {
+  } else if (status === 'ended') {
     pill.textContent =
       'ENCERRADA';
   } else {
@@ -541,7 +554,6 @@ function updateHeader() {
       'SEM PARTIDA';
   }
 }
-
 
 /* =========================
    CONFIRMAÇÕES
@@ -554,28 +566,37 @@ function openConfirm(
   callback,
   danger = true
 ) {
-  $('confirmKicker')
-    .textContent =
-    'CONFIRMAÇÃO';
+  setText(
+    'confirmKicker',
+    'CONFIRMAÇÃO'
+  );
 
-  $('confirmTitle')
-    .textContent =
-    title;
+  setText(
+    'confirmTitle',
+    title
+  );
 
-  $('confirmText')
-    .textContent =
-    text;
+  setText(
+    'confirmText',
+    text
+  );
 
-  $('confirmOk')
-    .textContent =
-    okText;
+  setText(
+    'confirmOk',
+    okText
+  );
 
-  $('confirmOk').className =
-    `btn ${
-      danger
-        ? 'danger'
-        : 'primary'
-    }`;
+  const ok =
+    $('confirmOk');
+
+  if (ok) {
+    ok.className =
+      `btn ${
+        danger
+          ? 'danger'
+          : 'primary'
+      }`;
+  }
 
   confirmCallback =
     callback;
@@ -596,20 +617,14 @@ function closeConfirm() {
 
 function draftDirty() {
   return (
-    JSON.stringify(
-      draft
-    ) !==
-    JSON.stringify(
-      appliedSnapshot
-    )
+    JSON.stringify(draft) !==
+    JSON.stringify(appliedSnapshot)
   );
 }
 
 function applyDraft() {
   state.match =
-    deepClone(
-      draft
-    );
+    deepClone(draft);
 
   state.match.players =
     createPlayers(
@@ -618,14 +633,11 @@ function applyDraft() {
     );
 
   appliedSnapshot =
-    deepClone(
-      draft
-    );
+    deepClone(draft);
 
   saveState();
 
   updateHeader();
-
   renderOperatorMenu();
 
   toast(
@@ -645,12 +657,8 @@ function restoreDraft() {
     );
 }
 
-function withPending(
-  action
-) {
-  if (
-    !draftDirty()
-  ) {
+function withPending(action) {
+  if (!draftDirty()) {
     action();
     return;
   }
@@ -662,7 +670,6 @@ function withPending(
     'pendingModal'
   );
 }
-
 
 /* =========================
    PLAYERS
@@ -680,19 +687,14 @@ function createPlayers(
   );
 
   const old =
-    Array.isArray(
-      previous
-    )
+    Array.isArray(previous)
       ? previous
       : [];
 
   const list = [];
 
   for (
-    const team of [
-      'A',
-      'B'
-    ]
+    const team of ['A', 'B']
   ) {
     for (
       let i = 1;
@@ -725,56 +727,47 @@ function createPlayers(
 
       const x =
         centerX +
-        Math.cos(angle) *
-          0.08;
+        Math.cos(angle) * 0.08;
 
       const y =
         centerY +
-        Math.sin(angle) *
-          0.08;
+        Math.sin(angle) * 0.08;
 
       list.push({
         id,
 
         name:
+          previousPlayer?.name ||
           `Jogador ${i}`,
 
         team,
 
         lives:
-          previousPlayer
-            ?.lives ??
-          state.match
-            .livesPerPlayer,
+          previousPlayer?.lives ??
+          state.match.livesPerPlayer,
 
         hits:
-          previousPlayer
-            ?.hits ??
+          previousPlayer?.hits ??
           0,
 
         status:
-          previousPlayer
-            ?.status ??
+          previousPlayer?.status ??
           'ATIVO',
 
         x:
-          previousPlayer
-            ?.x ??
+          previousPlayer?.x ??
           x,
 
         y:
-          previousPlayer
-            ?.y ??
+          previousPlayer?.y ??
           y,
 
         lat:
-          previousPlayer
-            ?.lat ??
+          previousPlayer?.lat ??
           null,
 
         lng:
-          previousPlayer
-            ?.lng ??
+          previousPlayer?.lng ??
           null,
 
         isMe:
@@ -788,29 +781,23 @@ function createPlayers(
           ),
 
         confirmed:
-          previousPlayer
-            ?.confirmed ??
+          previousPlayer?.confirmed ??
           false,
 
         carryingBomb:
-          previousPlayer
-            ?.carryingBomb ??
+          previousPlayer?.carryingBomb ??
           false,
 
         bombsRemaining:
-          previousPlayer
-            ?.bombsRemaining ??
-          state.match.bomb
-            .bombsPerPlayer,
+          previousPlayer?.bombsRemaining ??
+          state.match.bomb.bombsPerPlayer,
 
         respawnPendingUntil:
-          previousPlayer
-            ?.respawnPendingUntil ??
+          previousPlayer?.respawnPendingUntil ??
           null,
 
         respawnTargetId:
-          previousPlayer
-            ?.respawnTargetId ??
+          previousPlayer?.respawnTargetId ??
           null
       });
     }
@@ -829,7 +816,6 @@ function currentPlayer() {
   );
 }
 
-
 /* =========================
    MODES
 ========================= */
@@ -837,13 +823,11 @@ function currentPlayer() {
 function draftFeatures() {
   const modes =
     new Set(
-      draft.modes ||
-        []
+      draft.modes || []
     );
 
   return {
-    zone:
-      modes.has('zone'),
+    zone: modes.has('zone'),
 
     base:
       modes.has('flag') ||
@@ -861,13 +845,11 @@ function draftFeatures() {
 function stateFeatures() {
   const modes =
     new Set(
-      state.match.modes ||
-        []
+      state.match.modes || []
     );
 
   return {
-    zone:
-      modes.has('zone'),
+    zone: modes.has('zone'),
 
     base:
       modes.has('flag') ||
@@ -889,9 +871,7 @@ function objectiveLabel(
     (match.modes || [])
       .map(
         mode =>
-          MODE_DEFS[
-            mode
-          ]?.label ||
+          MODE_DEFS[mode]?.label ||
           mode
       )
       .join(' + ') ||
@@ -899,96 +879,64 @@ function objectiveLabel(
   );
 }
 
-
 /* =========================
-   RULE FORM
+   REGRAS
 ========================= */
 
 function syncDraftFields() {
-  $('oName').value =
-    draft.name || '';
+  const fields = {
+    oName: draft.name || '',
+    oLoc: draft.location || '',
+    oDur: draft.durationMin ?? 60,
+    playerCount: draft.playerCount ?? 5,
+    livesPerPlayer: draft.livesPerPlayer ?? 3,
+    respawnDelay: draft.respawnDelay ?? 60,
+    respawnPolicy: draft.respawnPolicy || 'nearest',
+    teamVisibility: draft.teamVisibility || 'always',
+    enemyVisibility: draft.enemyVisibility || 'off',
+    enemyVisibilitySeconds:
+      draft.enemyVisibilitySeconds ?? 60,
+    zoneCaptureSeconds:
+      draft.zoneCaptureSeconds ?? 30,
+    zonePoints:
+      draft.zonePoints ?? 100,
+    bombsPerPlayer:
+      draft.bomb?.bombsPerPlayer ?? 3,
+    bombDurationMin:
+      draft.bomb?.durationMin ?? 10,
+    bombDisarmSeconds:
+      draft.bomb?.disarmSeconds ?? 20,
+    bombBlastRadius:
+      draft.bomb?.blastRadius ?? 20,
+    bombArmPolicy:
+      draft.bomb?.armPolicy || 'areas',
+    bombTimingPolicy:
+      draft.bomb?.timingPolicy || 'predefined'
+  };
 
-  $('oLoc').value =
-    draft.location || '';
+  Object.entries(fields).forEach(
+    ([id, value]) => {
+      const element =
+        $(id);
 
-  $('oDur').value =
-    draft.durationMin ??
-    60;
-
-  $('playerCount').value =
-    draft.playerCount ??
-    5;
-
-  $('livesPerPlayer').value =
-    draft.livesPerPlayer ??
-    3;
-
-  $('respawnDelay').value =
-    draft.respawnDelay ??
-    60;
-
-  $('respawnPolicy').value =
-    draft.respawnPolicy ||
-    'nearest';
-
-  $('teamVisibility').value =
-    draft.teamVisibility ||
-    'always';
-
-  $('enemyVisibility').value =
-    draft.enemyVisibility ||
-    'off';
-
-  $('enemyVisibilitySeconds').value =
-    draft.enemyVisibilitySeconds ??
-    60;
-
-  $('zoneCaptureSeconds').value =
-    draft.zoneCaptureSeconds ??
-    30;
-
-  $('zonePoints').value =
-    draft.zonePoints ??
-    100;
-
-  $('bombsPerPlayer').value =
-    draft.bomb
-      .bombsPerPlayer ??
-    3;
-
-  $('bombDurationMin').value =
-    draft.bomb
-      .durationMin ??
-    10;
-
-  $('bombDisarmSeconds').value =
-    draft.bomb
-      .disarmSeconds ??
-    20;
-
-  $('bombBlastRadius').value =
-    draft.bomb
-      .blastRadius ??
-    20;
-
-  $('bombArmPolicy').value =
-    draft.bomb
-      .armPolicy ||
-    'areas';
-
-  $('bombTimingPolicy').value =
-    draft.bomb
-      .timingPolicy ||
-    'predefined';
+      if (element) {
+        element.value =
+          value;
+      }
+    }
+  );
 
   renderCarrierSelect();
-
   renderRuleAvailability();
 }
 
 function renderCarrierSelect() {
   const select =
     $('bombCarrier');
+
+  if (!select) {
+    return;
+  }
 
   const players =
     createPlayers(
@@ -1006,13 +954,7 @@ function renderCarrierSelect() {
     teamA
       .map(
         player =>
-          `<option value="${esc(
-            player.id
-          )}">
-            ${esc(
-              player.name
-            )}
-          </option>`
+          `<option value="${esc(player.id)}">${esc(player.name)}</option>`
       )
       .join('');
 
@@ -1020,19 +962,15 @@ function renderCarrierSelect() {
     teamA.some(
       player =>
         player.id ===
-        draft.bomb
-          .carrierId
+        draft.bomb.carrierId
     );
 
   select.value =
     exists
-      ? draft.bomb
-          .carrierId
+      ? draft.bomb.carrierId
       : (
-          teamA[2]
-            ?.id ||
-          teamA[0]
-            ?.id ||
+          teamA[2]?.id ||
+          teamA[0]?.id ||
           ''
         );
 
@@ -1041,21 +979,20 @@ function renderCarrierSelect() {
 }
 
 function readRulesForm() {
+  const value = id =>
+    $(id)?.value;
+
   draft.name =
-    $('oName')
-      .value
-      .trim() ||
+    value('oName')?.trim() ||
     'Operação Desert Falcons';
 
   draft.location =
-    $('oLoc')
-      .value
-      .trim() ||
+    value('oLoc')?.trim() ||
     'Campo';
 
   draft.durationMin =
     clamp(
-      $('oDur').value,
+      value('oDur'),
       10,
       480,
       60
@@ -1063,7 +1000,7 @@ function readRulesForm() {
 
   draft.playerCount =
     clamp(
-      $('playerCount').value,
+      value('playerCount'),
       1,
       20,
       5
@@ -1071,8 +1008,7 @@ function readRulesForm() {
 
   draft.livesPerPlayer =
     clamp(
-      $('livesPerPlayer')
-        .value,
+      value('livesPerPlayer'),
       1,
       20,
       3
@@ -1080,26 +1016,27 @@ function readRulesForm() {
 
   draft.respawnDelay =
     clamp(
-      $('respawnDelay').value,
+      value('respawnDelay'),
       0,
       900,
       60
     );
 
   draft.respawnPolicy =
-    $('respawnPolicy').value;
+    value('respawnPolicy') ||
+    'nearest';
 
   draft.teamVisibility =
-    $('teamVisibility').value;
+    value('teamVisibility') ||
+    'always';
 
   draft.enemyVisibility =
-    $('enemyVisibility').value;
+    value('enemyVisibility') ||
+    'off';
 
   draft.enemyVisibilitySeconds =
     clamp(
-      $(
-        'enemyVisibilitySeconds'
-      ).value,
+      value('enemyVisibilitySeconds'),
       5,
       900,
       60
@@ -1107,9 +1044,7 @@ function readRulesForm() {
 
   draft.zoneCaptureSeconds =
     clamp(
-      $(
-        'zoneCaptureSeconds'
-      ).value,
+      value('zoneCaptureSeconds'),
       1,
       1800,
       30
@@ -1117,69 +1052,55 @@ function readRulesForm() {
 
   draft.zonePoints =
     clamp(
-      $('zonePoints').value,
+      value('zonePoints'),
       0,
       10000,
       100
     );
 
-  draft.bomb
-    .bombsPerPlayer =
+  draft.bomb.bombsPerPlayer =
     clamp(
-      $(
-        'bombsPerPlayer'
-      ).value,
+      value('bombsPerPlayer'),
       0,
       20,
       3
     );
 
-  draft.bomb
-    .durationMin =
+  draft.bomb.durationMin =
     clamp(
-      $(
-        'bombDurationMin'
-      ).value,
+      value('bombDurationMin'),
       1,
       120,
       10
     );
 
-  draft.bomb
-    .disarmSeconds =
+  draft.bomb.disarmSeconds =
     clamp(
-      $(
-        'bombDisarmSeconds'
-      ).value,
+      value('bombDisarmSeconds'),
       1,
       600,
       20
     );
 
-  draft.bomb
-    .blastRadius =
+  draft.bomb.blastRadius =
     clamp(
-      $(
-        'bombBlastRadius'
-      ).value,
+      value('bombBlastRadius'),
       1,
       500,
       20
     );
 
-  draft.bomb
-    .armPolicy =
-    $('bombArmPolicy').value;
+  draft.bomb.armPolicy =
+    value('bombArmPolicy') ||
+    'areas';
 
-  draft.bomb
-    .timingPolicy =
-    $(
-      'bombTimingPolicy'
-    ).value;
+  draft.bomb.timingPolicy =
+    value('bombTimingPolicy') ||
+    'predefined';
 
-  draft.bomb
-    .carrierId =
-    $('bombCarrier').value;
+  draft.bomb.carrierId =
+    value('bombCarrier') ||
+    draft.bomb.carrierId;
 
   draft.players =
     createPlayers(
@@ -1192,35 +1113,34 @@ function renderRuleAvailability() {
   const features =
     draftFeatures();
 
-  $$(
-    '[data-rule-feature]'
-  ).forEach(
-    section => {
-      const type =
-        section
-          .dataset
-          .ruleFeature;
+  $$('[data-rule-feature]')
+    .forEach(
+      section => {
+        const type =
+          section.dataset.ruleFeature;
 
-      section.classList.toggle(
-        'hidden',
-        !features[type]
-      );
-    }
-  );
+        section.classList.toggle(
+          'hidden',
+          !features[type]
+        );
+      }
+    );
 }
-
 
 /* =========================
    MODE MODAL
 ========================= */
 
 function renderModeModal() {
-  $(
-    'mergeModes'
-  ).checked =
-    Boolean(
-      draft.mergeModes
-    );
+  const merge =
+    $('mergeModes');
+
+  if (merge) {
+    merge.checked =
+      Boolean(
+        draft.mergeModes
+      );
+  }
 
   $$('.choice-card').forEach(
     button => {
@@ -1238,6 +1158,10 @@ function renderModeModal() {
 
   const matrix =
     $('featureMatrix');
+
+  if (!matrix) {
+    return;
+  }
 
   matrix.innerHTML =
     '';
@@ -1270,12 +1194,7 @@ function renderModeModal() {
   ];
 
   items.forEach(
-    ([
-      key,
-      icon,
-      title,
-      help
-    ]) => {
+    ([key, icon, title, help]) => {
       const row =
         document.createElement(
           'div'
@@ -1291,9 +1210,7 @@ function renderModeModal() {
       row.innerHTML =
         `
           <span>${icon}</span>
-
           <div>
-
             <strong>
               ${title} · ${
                 features[key]
@@ -1301,11 +1218,7 @@ function renderModeModal() {
                   : 'INATIVO'
               }
             </strong>
-
-            <small>
-              ${help}
-            </small>
-
+            <small>${help}</small>
           </div>
         `;
 
@@ -1316,7 +1229,6 @@ function renderModeModal() {
   );
 }
 
-
 /* =========================
    OPERATOR MENU
 ========================= */
@@ -1326,32 +1238,28 @@ function renderOperatorMenu() {
     $('operatorStateBadge');
 
   const live =
-    state.match.status ===
-    'live';
+    state.match.status === 'live';
 
-  badge.textContent =
-    live
-      ? 'EM JOGO'
-      : 'CONFIGURANDO';
+  if (badge) {
+    badge.textContent =
+      live
+        ? 'EM JOGO'
+        : 'CONFIGURANDO';
 
-  badge.classList.toggle(
-    'live',
-    live
-  );
+    badge.classList.toggle(
+      'live',
+      live
+    );
+  }
 
-  $(
-    'openControlFromMenu'
-  ).classList.toggle(
-    'hidden',
+  toggleHidden(
+    'openControlFromMenu',
     !live
   );
 
-  $('btnEnd').classList.toggle(
-    'hidden',
-    ![
-      'open',
-      'live'
-    ].includes(
+  toggleHidden(
+    'btnEnd',
+    !['open', 'live'].includes(
       state.match.status
     )
   );
@@ -1359,122 +1267,83 @@ function renderOperatorMenu() {
   const rows = [
     [
       'Modos',
-      objectiveLabel(
-        draft
-      )
+      objectiveLabel(draft)
     ],
 
     [
       'Partida',
-      `${
-        draft.name ||
-        '—'
-      } · ${
-        draft.durationMin ||
-        60
+      `${draft.name || '—'} · ${
+        draft.durationMin || 60
       } min`
     ],
 
     [
       'Vidas',
-      `${
-        draft.livesPerPlayer ||
-        3
-      } por jogador`
+      `${draft.livesPerPlayer || 3} por jogador`
     ],
 
     [
       'Respawn',
       formatTime(
-        draft.respawnDelay ||
-        0
+        draft.respawnDelay || 0
       )
     ],
 
     [
       'Bomba',
-      draft.modes.includes(
-        'bomb'
-      )
-        ? `${
-            draft.bomb
-              .durationMin
-          } min · ${
-            draft.bomb
-              .bombsPerPlayer
-          }/jogador`
+      draft.modes.includes('bomb')
+        ? `${draft.bomb.durationMin} min · ${draft.bomb.bombsPerPlayer}/jogador`
         : 'Não usada'
     ],
 
     [
       'Mapa',
       draft.map.dataUrl
-        ? `${
-            draft.map
-              .marks
-              .length
-          } elementos`
+        ? `${draft.map.marks.length} elementos`
         : 'Não configurado'
     ]
   ];
 
-  $('operatorSummary')
-    .innerHTML =
+  const summary =
+    $('operatorSummary');
+
+  if (!summary) {
+    return;
+  }
+
+  summary.innerHTML =
     rows
       .map(
-        ([
-          key,
-          value
-        ]) =>
+        ([key, value]) =>
           `
-          <div class="summary-item">
-
-            <span>
-              ${esc(key)}
-            </span>
-
-            <strong>
-              ${esc(value)}
-            </strong>
-
-          </div>
+            <div class="summary-item">
+              <span>${esc(key)}</span>
+              <strong>${esc(value)}</strong>
+            </div>
           `
       )
       .join('');
 }
 
-
 /* =========================
-   MODALS
+   MODAIS
 ========================= */
 
 function openConfig(id) {
-  if (
-    id ===
-    'rulesModal'
-  ) {
+  if (id === 'rulesModal') {
     syncDraftFields();
   }
 
-  if (
-    id ===
-    'modesModal'
-  ) {
+  if (id === 'modesModal') {
     renderModeModal();
   }
 
-  if (
-    id ===
-    'mapModal'
-  ) {
+  if (id === 'mapModal') {
     renderMapSummary();
     drawPreview();
   }
 
-  if (
-    id ===
-    'reviewModal'
-  ) {
+  if (id === 'reviewModal') {
     renderReview();
   }
 
@@ -1495,21 +1364,17 @@ function renderReview() {
   const rows = [
     [
       'Modos',
-      objectiveLabel(
-        draft
-      ]
+      objectiveLabel(draft)
     ],
 
     [
       'Partida',
-      draft.name ||
-        '—'
+      draft.name || '—'
     ],
 
     [
       'Local',
-      draft.location ||
-        '—'
+      draft.location || '—'
     ],
 
     [
@@ -1524,14 +1389,10 @@ function renderReview() {
 
     [
       'Respawn',
-      `${
-        draft.respawnDelay
-      }s · ${
-        draft.respawnPolicy ===
-        'nearest'
+      `${draft.respawnDelay}s · ${
+        draft.respawnPolicy === 'nearest'
           ? 'base mais próxima'
-          : draft.respawnPolicy ===
-            'choice'
+          : draft.respawnPolicy === 'choice'
           ? 'jogador escolhe'
           : 'operador escolhe'
       }`
@@ -1539,11 +1400,9 @@ function renderReview() {
 
     [
       'GPS equipe',
-      draft.teamVisibility ===
-      'always'
+      draft.teamVisibility === 'always'
         ? 'sempre'
-        : draft.teamVisibility ===
-          'benefit'
+        : draft.teamVisibility === 'benefit'
         ? 'benefício'
         : 'desativado'
     ],
@@ -1551,59 +1410,41 @@ function renderReview() {
     [
       'Zonas',
       features.zone
-        ? `${
-            draft.zoneCaptureSeconds
-          }s · ${
-            draft.zonePoints
-          } pts`
+        ? `${draft.zoneCaptureSeconds}s · ${draft.zonePoints} pts`
         : 'não usadas'
     ],
 
     [
       'Bomba',
       features.bomb
-        ? `${
-            draft.bomb
-              .durationMin
-          } min · ${
-            draft.bomb
-              .bombsPerPlayer
-          }/jogador`
+        ? `${draft.bomb.durationMin} min · ${draft.bomb.bombsPerPlayer}/jogador`
         : 'não usada'
     ],
 
     [
       'Mapa',
       draft.map.dataUrl
-        ? `${
-            draft.map
-              .marks
-              .length
-          } elementos`
+        ? `${draft.map.marks.length} elementos`
         : 'não configurado'
     ]
   ];
 
-  $('reviewSummary')
-    .innerHTML =
+  const holder =
+    $('reviewSummary');
+
+  if (!holder) {
+    return;
+  }
+
+  holder.innerHTML =
     rows
       .map(
-        ([
-          key,
-          value
-        ]) =>
+        ([key, value]) =>
           `
-          <div class="review-item">
-
-            <span>
-              ${esc(key)}
-            </span>
-
-            <strong>
-              ${esc(value)}
-            </strong>
-
-          </div>
+            <div class="review-item">
+              <span>${esc(key)}</span>
+              <strong>${esc(value)}</strong>
+            </div>
           `
       )
       .join('');
@@ -1612,9 +1453,7 @@ function renderReview() {
 function validateStart() {
   readRulesForm();
 
-  if (
-    !draft.map.dataUrl
-  ) {
+  if (!draft.map.dataUrl) {
     toast(
       'CONFIGURE O MAPA ANTES DE INICIAR.'
     );
@@ -1622,9 +1461,7 @@ function validateStart() {
     return false;
   }
 
-  if (
-    !draft.modes.length
-  ) {
+  if (!draft.modes.length) {
     toast(
       'SELECIONE PELO MENOS UM MODO.'
     );
@@ -1634,8 +1471,7 @@ function validateStart() {
 
   if (
     !draft.mergeModes &&
-    draft.modes.length >
-      1
+    draft.modes.length > 1
   ) {
     toast(
       'ATIVE “MESCLAR MODOS” PARA USAR MAIS DE UM.'
@@ -1644,10 +1480,11 @@ function validateStart() {
     return false;
   }
 
+  const confirm =
+    $('confirmStart');
+
   if (
-    !$(
-      'confirmStart'
-    ).checked
+    !confirm?.checked
   ) {
     toast(
       'MARQUE A CONFIRMAÇÃO DO BRIEFING.'
@@ -1659,21 +1496,16 @@ function validateStart() {
   return true;
 }
 
-
 /* =========================
-   START MATCH
+   START
 ========================= */
 
 function startMatch() {
-  if (
-    !validateStart()
-  ) {
+  if (!validateStart()) {
     return;
   }
 
-  if (
-    draftDirty()
-  ) {
+  if (draftDirty()) {
     applyDraft();
   }
 
@@ -1717,17 +1549,16 @@ function startMatch() {
         ...player,
 
         lives:
-          state.match
-            .livesPerPlayer,
+          state.match.livesPerPlayer,
 
-        hits: 0,
+        hits:
+          0,
 
         status:
           'ATIVO',
 
         bombsRemaining:
-          state.match.bomb
-            .bombsPerPlayer,
+          state.match.bomb.bombsPerPlayer,
 
         respawnPendingUntil:
           null,
@@ -1741,8 +1572,7 @@ function startMatch() {
     player => {
       player.carryingBomb =
         player.id ===
-        state.match.bomb
-          .carrierId;
+        state.match.bomb.carrierId;
     }
   );
 
@@ -1750,8 +1580,7 @@ function startMatch() {
     state.match.players.find(
       player =>
         player.id ===
-        state.match.bomb
-          .carrierId
+        state.match.bomb.carrierId
     );
 
   if (carrier) {
@@ -1764,7 +1593,6 @@ function startMatch() {
   );
 
   saveState();
-
   updateHeader();
 
   closeOverlay(
@@ -1781,11 +1609,8 @@ function startMatch() {
   );
 }
 
-
 /* =========================
-   MAP RENDERER
-   IMAGEM + ELEMENTOS
-   NO MESMO CANVAS
+   MAP
 ========================= */
 
 function mapMarks() {
@@ -1810,13 +1635,11 @@ function mapBox(
   panY = 0
 ) {
   const iw =
-    draft.map
-      .naturalWidth ||
+    draft.map.naturalWidth ||
     width;
 
   const ih =
-    draft.map
-      .naturalHeight ||
+    draft.map.naturalHeight ||
     height;
 
   const scale =
@@ -1826,14 +1649,10 @@ function mapBox(
     );
 
   const boxWidth =
-    iw *
-    scale *
-    zoom;
+    iw * scale * zoom;
 
   const boxHeight =
-    ih *
-    scale *
-    zoom;
+    ih * scale * zoom;
 
   return {
     left:
@@ -1854,9 +1673,7 @@ function mapBox(
   };
 }
 
-function resizeCanvas(
-  canvas
-) {
+function resizeCanvas(canvas) {
   if (!canvas) {
     return null;
   }
@@ -1867,16 +1684,14 @@ function resizeCanvas(
   const dpr =
     Math.min(
       2,
-      window.devicePixelRatio ||
-        1
+      window.devicePixelRatio || 1
     );
 
   const width =
     Math.max(
       1,
       Math.floor(
-        rect.width *
-          dpr
+        rect.width * dpr
       )
     );
 
@@ -1884,16 +1699,13 @@ function resizeCanvas(
     Math.max(
       1,
       Math.floor(
-        rect.height *
-          dpr
+        rect.height * dpr
       )
     );
 
   if (
-    canvas.width !==
-      width ||
-    canvas.height !==
-      height
+    canvas.width !== width ||
+    canvas.height !== height
   ) {
     canvas.width =
       width;
@@ -1903,12 +1715,8 @@ function resizeCanvas(
   }
 
   return {
-    width:
-      rect.width,
-
-    height:
-      rect.height,
-
+    width: rect.width,
+    height: rect.height,
     dpr
   };
 }
@@ -1930,12 +1738,18 @@ function drawMapMarks(
       options.playerView
     );
 
-  mapMarks().forEach(
+  const marks =
+    options.live
+      ? (
+          state.match.map.marks ||
+          []
+        )
+      : mapMarks();
+
+  marks.forEach(
     mark => {
       if (
-        !allowed[
-          mark.type
-        ]
+        !allowed[mark.type]
       ) {
         return;
       }
@@ -1943,12 +1757,12 @@ function drawMapMarks(
       const x =
         box.left +
         mark.x *
-          box.width;
+        box.width;
 
       const y =
         box.top +
         mark.y *
-          box.height;
+        box.height;
 
       const size =
         Math.max(
@@ -1957,21 +1771,14 @@ function drawMapMarks(
             box.width,
             box.height
           ) *
-            mark.size
+          mark.size
         );
 
       const colors = {
-        zone:
-          '#5a8f5a',
-
-        base:
-          '#4a7a4a',
-
-        flag:
-          '#b38c2f',
-
-        bomb:
-          '#a04848'
+        zone: '#5a8f5a',
+        base: '#4a7a4a',
+        flag: '#b38c2f',
+        bomb: '#a04848'
       };
 
       const stroke =
@@ -1980,21 +1787,18 @@ function drawMapMarks(
         ];
 
       const fill =
-        mark.type ===
-        'zone'
+        mark.type === 'zone'
           ? 'rgba(90,143,90,.14)'
-          : mark.type ===
-            'base'
+          : mark.type === 'base'
           ? 'rgba(74,122,74,.14)'
-          : mark.type ===
-            'flag'
+          : mark.type === 'flag'
           ? 'rgba(179,140,47,.16)'
           : 'rgba(160,72,72,.16)';
 
       const selected =
         !playerView &&
         mark.id ===
-          editor.selectedId;
+        editor.selectedId;
 
       ctx.save();
 
@@ -2009,10 +1813,8 @@ function drawMapMarks(
       ctx.fillStyle =
         fill;
 
-
       if (
-        mark.type ===
-        'zone'
+        mark.type === 'zone'
       ) {
         ctx.beginPath();
 
@@ -2025,33 +1827,24 @@ function drawMapMarks(
         );
 
         ctx.fill();
-
         ctx.stroke();
-
       } else if (
-        mark.type ===
-        'base'
+        mark.type === 'base'
       ) {
         ctx.fillRect(
-          x -
-            size / 2,
-          y -
-            size / 2,
+          x - size / 2,
+          y - size / 2,
           size,
           size
         );
 
         ctx.strokeRect(
-          x -
-            size / 2,
-          y -
-            size / 2,
+          x - size / 2,
+          y - size / 2,
           size,
           size
         );
-
       } else {
-
         ctx.beginPath();
 
         ctx.arc(
@@ -2063,10 +1856,8 @@ function drawMapMarks(
         );
 
         ctx.fill();
-
         ctx.stroke();
       }
-
 
       ctx.fillStyle =
         stroke;
@@ -2076,8 +1867,7 @@ function drawMapMarks(
           9,
           Math.min(
             15,
-            size *
-              .20
+            size * .20
           )
         )}px system-ui`;
 
@@ -2088,14 +1878,14 @@ function drawMapMarks(
         'middle';
 
       ctx.fillText(
-        mark.label.toUpperCase(),
+        String(
+          mark.label || ''
+        ).toUpperCase(),
         x,
         y
       );
 
-
       if (selected) {
-
         ctx.setLineDash([
           5,
           4
@@ -2109,128 +1899,107 @@ function drawMapMarks(
         ctx.arc(
           x,
           y,
-          size / 2 +
-            6,
+          size / 2 + 6,
           0,
           Math.PI * 2
         );
 
         ctx.stroke();
 
-        ctx.setLineDash(
-          []
-        );
+        ctx.setLineDash([]);
       }
 
       ctx.restore();
     }
   );
 
-
-  if (
-    options.playerView
-  ) {
-
-    const me =
-      currentPlayer();
-
-    const bomb =
-      state.match.bomb;
-
-
-    /*
-      A bomba armada aparece
-      para os dois lados.
-    */
-
-    if (
-      bomb.planted
-    ) {
-
-      const bx =
-        box.left +
-        bomb.x *
-          box.width;
-
-      const by =
-        box.top +
-        bomb.y *
-          box.height;
-
-      ctx.save();
-
-      ctx.beginPath();
-
-      ctx.arc(
-        bx,
-        by,
-        17,
-        0,
-        Math.PI * 2
-      );
-
-      ctx.fillStyle =
-        '#a04848';
-
-      ctx.strokeStyle =
-        '#fff';
-
-      ctx.lineWidth =
-        3;
-
-      ctx.fill();
-
-      ctx.stroke();
-
-      ctx.fillStyle =
-        '#fff';
-
-      ctx.font =
-        '12px sans-serif';
-
-      ctx.textAlign =
-        'center';
-
-      ctx.textBaseline =
-        'middle';
-
-      ctx.fillText(
-        '💣',
-        bx,
-        by
-      );
-
-      ctx.restore();
-    }
-
-
-    /*
-      Aliados
-    */
-
-    (
-      state.match.players ||
-      []
-    )
-      .filter(
-        player =>
-          player.status !==
-            'FORA DA OPERAÇÃO' &&
-          player.team ===
-            (
-              me?.team ||
-              'A'
-            )
-      )
-      .forEach(
-        player =>
-          drawPlayerMark(
-            ctx,
-            player,
-            box
-          )
-      );
+  if (!options.playerView) {
+    return;
   }
+
+  const me =
+    currentPlayer();
+
+  const bomb =
+    state.match.bomb;
+
+  if (bomb.planted) {
+    const bx =
+      box.left +
+      bomb.x *
+      box.width;
+
+    const by =
+      box.top +
+      bomb.y *
+      box.height;
+
+    ctx.save();
+
+    ctx.beginPath();
+
+    ctx.arc(
+      bx,
+      by,
+      17,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fillStyle =
+      '#a04848';
+
+    ctx.strokeStyle =
+      '#fff';
+
+    ctx.lineWidth =
+      3;
+
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle =
+      '#fff';
+
+    ctx.font =
+      '12px sans-serif';
+
+    ctx.textAlign =
+      'center';
+
+    ctx.textBaseline =
+      'middle';
+
+    ctx.fillText(
+      '💣',
+      bx,
+      by
+    );
+
+    ctx.restore();
+  }
+
+  (
+    state.match.players || []
+  )
+    .filter(
+      player =>
+        player.status !==
+          'FORA DA OPERAÇÃO' &&
+        player.team ===
+          (
+            me?.team ||
+            'A'
+          )
+    )
+    .forEach(
+      player =>
+        drawPlayerMark(
+          ctx,
+          player,
+          box
+        )
+    );
 }
 
 function drawPlayerMark(
@@ -2241,12 +2010,12 @@ function drawPlayerMark(
   const x =
     box.left +
     player.x *
-      box.width;
+    box.width;
 
   const y =
     box.top +
     player.y *
-      box.height;
+    box.height;
 
   const radius =
     Math.max(
@@ -2254,8 +2023,7 @@ function drawPlayerMark(
       Math.min(
         box.width,
         box.height
-      ) *
-        .018
+      ) * .018
     );
 
   ctx.save();
@@ -2282,7 +2050,6 @@ function drawPlayerMark(
     2;
 
   ctx.fill();
-
   ctx.stroke();
 
   ctx.fillStyle =
@@ -2291,8 +2058,7 @@ function drawPlayerMark(
   ctx.font =
     `800 ${Math.max(
       8,
-      radius *
-        .9
+      radius * .9
     )}px system-ui`;
 
   ctx.textAlign =
@@ -2304,32 +2070,22 @@ function drawPlayerMark(
   ctx.fillText(
     player.isMe
       ? 'VOCÊ'
-      : player.name.toUpperCase(),
+      : String(
+          player.name || ''
+        ).toUpperCase(),
     x,
-    y +
-      radius +
-      5
+    y + radius + 5
   );
 
   ctx.restore();
 }
-
-
-/*
-  Renderer único.
-
-  A imagem do mapa e os elementos
-  passam pelo mesmo canvas.
-*/
 
 function drawCanvas(
   canvas,
   dataUrl,
   options = {}
 ) {
-  if (
-    !canvas
-  ) {
+  if (!canvas) {
     return;
   }
 
@@ -2349,9 +2105,11 @@ function drawCanvas(
   } = metrics;
 
   const ctx =
-    canvas.getContext(
-      '2d'
-    );
+    canvas.getContext('2d');
+
+  if (!ctx) {
+    return;
+  }
 
   ctx.clearRect(
     0,
@@ -2360,24 +2118,14 @@ function drawCanvas(
     canvas.height
   );
 
-  ctx.save();
-
-  ctx.scale(
-    dpr,
-    dpr
-  );
-
   const zoom =
-    options.zoom ??
-    1;
+    options.zoom ?? 1;
 
   const panX =
-    options.panX ??
-    0;
+    options.panX ?? 0;
 
   const panY =
-    options.panY ??
-    0;
+    options.panY ?? 0;
 
   const box =
     mapBox(
@@ -2388,30 +2136,8 @@ function drawCanvas(
       panY
     );
 
-  if (
-    !dataUrl
-  ) {
-    drawMapMarks(
-      ctx,
-      width,
-      height,
-      box,
-      options
-    );
-
-    ctx.restore();
-
-    return;
-  }
-
-  let image =
-    imageCache.get(
-      dataUrl
-    );
-
   const paint =
-    () => {
-
+    image => {
       const current =
         resizeCanvas(
           canvas
@@ -2422,9 +2148,7 @@ function drawCanvas(
       }
 
       const context =
-        canvas.getContext(
-          '2d'
-        );
+        canvas.getContext('2d');
 
       context.clearRect(
         0,
@@ -2449,13 +2173,15 @@ function drawCanvas(
           panY
         );
 
-      context.drawImage(
-        image,
-        currentBox.left,
-        currentBox.top,
-        currentBox.width,
-        currentBox.height
-      );
+      if (image) {
+        context.drawImage(
+          image,
+          currentBox.left,
+          currentBox.top,
+          currentBox.width,
+          currentBox.height
+        );
+      }
 
       drawMapMarks(
         context,
@@ -2468,8 +2194,33 @@ function drawCanvas(
       context.restore();
     };
 
-  if (!image) {
+  if (!dataUrl) {
+    ctx.save();
 
+    ctx.scale(
+      dpr,
+      dpr
+    );
+
+    drawMapMarks(
+      ctx,
+      width,
+      height,
+      box,
+      options
+    );
+
+    ctx.restore();
+
+    return;
+  }
+
+  let image =
+    imageCache.get(
+      dataUrl
+    );
+
+  if (!image) {
     image =
       new Image();
 
@@ -2478,25 +2229,21 @@ function drawCanvas(
       image
     );
 
-    image.onload =
-      paint;
+    image.onload = () =>
+      paint(image);
 
     image.src =
       dataUrl;
 
-  } else if (
-    image.complete
-  ) {
-
-    paint();
-
-  } else {
-
-    image.onload =
-      paint;
+    return;
   }
 
-  ctx.restore();
+  if (image.complete) {
+    paint(image);
+  } else {
+    image.onload = () =>
+      paint(image);
+  }
 }
 
 function drawPreview() {
@@ -2516,23 +2263,18 @@ function drawEditor() {
     $('mapEditorCanvas'),
     draft.map.dataUrl,
     {
-      zoom:
-        editor.zoom,
-
-      panX:
-        editor.panX,
-
-      panY:
-        editor.panY
+      zoom: editor.zoom,
+      panX: editor.panX,
+      panY: editor.panY
     }
   );
 
-  $('zoomValue')
-    .textContent =
+  setText(
+    'zoomValue',
     `${Math.round(
-      editor.zoom *
-        100
-    )}%`;
+      editor.zoom * 100
+    )}%`
+  );
 }
 
 function drawPlayerMap() {
@@ -2557,25 +2299,28 @@ function drawPlayerMap() {
     }
   );
 
-  $('playerZoomValue')
-    .textContent =
+  setText(
+    'playerZoomValue',
     `${Math.round(
-      playerViewer.zoom *
-        100
-    )}%`;
+      playerViewer.zoom * 100
+    )}%`
+  );
 }
-
 
 /* =========================
    MAP SUMMARY
 ========================= */
 
 function renderMapSummary() {
-  const features =
-    draftFeatures();
-
   const holder =
     $('mapToolSummary');
+
+  if (!holder) {
+    return;
+  }
+
+  const features =
+    draftFeatures();
 
   holder.innerHTML =
     '';
@@ -2583,11 +2328,7 @@ function renderMapSummary() {
   Object.entries(
     TOOLS
   ).forEach(
-    ([
-      key,
-      tool
-    ]) => {
-
+    ([key, tool]) => {
       const chip =
         document.createElement(
           'div'
@@ -2601,9 +2342,7 @@ function renderMapSummary() {
         }`;
 
       chip.textContent =
-        `${tool.icon} ${
-          tool.label
-        } · ${
+        `${tool.icon} ${tool.label} · ${
           features[key]
             ? 'ATIVO'
             : 'INATIVO'
@@ -2615,7 +2354,6 @@ function renderMapSummary() {
     }
   );
 }
-
 
 /* =========================
    MAP EDITOR
@@ -2629,14 +2367,11 @@ function addMapMark(
   const features =
     draftFeatures();
 
-  if (
-    !features[type]
-  ) {
+  if (!features[type]) {
     toast(
       `O modo escolhido não permite ${
-        TOOLS[type]
-          .label
-          .toLowerCase()
+        TOOLS[type]?.label?.toLowerCase() ||
+        type
       }.`
     );
 
@@ -2646,8 +2381,7 @@ function addMapMark(
   const number =
     mapMarks().filter(
       mark =>
-        mark.type ===
-        type
+        mark.type === type
     ).length + 1;
 
   const size =
@@ -2673,19 +2407,13 @@ function addMapMark(
     x:
       Math.max(
         0.02,
-        Math.min(
-          0.98,
-          x
-        )
+        Math.min(0.98, x)
       ),
 
     y:
       Math.max(
         0.02,
-        Math.min(
-          0.98,
-          y
-        )
+        Math.min(0.98, y)
       ),
 
     size
@@ -2699,9 +2427,7 @@ function addMapMark(
     mark.id;
 
   drawEditor();
-
   drawPreview();
-
   renderInspector();
 
   toast(
@@ -2720,16 +2446,12 @@ function findMarkAt(
     .find(
       mark =>
         Math.hypot(
-          x -
-            mark.x,
-
-          y -
-            mark.y
+          x - mark.x,
+          y - mark.y
         ) <=
         Math.max(
           0.045,
-          mark.size /
-            2
+          mark.size / 2
         )
     );
 }
@@ -2737,6 +2459,10 @@ function findMarkAt(
 function renderEditorTools() {
   const holder =
     $('editorTools');
+
+  if (!holder) {
+    return;
+  }
 
   holder.innerHTML =
     '';
@@ -2747,11 +2473,7 @@ function renderEditorTools() {
   Object.entries(
     TOOLS
   ).forEach(
-    ([
-      key,
-      tool
-    ]) => {
-
+    ([key, tool]) => {
       const button =
         document.createElement(
           'button'
@@ -2763,9 +2485,7 @@ function renderEditorTools() {
       button.className =
         'tool-btn editor-tool selectable';
 
-      if (
-        !features[key]
-      ) {
+      if (!features[key]) {
         button.classList.add(
           'disabled'
         );
@@ -2774,9 +2494,7 @@ function renderEditorTools() {
       button.innerHTML =
         `
           <strong>
-            ${tool.icon} ${
-              tool.label
-            }
+            ${tool.icon} ${tool.label}
           </strong>
 
           <small>
@@ -2787,14 +2505,9 @@ function renderEditorTools() {
       button.addEventListener(
         'click',
         () => {
-
-          if (
-            !features[key]
-          ) {
+          if (!features[key]) {
             toast(
-              `O modo atual não libera ${
-                tool.label.toLowerCase()
-              }.`
+              `O modo atual não libera ${tool.label.toLowerCase()}.`
             );
 
             return;
@@ -2819,9 +2532,7 @@ function renderEditorTools() {
           );
 
           toast(
-            `TOQUE NO MAPA PARA ADICIONAR ${
-              tool.label.toUpperCase()
-            }.`
+            `TOQUE NO MAPA PARA ADICIONAR ${tool.label.toUpperCase()}.`
           );
         }
       );
@@ -2840,6 +2551,10 @@ function renderInspector() {
   const content =
     $('inspectorContent');
 
+  if (!panel || !content) {
+    return;
+  }
+
   const mark =
     mapMarks().find(
       item =>
@@ -2848,7 +2563,6 @@ function renderInspector() {
     );
 
   if (!mark) {
-
     panel.classList.add(
       'hidden'
     );
@@ -2863,27 +2577,17 @@ function renderInspector() {
   content.innerHTML =
     `
       <div class="field">
-
-        <span>
-          Nome
-        </span>
+        <span>Nome</span>
 
         <input
           id="inspectorName"
           maxlength="36"
-          value="${esc(
-            mark.label
-          )}"
+          value="${esc(mark.label)}"
         >
-
       </div>
 
-
       <div class="field">
-
-        <span>
-          Tamanho
-        </span>
+        <span>Tamanho</span>
 
         <input
           id="inspectorSize"
@@ -2896,19 +2600,17 @@ function renderInspector() {
 
         <small id="inspectorSizeValue">
           ${Math.round(
-            mark.size *
-              100
+            mark.size * 100
           )}%
         </small>
-
       </div>
-
 
       <div class="inspector-actions">
 
         <button
           class="tool-btn"
           id="inspectorSave"
+          type="button"
         >
           APLICAR
         </button>
@@ -2916,6 +2618,7 @@ function renderInspector() {
         <button
           class="tool-btn danger-tool"
           id="inspectorDelete"
+          type="button"
         >
           🗑 APAGAR
         </button>
@@ -2923,53 +2626,40 @@ function renderInspector() {
       </div>
     `;
 
-  $(
-    'inspectorSize'
-  ).addEventListener(
+  on(
+    'inspectorSize',
     'input',
     event => {
-
       mark.size =
         Number(
           event.target.value
         );
 
-      $(
-        'inspectorSizeValue'
-      ).textContent =
+      setText(
+        'inspectorSizeValue',
         `${Math.round(
-          mark.size *
-            100
-        )}%`;
+          mark.size * 100
+        )}%`
+      );
 
       drawEditor();
-
       drawPreview();
     }
   );
 
-  $(
-    'inspectorSave'
-  ).addEventListener(
+  on(
+    'inspectorSave',
     'click',
     () => {
-
       const name =
-        $(
-          'inspectorName'
-        )
-          .value
-          .trim();
+        $('inspectorName')?.value?.trim();
 
-      if (
-        name
-      ) {
+      if (name) {
         mark.label =
           name;
       }
 
       drawEditor();
-
       drawPreview();
 
       toast(
@@ -2978,9 +2668,8 @@ function renderInspector() {
     }
   );
 
-  $(
-    'inspectorDelete'
-  ).addEventListener(
+  on(
+    'inspectorDelete',
     'click',
     () =>
       deleteMark(
@@ -2989,49 +2678,36 @@ function renderInspector() {
   );
 }
 
-function renumber(
-  type
-) {
+function renumber(type) {
   let n = 1;
 
   mapMarks()
     .filter(
       mark =>
-        mark.type ===
-        type
+        mark.type === type
     )
     .forEach(
       mark => {
+        const oldNumber =
+          mark.number;
 
         mark.number =
           n;
 
-        /*
-          Mantém nomes personalizados.
-          Só renumera quem usa o nome padrão.
-        */
-
-        const defaultName =
-          `${TOOLS[type].label} ${
-            mark.number
-          }`;
+        const oldDefault =
+          new RegExp(
+            `^${TOOLS[type].label} \\d+$`
+          );
 
         if (
-          /^Zona \d+$/.test(
+          oldDefault.test(
             mark.label
           ) ||
-          /^Base \d+$/.test(
-            mark.label
-          ) ||
-          /^Bandeira \d+$/.test(
-            mark.label
-          ) ||
-          /^Área da bomba \d+$/.test(
-            mark.label
-          )
+          mark.label ===
+            `${TOOLS[type].label} ${oldNumber}`
         ) {
           mark.label =
-            defaultName;
+            `${TOOLS[type].label} ${n}`;
         }
 
         n++;
@@ -3039,14 +2715,11 @@ function renumber(
     );
 }
 
-function deleteMark(
-  id
-) {
+function deleteMark(id) {
   const mark =
     mapMarks().find(
       item =>
-        item.id ===
-        id
+        item.id === id
     );
 
   if (!mark) {
@@ -3055,18 +2728,13 @@ function deleteMark(
 
   openConfirm(
     `Apagar ${mark.label}?`,
-
     'O elemento será removido do mapa. A imagem original não será alterada.',
-
     'APAGAR',
-
     () => {
-
       draft.map.marks =
         draft.map.marks.filter(
           item =>
-            item.id !==
-            id
+            item.id !== id
         );
 
       renumber(
@@ -3077,9 +2745,7 @@ function deleteMark(
         null;
 
       drawEditor();
-
       drawPreview();
-
       renderInspector();
 
       toast(
@@ -3090,9 +2756,7 @@ function deleteMark(
 }
 
 function clearMarks() {
-  if (
-    !mapMarks().length
-  ) {
+  if (!mapMarks().length) {
     toast(
       'NÃO HÁ ELEMENTOS NO MAPA.'
     );
@@ -3102,13 +2766,9 @@ function clearMarks() {
 
   openConfirm(
     'Limpar todos os elementos?',
-
     'Todas as zonas, bases, bandeiras e áreas de bomba serão removidas.',
-
     'LIMPAR',
-
     () => {
-
       draft.map.marks =
         [];
 
@@ -3116,9 +2776,7 @@ function clearMarks() {
         null;
 
       drawEditor();
-
       drawPreview();
-
       renderInspector();
 
       toast(
@@ -3128,15 +2786,8 @@ function clearMarks() {
   );
 }
 
-
-/* =========================
-   OPEN MAP EDITOR
-========================= */
-
 function openEditor() {
-  if (
-    !hasMap()
-  ) {
+  if (!hasMap()) {
     toast(
       'ENVIE OU GERE UM MAPA PRIMEIRO.'
     );
@@ -3160,7 +2811,6 @@ function openEditor() {
     null;
 
   renderEditorTools();
-
   renderInspector();
 
   openOverlay(
@@ -3172,7 +2822,6 @@ function openEditor() {
     80
   );
 }
-
 
 /* =========================
    MAP GENERATION
@@ -3191,9 +2840,11 @@ function generateMap() {
     1000;
 
   const ctx =
-    canvas.getContext(
-      '2d'
-    );
+    canvas.getContext('2d');
+
+  if (!ctx) {
+    return;
+  }
 
   ctx.clearRect(
     0,
@@ -3211,13 +2862,11 @@ function generateMap() {
   ctx.lineWidth =
     3;
 
-
   for (
     let x = 0;
     x <= canvas.width;
     x += 160
   ) {
-
     ctx.beginPath();
 
     ctx.moveTo(
@@ -3233,13 +2882,11 @@ function generateMap() {
     ctx.stroke();
   }
 
-
   for (
     let y = 0;
     y <= canvas.height;
     y += 160
   ) {
-
     ctx.beginPath();
 
     ctx.moveTo(
@@ -3255,51 +2902,39 @@ function generateMap() {
     ctx.stroke();
   }
 
-
   ctx.globalAlpha =
     .16;
 
   ctx.fillStyle =
     '#8b6b4a';
 
-
   for (
     let i = 0;
     i < 12;
     i++
   ) {
-
     ctx.fillRect(
       80 +
         (
-          i *
-          137
-        ) %
-          1320,
+          i * 137
+        ) % 1320,
 
       100 +
         (
-          i *
-          89
-        ) %
-          760,
+          i * 89
+        ) % 760,
 
       120 +
         (
-          i %
-          3
-        ) *
-          70,
+          i % 3
+        ) * 70,
 
       70 +
         (
-          i %
-          2
-        ) *
-          45
+          i % 2
+        ) * 45
     );
   }
-
 
   ctx.globalAlpha =
     1;
@@ -3329,7 +2964,6 @@ function generateMap() {
     65
   );
 
-
   draft.map.dataUrl =
     canvas.toDataURL(
       'image/png'
@@ -3354,26 +2988,21 @@ function generateMap() {
   );
 }
 
-
 /* =========================
    CROP
 ========================= */
 
-function onMapFile(
-  file
-) {
+function onMapFile(file) {
   const reader =
     new FileReader();
 
   reader.onload =
     () => {
-
       cropImage =
         new Image();
 
       cropImage.onload =
         () => {
-
           cropRect = {
             x: 5,
             y: 5,
@@ -3386,7 +3015,6 @@ function onMapFile(
           );
 
           drawCrop();
-
           positionCrop();
         };
 
@@ -3422,9 +3050,11 @@ function drawCrop() {
   } = metrics;
 
   const ctx =
-    canvas.getContext(
-      '2d'
-    );
+    canvas.getContext('2d');
+
+  if (!ctx) {
+    return;
+  }
 
   ctx.clearRect(
     0,
@@ -3443,22 +3073,18 @@ function drawCrop() {
   const scale =
     Math.min(
       width /
-        cropImage
-          .naturalWidth,
+        cropImage.naturalWidth,
 
       height /
-        cropImage
-          .naturalHeight
+        cropImage.naturalHeight
     );
 
   const imageWidth =
-    cropImage
-      .naturalWidth *
+    cropImage.naturalWidth *
     scale;
 
   const imageHeight =
-    cropImage
-      .naturalHeight *
+    cropImage.naturalHeight *
     scale;
 
   const x =
@@ -3488,6 +3114,10 @@ function positionCrop() {
   const box =
     $('cropBox');
 
+  if (!box) {
+    return;
+  }
+
   box.style.left =
     `${cropRect.x}%`;
 
@@ -3502,14 +3132,16 @@ function positionCrop() {
 }
 
 function applyCrop() {
-  if (
-    !cropImage
-  ) {
+  if (!cropImage) {
     return;
   }
 
   const stage =
     $('cropStage');
+
+  if (!stage) {
+    return;
+  }
 
   const rect =
     stage.getBoundingClientRect();
@@ -3517,22 +3149,18 @@ function applyCrop() {
   const scale =
     Math.min(
       rect.width /
-        cropImage
-          .naturalWidth,
+        cropImage.naturalWidth,
 
       rect.height /
-        cropImage
-          .naturalHeight
+        cropImage.naturalHeight
     );
 
   const imageWidth =
-    cropImage
-      .naturalWidth *
+    cropImage.naturalWidth *
     scale;
 
   const imageHeight =
-    cropImage
-      .naturalHeight *
+    cropImage.naturalHeight *
     scale;
 
   const offsetX =
@@ -3549,22 +3177,22 @@ function applyCrop() {
 
   const cropLeft =
     cropRect.x /
-      100 *
+    100 *
     rect.width;
 
   const cropTop =
     cropRect.y /
-      100 *
+    100 *
     rect.height;
 
   const cropWidth =
     cropRect.w /
-      100 *
+    100 *
     rect.width;
 
   const cropHeight =
     cropRect.h /
-      100 *
+    100 *
     rect.height;
 
   const sx =
@@ -3573,8 +3201,7 @@ function applyCrop() {
       (
         cropLeft -
         offsetX
-      ) /
-        scale
+      ) / scale
     );
 
   const sy =
@@ -3583,14 +3210,12 @@ function applyCrop() {
       (
         cropTop -
         offsetY
-      ) /
-        scale
+      ) / scale
     );
 
   const sw =
     Math.min(
-      cropImage
-        .naturalWidth -
+      cropImage.naturalWidth -
         sx,
 
       cropWidth /
@@ -3599,8 +3224,7 @@ function applyCrop() {
 
   const sh =
     Math.min(
-      cropImage
-        .naturalHeight -
+      cropImage.naturalHeight -
         sy,
 
       cropHeight /
@@ -3631,14 +3255,12 @@ function applyCrop() {
 
   output
     .getContext('2d')
-    .drawImage(
+    ?.drawImage(
       cropImage,
-
       sx,
       sy,
       sw,
       sh,
-
       0,
       0,
       output.width,
@@ -3676,7 +3298,6 @@ function applyCrop() {
   );
 }
 
-
 /* =========================
    PLAYER
 ========================= */
@@ -3691,15 +3312,15 @@ function renderPlayer() {
   const live =
     $('playerLive');
 
+  if (!wait || !ready || !live) {
+    return;
+  }
+
   if (
-    ![
-      'open',
-      'live'
-    ].includes(
+    !['open', 'live'].includes(
       state.match.status
     )
   ) {
-
     wait.classList.remove(
       'hidden'
     );
@@ -3723,10 +3344,8 @@ function renderPlayer() {
     currentPlayer();
 
   if (
-    state.match.status ===
-    'open'
+    state.match.status === 'open'
   ) {
-
     ready.classList.remove(
       'hidden'
     );
@@ -3735,57 +3354,63 @@ function renderPlayer() {
       'hidden'
     );
 
-    $('pName').textContent =
+    setText(
+      'pName',
       state.match.name ||
-      'Operação Desert Falcons';
+        'Operação Desert Falcons'
+    );
 
-    $('pLoc').textContent =
+    setText(
+      'pLoc',
       state.match.location ||
-      'Campo';
+        'Campo'
+    );
 
-    $('pObj').textContent =
-      objectiveLabel();
+    setText(
+      'pObj',
+      objectiveLabel()
+    );
 
-    $('pDur').textContent =
-      `${
-        state.match
-          .durationMin
-      } min`;
+    setText(
+      'pDur',
+      `${state.match.durationMin} min`
+    );
 
-    $('pLivesReady')
-      .textContent =
+    setText(
+      'pLivesReady',
       me
-        ? `${
-            me.lives
-          } vida(s)`
-        : '—';
+        ? `${me.lives} vida(s)`
+        : '—'
+    );
 
-    $('pTeam')
-      .textContent =
+    setText(
+      'pTeam',
       `EQUIPE ${
-        me?.team ||
-        'A'
-      }`;
+        me?.team || 'A'
+      }`
+    );
 
-    $('btnConfirm')
-      .textContent =
-      me?.confirmed
-        ? 'PRESENÇA CONFIRMADA ✓'
-        : 'CONFIRMAR PRESENÇA';
+    const confirmBtn =
+      $('btnConfirm');
 
-    $('btnConfirm')
-      .classList.toggle(
+    if (confirmBtn) {
+      confirmBtn.textContent =
+        me?.confirmed
+          ? 'PRESENÇA CONFIRMADA ✓'
+          : 'CONFIRMAR PRESENÇA';
+
+      confirmBtn.classList.toggle(
         'selected',
         Boolean(
           me?.confirmed
         )
       );
+    }
 
-    $('btnEnter')
-      .classList.toggle(
-        'hidden',
-        !me?.confirmed
-      );
+    toggleHidden(
+      'btnEnter',
+      !me?.confirmed
+    );
 
     return;
   }
@@ -3802,9 +3427,7 @@ function renderPlayer() {
 }
 
 function matchElapsed() {
-  if (
-    !state.match.startAt
-  ) {
+  if (!state.match.startAt) {
     return 0;
   }
 
@@ -3814,8 +3437,7 @@ function matchElapsed() {
       (
         Date.now() -
         state.match.startAt
-      ) /
-        1000
+      ) / 1000
     )
   );
 }
@@ -3825,13 +3447,10 @@ function matchRemaining() {
     0,
     (
       Number(
-        state.match
-          .durationMin
-      ) ||
-      60
-    ) *
-      60 -
-      matchElapsed()
+        state.match.durationMin
+      ) || 60
+    ) * 60 -
+    matchElapsed()
   );
 }
 
@@ -3839,93 +3458,77 @@ function renderPlayerLive() {
   const me =
     currentPlayer();
 
-  $('pLiveObj')
-    .textContent =
-    objectiveLabel();
+  setText(
+    'pLiveObj',
+    objectiveLabel()
+  );
 
-  $('pScoreA')
-    .textContent =
+  setText(
+    'pScoreA',
     `A ${
-      state.match
-        .scores.A ||
-      0
-    }`;
+      state.match.scores.A || 0
+    }`
+  );
 
-  $('pScoreB')
-    .textContent =
+  setText(
+    'pScoreB',
     `B ${
-      state.match
-        .scores.B ||
-      0
-    }`;
+      state.match.scores.B || 0
+    }`
+  );
 
-  $('pTimer')
-    .textContent =
+  setText(
+    'pTimer',
     formatTime(
       matchRemaining()
-    );
+    )
+  );
 
-  $('pPlayerState')
-    .textContent =
-    me?.status ||
-    'ATIVO';
+  setText(
+    'pPlayerState',
+    me?.status || 'ATIVO'
+  );
 
-  $('pAlive')
-    .textContent =
-    `${
-      me?.status ||
-      'ATIVO'
-    } · ${
-      me?.lives ??
-      0
-    } vida(s)`;
+  setText(
+    'pAlive',
+    `${me?.status || 'ATIVO'} · ${me?.lives ?? 0} vida(s)`
+  );
 
-  $('pGps')
-    .textContent =
+  setText(
+    'pGps',
     state.gps.updatedAt
-      ? `GPS ±${
-          Math.round(
-            state.gps
-              .accuracy ||
-              0
-          )
-        }m`
-      : 'GPS aguardando…';
+      ? `GPS ±${Math.round(
+          state.gps.accuracy || 0
+        )}m`
+      : 'GPS aguardando…'
+  );
 
-  $('hudTeamChip')
-    .textContent =
+  setText(
+    'hudTeamChip',
     `EQUIPE ${
-      me?.team ||
-      'A'
-    }`;
+      me?.team || 'A'
+    }`
+  );
 
   renderAllies();
-
   renderBombHud();
-
   renderZoneHud();
-
   renderQuickActions();
-
   drawPlayerMap();
 
-  $('btnOrgFromGame')
-    .classList.toggle(
-      'hidden',
-      role() !==
-        'organizer'
-    );
+  toggleHidden(
+    'btnOrgFromGame',
+    role() !== 'organizer'
+  );
 
-  $('btnEndFromGame')
-    .classList.toggle(
-      'hidden',
-      role() !==
-        'organizer'
-    );
+  toggleHidden(
+    'btnEndFromGame',
+    role() !== 'organizer'
+  );
 
   if (
-    matchRemaining() <=
-      0
+    matchRemaining() <= 0 &&
+    state.match.status === 'live'
   ) {
     endMatch(
       'TEMPO DA PARTIDA ENCERRADO.'
@@ -3940,47 +3543,43 @@ function renderAllies() {
   const holder =
     $('allyList');
 
+  if (!holder) {
+    return;
+  }
+
   holder.innerHTML =
     (
-      state.match
-        .players ||
+      state.match.players ||
       []
     )
       .filter(
         player =>
           player.team ===
           (
-            me?.team ||
-            'A'
+            me?.team || 'A'
           )
       )
       .map(
         player =>
           `
           <div class="ally-item ${
-            player.isMe
-              ? 'you'
-              : ''
+            player.isMe ? 'you' : ''
           }">
 
             <span class="ally-dot"></span>
 
             <span class="name">
-              ${
-                esc(
-                  player.isMe
-                    ? 'Você'
-                    : player.name
-                )
-              }
+              ${esc(
+                player.isMe
+                  ? 'Você'
+                  : player.name
+              )}
             </span>
 
             <small>
-              ${
-                esc(
-                  player.status
-                )
-              } · ${
+              ${esc(
+                player.status
+              )} · ${
                 player.lives
               } vida(s)
             </small>
@@ -3991,7 +3590,6 @@ function renderAllies() {
       .join('');
 }
 
-
 /* =========================
    BOMB
 ========================= */
@@ -4000,14 +3598,15 @@ function renderBombHud() {
   const holder =
     $('bombHud');
 
-  if (
-    !state.match
-      .modes
-      .includes(
-        'bomb'
-      )
-  ) {
+  if (!holder) {
+    return;
+  }
 
+  if (
+    !state.match.modes.includes(
+      'bomb'
+    )
+  ) {
     holder.classList.add(
       'hidden'
     );
@@ -4032,36 +3631,22 @@ function renderBombHud() {
         bomb.carrierId
     );
 
-  if (
-    !bomb.planted
-  ) {
-
+  if (!bomb.planted) {
     holder.className =
       'live-panel';
 
     holder.innerHTML =
       `
         <div class="live-title">
-
-          <strong>
-            💣 BOMBA · PORTADOR
-          </strong>
-
-          <b>
-            ${
-              esc(
-                carrier?.name ||
-                '—'
-              )
-            }
-          </b>
-
+          <strong>💣 BOMBA · PORTADOR</strong>
+          <b>${esc(
+            carrier?.name || '—'
+          )}</b>
         </div>
 
         <div class="live-copy">
           ${
-            carrier?.team ===
-            me?.team
+            carrier?.team === me?.team
               ? 'A bomba pertence à sua equipe.'
               : 'Aguardando armamento.'
           }
@@ -4082,8 +3667,7 @@ function renderBombHud() {
         (
           bomb.expiresAt -
           Date.now()
-        ) /
-          1000
+        ) / 1000
       )
     );
 
@@ -4095,15 +3679,12 @@ function renderBombHud() {
 
   holder.className =
     `live-panel ${
-      enemy
-        ? 'enemy'
-        : ''
+      enemy ? 'enemy' : ''
     }`;
 
   holder.innerHTML =
     `
       <div class="live-title">
-
         <strong>
           ${
             enemy
@@ -4117,14 +3698,11 @@ function renderBombHud() {
             remaining
           )}
         </b>
-
       </div>
 
-
       <div class="live-copy">
-        Localização GPS ativa · aproximadamente ${
-          distance
-        } m.
+        Localização GPS ativa · aproximadamente
+        ${distance} m.
 
         ${
           enemy
@@ -4136,35 +3714,32 @@ function renderBombHud() {
       ${
         enemy
           ? `
-              <button
-                class="quick-action"
-                id="quickDisarm"
-              >
-                DESARMAR BOMBA
-              </button>
-            `
+            <button
+              class="quick-action"
+              id="quickDisarm"
+              type="button"
+            >
+              DESARMAR BOMBA
+            </button>
+          `
           : ''
       }
     `;
 
-  $(
-    'quickDisarm'
-  )?.addEventListener(
+  on(
+    'quickDisarm',
     'click',
     startDisarm
   );
 
-  if (
-    enemy
-  ) {
+  if (enemy) {
     bombBeep(
       distance
     );
   }
 
   if (
-    remaining <=
-      0
+    remaining <= 0
   ) {
     explodeBomb();
   }
@@ -4188,7 +3763,6 @@ function bombDistance(
       bomb?.lng
     )
   ) {
-
     const R =
       6371000;
 
@@ -4213,8 +3787,7 @@ function bombDistance(
     const a =
       Math.sin(
         dLat / 2
-      ) **
-        2 +
+      ) ** 2 +
 
       Math.cos(
         toRad(
@@ -4230,19 +3803,15 @@ function bombDistance(
 
       Math.sin(
         dLng / 2
-      ) **
-        2;
+      ) ** 2;
 
     return Math.round(
       R *
-        2 *
-        Math.atan2(
-          Math.sqrt(a),
-          Math.sqrt(
-            1 -
-              a
-          )
-        )
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      )
     );
   }
 
@@ -4252,56 +3821,45 @@ function bombDistance(
         player?.x ??
         0.5
       ) -
-        (
-          bomb?.x ??
-          0.5
-        ),
+      (
+        bomb?.x ??
+        0.5
+      ),
 
       (
         player?.y ??
         0.5
       ) -
-        (
-          bomb?.y ??
-          0.5
-        )
-    ) *
-      120
+      (
+        bomb?.y ??
+        0.5
+      )
+    ) * 120
   );
 }
 
-function bombBeep(
-  distance
-) {
+function bombBeep(distance) {
   const now =
     Date.now();
 
   let interval =
     1600;
 
-  if (
-    distance <
-    25
-  ) {
-    interval =
-      250;
+  if (distance < 25) {
+    interval = 250;
   } else if (
-    distance <
-    50
+    distance < 50
   ) {
-    interval =
-      500;
+    interval = 500;
   } else if (
-    distance <
-    100
+    distance < 100
   ) {
-    interval =
-      900;
+    interval = 900;
   }
 
   if (
     now -
-      lastBeep <
+    lastBeep <
     interval
   ) {
     return;
@@ -4311,7 +3869,6 @@ function bombBeep(
     now;
 
   try {
-
     audioContext ||=
       new (
         window.AudioContext ||
@@ -4319,8 +3876,7 @@ function bombBeep(
       )();
 
     if (
-      audioContext
-        .state ===
+      audioContext.state ===
       'suspended'
     ) {
       audioContext
@@ -4338,17 +3894,12 @@ function bombBeep(
       audioContext
         .createGain();
 
-    oscillator
-      .frequency
-      .value =
-      distance <
-      25
+    oscillator.frequency.value =
+      distance < 25
         ? 1050
-        : distance <
-          50
+        : distance < 50
         ? 780
-        : distance <
-          100
+        : distance < 100
         ? 600
         : 480;
 
@@ -4356,36 +3907,23 @@ function bombBeep(
       0.035;
 
     oscillator
+      .connect(gain)
       .connect(
-        gain
-      )
-      .connect(
-        audioContext
-          .destination
+        audioContext.destination
       );
 
     oscillator.start();
 
     oscillator.stop(
-      audioContext
-        .currentTime +
-        0.09
+      audioContext.currentTime +
+      0.09
     );
-
   } catch (_) {}
 
-  if (
-    navigator.vibrate
-  ) {
-
+  if (navigator.vibrate) {
     navigator.vibrate(
-      distance <
-        25
-        ? [
-            60,
-            40,
-            60
-          ]
+      distance < 25
+        ? [60, 40, 60]
         : 35
     );
   }
@@ -4394,6 +3932,10 @@ function bombBeep(
 function renderQuickActions() {
   const holder =
     $('quickActions');
+
+  if (!holder) {
+    return;
+  }
 
   const me =
     currentPlayer();
@@ -4405,29 +3947,22 @@ function renderQuickActions() {
     '';
 
   if (
-    state.match
-      .modes
-      .includes(
-        'bomb'
-      ) &&
-
+    state.match.modes.includes(
+      'bomb'
+    ) &&
     !bomb.planted &&
-
-    bomb.carrierId ===
-      me?.id &&
-
+    bomb.carrierId === me?.id &&
     Number(
       me?.bombsRemaining ??
-        bomb.bombsPerPlayer
-    ) >
-      0
+      bomb.bombsPerPlayer
+    ) > 0
   ) {
-
     html +=
       `
         <button
           class="quick-action"
           id="quickArm"
+          type="button"
         >
           💣 ARMAR BOMBA
         </button>
@@ -4437,9 +3972,8 @@ function renderQuickActions() {
   holder.innerHTML =
     html;
 
-  $(
-    'quickArm'
-  )?.addEventListener(
+  on(
+    'quickArm',
     'click',
     armBomb
   );
@@ -4455,8 +3989,7 @@ function armBomb() {
   if (
     !me ||
     bomb.planted ||
-    bomb.carrierId !==
-      me.id
+    bomb.carrierId !== me.id
   ) {
     return;
   }
@@ -4464,11 +3997,9 @@ function armBomb() {
   if (
     Number(
       me.bombsRemaining ??
-        bomb.bombsPerPlayer
-    ) <=
-      0
+      bomb.bombsPerPlayer
+    ) <= 0
   ) {
-
     toast(
       'VOCÊ NÃO TEM MAIS BOMBAS DISPONÍVEIS.'
     );
@@ -4478,14 +4009,12 @@ function armBomb() {
 
   if (
     bomb.armPolicy ===
-      'areas' &&
+    'areas' &&
     !state.match.map.marks.some(
       mark =>
-        mark.type ===
-        'bomb'
+        mark.type === 'bomb'
     )
   ) {
-
     toast(
       'NÃO HÁ ÁREA DE BOMBA CONFIGURADA.'
     );
@@ -4495,9 +4024,8 @@ function armBomb() {
 
   if (
     bomb.timingPolicy ===
-      'arming'
+    'arming'
   ) {
-
     const value =
       prompt(
         'Tempo da bomba em minutos:',
@@ -4506,10 +4034,7 @@ function armBomb() {
         )
       );
 
-    if (
-      value ===
-      null
-    ) {
+    if (value === null) {
       return;
     }
 
@@ -4520,12 +4045,9 @@ function armBomb() {
       !Number.isFinite(
         minutes
       ) ||
-      minutes <
-        1 ||
-      minutes >
-        120
+      minutes < 1 ||
+      minutes > 120
     ) {
-
       toast(
         'INFORME ENTRE 1 E 120 MINUTOS.'
       );
@@ -4537,7 +4059,6 @@ function armBomb() {
       minutes;
   }
 
-
   bomb.planted =
     true;
 
@@ -4547,7 +4068,7 @@ function armBomb() {
   bomb.expiresAt =
     Date.now() +
     bomb.durationMin *
-      60000;
+    60000;
 
   bomb.armedByTeam =
     me.team;
@@ -4564,17 +4085,14 @@ function armBomb() {
   bomb.lng =
     state.gps.lng;
 
-
   me.bombsRemaining =
     Math.max(
       0,
       Number(
         me.bombsRemaining ??
-          bomb.bombsPerPlayer
-      ) -
-        1
+        bomb.bombsPerPlayer
+      ) - 1
     );
-
 
   addLog(
     `${me.name} armou a bomba.`
@@ -4600,19 +4118,15 @@ function startDisarm() {
   if (
     !bomb.planted ||
     bomb.armedByTeam ===
-      me?.team
+    me?.team
   ) {
     return;
   }
 
   if (
-    bombDistance(
-      me,
-      bomb
-    ) >
+    bombDistance(me, bomb) >
     25
   ) {
-
     toast(
       'APROXIME-SE DA BOMBA PARA DESARMAR.'
     );
@@ -4623,23 +4137,19 @@ function startDisarm() {
   let remaining =
     Number(
       bomb.disarmSeconds
-    ) ||
-    20;
+    ) || 20;
 
   toast(
-    `DESARME INICIADO · ${
-      remaining
-    }s`
+    `DESARME INICIADO · ${remaining}s`
   );
 
   const timer =
     setInterval(
       () => {
-
         if (
           !bomb.planted ||
           state.match.status !==
-            'live'
+          'live'
         ) {
           clearInterval(
             timer
@@ -4652,10 +4162,8 @@ function startDisarm() {
           bombDistance(
             me,
             bomb
-          ) >
-          25
+          ) > 25
         ) {
-
           clearInterval(
             timer
           );
@@ -4670,17 +4178,14 @@ function startDisarm() {
         remaining--;
 
         if (
-          remaining <=
-          0
+          remaining <= 0
         ) {
-
           clearInterval(
             timer
           );
 
           disarmBomb();
         }
-
       },
       1000
     );
@@ -4690,9 +4195,7 @@ function disarmBomb() {
   const bomb =
     state.match.bomb;
 
-  if (
-    !bomb.planted
-  ) {
+  if (!bomb.planted) {
     return;
   }
 
@@ -4708,19 +4211,13 @@ function disarmBomb() {
   bomb.expiresAt =
     null;
 
-  state.match.scores[
-    team
-  ] =
+  state.match.scores[team] =
     Math.max(
       0,
       (
-        state.match
-          .scores[
-            team
-          ] ||
+        state.match.scores[team] ||
         0
-      ) -
-        25
+      ) - 25
     );
 
   addLog(
@@ -4734,7 +4231,6 @@ function disarmBomb() {
   );
 
   renderPlayer();
-
   renderControl();
 }
 
@@ -4742,9 +4238,7 @@ function explodeBomb() {
   const bomb =
     state.match.bomb;
 
-  if (
-    !bomb.planted
-  ) {
+  if (!bomb.planted) {
     return;
   }
 
@@ -4752,8 +4246,7 @@ function explodeBomb() {
     bomb.armedByTeam;
 
   const enemyTeam =
-    attackingTeam ===
-    'A'
+    attackingTeam === 'A'
       ? 'B'
       : 'A';
 
@@ -4761,63 +4254,46 @@ function explodeBomb() {
     state.match.players.filter(
       player =>
         player.team ===
-          enemyTeam &&
-
+        enemyTeam &&
         player.status !==
-          'FORA DA OPERAÇÃO' &&
-
+        'FORA DA OPERAÇÃO' &&
         bombDistance(
           player,
           bomb
         ) <=
-          bomb.blastRadius
+        bomb.blastRadius
     );
 
   victims.forEach(
     player => {
-
-      player.hits +=
-        1;
+      player.hits += 1;
 
       player.lives =
         Math.max(
           0,
-          player.lives -
-            1
+          player.lives - 1
         );
 
       player.status =
-        player.lives >
-        0
+        player.lives > 0
           ? 'HIT'
           : 'FORA DA OPERAÇÃO';
     }
   );
 
-  state.match.hits[
-    enemyTeam
-  ] =
+  state.match.hits[enemyTeam] =
     (
-      state.match
-        .hits[
-          enemyTeam
-        ] ||
+      state.match.hits[enemyTeam] ||
       0
     ) +
     victims.length;
 
-  state.match.scores[
-    attackingTeam
-  ] =
+  state.match.scores[attackingTeam] =
     (
-      state.match
-        .scores[
-          attackingTeam
-        ] ||
+      state.match.scores[attackingTeam] ||
       0
     ) +
-    victims.length *
-      50;
+    victims.length * 50;
 
   bomb.planted =
     false;
@@ -4829,23 +4305,14 @@ function explodeBomb() {
     null;
 
   addLog(
-    `Bomba detonou · ${
-      victims.length
-    } atingido(s).`
+    `Bomba detonou · ${victims.length} atingido(s).`
   );
 
   saveState();
 
-  if (
-    navigator.vibrate
-  ) {
-
+  if (navigator.vibrate) {
     navigator.vibrate(
-      [
-        100,
-        70,
-        140
-      ]
+      [100, 70, 140]
     );
   }
 
@@ -4855,27 +4322,26 @@ function explodeBomb() {
   );
 
   renderPlayer();
-
   renderControl();
 }
 
-
 /* =========================
-   ZONES
+   ZONAS
 ========================= */
 
 function renderZoneHud() {
   const holder =
     $('zoneHud');
 
-  if (
-    !state.match
-      .modes
-      .includes(
-        'zone'
-      )
-  ) {
+  if (!holder) {
+    return;
+  }
 
+  if (
+    !state.match.modes.includes(
+      'zone'
+    )
+  ) {
     holder.classList.add(
       'hidden'
     );
@@ -4893,37 +4359,23 @@ function renderZoneHud() {
   const zone =
     state.match.map.marks.find(
       mark =>
-        mark.type ===
-          'zone' &&
-
+        mark.type === 'zone' &&
         Math.hypot(
-          me.x -
-            mark.x,
-
-          me.y -
-            mark.y
+          me.x - mark.x,
+          me.y - mark.y
         ) <=
-          mark.size /
-            2
+        mark.size / 2
     );
 
   if (!zone) {
-
     holder.className =
       'live-panel';
 
     holder.innerHTML =
       `
         <div class="live-title">
-
-          <strong>
-            ◎ ZONAS
-          </strong>
-
-          <b>
-            FORA
-          </b>
-
+          <strong>◎ ZONAS</strong>
+          <b>FORA</b>
         </div>
 
         <div class="live-copy">
@@ -4938,35 +4390,24 @@ function renderZoneHud() {
     zone.id;
 
   const progress =
-    state.match
-      .zones[
-        key
-      ] ||
+    state.match.zones[key] ||
     {
-      startedAt:
-        null,
-
-      captured:
-        false,
-
-      team:
-        null
+      startedAt: null,
+      captured: false,
+      team: null
     };
 
   if (
     !progress.startedAt &&
     !progress.captured
   ) {
-
     progress.startedAt =
       Date.now();
 
     progress.team =
       me.team;
 
-    state.match.zones[
-      key
-    ] =
+    state.match.zones[key] =
       progress;
 
     saveState();
@@ -4977,33 +4418,24 @@ function renderZoneHud() {
       (
         Date.now() -
         progress.startedAt
-      ) /
-        1000
+      ) / 1000
     );
 
   if (
     !progress.captured &&
     elapsed >=
-      state.match
-        .zoneCaptureSeconds
+    state.match.zoneCaptureSeconds
   ) {
-
     progress.captured =
       true;
 
-    state.match.scores[
-      me.team
-    ] =
+    state.match.scores[me.team] =
       (
-        state.match
-          .scores[
-            me.team
-          ] ||
+        state.match.scores[me.team] ||
         0
       ) +
       Number(
-        state.match
-          .zonePoints ||
+        state.match.zonePoints ||
         0
       );
 
@@ -5021,11 +4453,8 @@ function renderZoneHud() {
   holder.innerHTML =
     `
       <div class="live-title">
-
         <strong>
-          ${esc(
-            zone.label
-          )}
+          ${esc(zone.label)}
         </strong>
 
         <b>
@@ -5035,22 +4464,17 @@ function renderZoneHud() {
               : `${elapsed}s`
           }
         </b>
-
       </div>
 
       <div class="live-copy">
         ${
           progress.captured
             ? 'Zona capturada.'
-            : `Necessário ${
-                state.match
-                  .zoneCaptureSeconds
-              }s para capturar.`
+            : `Necessário ${state.match.zoneCaptureSeconds}s para capturar.`
         }
       </div>
     `;
 }
-
 
 /* =========================
    HIT + RESPAWN
@@ -5063,49 +4487,36 @@ function hitPlayer() {
   if (
     !me ||
     state.match.status !==
-      'live' ||
+    'live' ||
     me.status ===
-      'FORA DA OPERAÇÃO'
+    'FORA DA OPERAÇÃO'
   ) {
     return;
   }
 
   openConfirm(
     'Confirmar HIT?',
-
     'Seu HIT será registrado, uma vida será removida e o respawn seguirá a regra configurada.',
-
     'CONFIRMAR',
-
     () => {
-
-      me.hits +=
-        1;
+      me.hits += 1;
 
       me.lives =
         Math.max(
           0,
-          me.lives -
-            1
+          me.lives - 1
         );
 
-      state.match.hits[
-        me.team
-      ] =
+      state.match.hits[me.team] =
         (
-          state.match
-            .hits[
-              me.team
-            ] ||
+          state.match.hits[me.team] ||
           0
         ) +
         1;
 
       if (
-        me.lives <=
-        0
+        me.lives <= 0
       ) {
-
         me.status =
           'FORA DA OPERAÇÃO';
 
@@ -5113,16 +4524,12 @@ function hitPlayer() {
           'VOCÊ ESTÁ FORA DA OPERAÇÃO.',
           3000
         );
-
       } else {
-
         me.status =
           'HIT';
 
         toast(
-          `HIT REGISTRADO · ${
-            me.lives
-          } VIDA(S) RESTANTES.`
+          `HIT REGISTRADO · ${me.lives} VIDA(S) RESTANTES.`
         );
 
         startRespawn(
@@ -5137,35 +4544,25 @@ function hitPlayer() {
       saveState();
 
       renderPlayer();
-
       renderControl();
     }
   );
 }
 
-function startRespawn(
-  player
-) {
+function startRespawn(player) {
   const delay =
     Number(
-      state.match
-        .respawnDelay
-    ) ||
-    0;
+      state.match.respawnDelay
+    ) || 0;
 
   player.respawnPendingUntil =
     Date.now() +
-    delay *
-      1000;
+    delay * 1000;
 
   player.respawnTargetId =
     null;
 
-  if (
-    delay <=
-    0
-  ) {
-
+  if (delay <= 0) {
     resolveRespawn(
       player
     );
@@ -5183,28 +4580,22 @@ function startRespawn(
       resolveRespawn(
         player
       ),
-    delay *
-      1000
+    delay * 1000
   );
 }
 
-function resolveRespawn(
-  player
-) {
+function resolveRespawn(player) {
   if (
     !player ||
-    player.lives <=
-      0
+    player.lives <= 0
   ) {
     return;
   }
 
   if (
-    state.match
-      .respawnPolicy ===
+    state.match.respawnPolicy ===
     'operator'
   ) {
-
     player.status =
       'AGUARDANDO BASE';
 
@@ -5212,9 +4603,7 @@ function resolveRespawn(
 
     renderControl();
 
-    if (
-      player.isMe
-    ) {
+    if (player.isMe) {
       toast(
         'AGUARDANDO O OPERADOR DEFINIR A BASE.'
       );
@@ -5224,35 +4613,24 @@ function resolveRespawn(
   }
 
   if (
-    state.match
-      .respawnPolicy ===
+    state.match.respawnPolicy ===
     'choice' &&
     player.isMe
   ) {
-
     const bases =
       state.match.map.marks.filter(
         mark =>
-          mark.type ===
-          'base'
+          mark.type === 'base'
       );
 
-    if (
-      bases.length
-    ) {
-
+    if (bases.length) {
       const list =
         bases
           .map(
-            (
-              base,
-              index
-            ) =>
+            (base, index) =>
               `${index + 1}. ${base.label}`
           )
-          .join(
-            '\n'
-          );
+          .join('\n');
 
       const value =
         prompt(
@@ -5262,10 +4640,7 @@ function resolveRespawn(
 
       const chosen =
         bases[
-          Number(
-            value
-          ) -
-            1
+          Number(value) - 1
         ];
 
       player.respawnTargetId =
@@ -5285,8 +4660,7 @@ function respawnPlayer(
 ) {
   if (
     !player ||
-    player.lives <=
-      0
+    player.lives <= 0
   ) {
     return;
   }
@@ -5294,23 +4668,18 @@ function respawnPlayer(
   const bases =
     state.match.map.marks.filter(
       mark =>
-        mark.type ===
-        'base'
+        mark.type === 'base'
     );
 
   let chosen =
     null;
 
-  if (
-    baseId
-  ) {
+  if (baseId) {
     chosen =
       bases.find(
         base =>
-          base.id ===
-          baseId
-      ) ||
-      null;
+          base.id === baseId
+      ) || null;
   }
 
   if (
@@ -5322,55 +4691,36 @@ function respawnPlayer(
         base =>
           base.id ===
           player.respawnTargetId
-      ) ||
-      null;
+      ) || null;
   }
 
   if (
     !chosen &&
     bases.length
   ) {
-
     if (
-      state.match
-        .respawnPolicy ===
+      state.match.respawnPolicy ===
       'nearest'
     ) {
-
       chosen =
         [...bases].sort(
-          (
-            a,
-            b
-          ) =>
+          (a, b) =>
             Math.hypot(
-              player.x -
-                a.x,
-
-              player.y -
-                a.y
+              player.x - a.x,
+              player.y - a.y
             ) -
-
             Math.hypot(
-              player.x -
-                b.x,
-
-              player.y -
-                b.y
+              player.x - b.x,
+              player.y - b.y
             )
         )[0];
-
     } else {
-
       chosen =
         bases[0];
     }
   }
 
-  if (
-    chosen
-  ) {
-
+  if (chosen) {
     player.x =
       chosen.x;
 
@@ -5398,80 +4748,76 @@ function respawnPlayer(
   );
 
   renderPlayer();
-
   renderControl();
 }
-
 
 /* =========================
    CONTROL PANEL
 ========================= */
 
 function renderControl() {
-  $('ctrlScoreA')
-    .textContent =
-    state.match
-      .scores.A ||
-    0;
+  setText(
+    'ctrlScoreA',
+    state.match.scores.A || 0
+  );
 
-  $('ctrlScoreB')
-    .textContent =
-    state.match
-      .scores.B ||
-    0;
+  setText(
+    'ctrlScoreB',
+    state.match.scores.B || 0
+  );
 
-  $('ctrlHitsA')
-    .textContent =
-    `${
-      state.match
-        .hits.A ||
-      0
-    } hits`;
+  setText(
+    'ctrlHitsA',
+    `${state.match.hits.A || 0} hits`
+  );
 
-  $('ctrlHitsB')
-    .textContent =
-    `${
-      state.match
-        .hits.B ||
-      0
-    } hits`;
+  setText(
+    'ctrlHitsB',
+    `${state.match.hits.B || 0} hits`
+  );
 
-  $('ctrlTimer')
-    .textContent =
+  setText(
+    'ctrlTimer',
     formatTime(
       matchElapsed()
-    );
+    )
+  );
 
-  $('ctrlMatchName')
-    .textContent =
-    state.match.name ||
-    '—';
+  setText(
+    'ctrlMatchName',
+    state.match.name || '—'
+  );
 
-  $('liveRespawnDelay')
-    .value =
-    state.match
-      .respawnDelay ??
-    60;
+  const delay =
+    $('liveRespawnDelay');
 
-  $('liveRespawnPolicy')
-    .value =
-    state.match
-      .respawnPolicy ||
-    'nearest';
+  if (delay) {
+    delay.value =
+      state.match.respawnDelay ?? 60;
+  }
 
+  const policy =
+    $('liveRespawnPolicy');
+
+  if (policy) {
+    policy.value =
+      state.match.respawnPolicy ||
+      'nearest';
+  }
 
   renderOperatorPlayers();
-
   renderRespawnQueue();
-
   renderOperatorBomb();
-
   renderControlLog();
 }
 
 function renderOperatorPlayers() {
   const holder =
     $('operatorPlayers');
+
+  if (!holder) {
+    return;
+  }
 
   holder.innerHTML =
     (
@@ -5486,38 +4832,24 @@ function renderOperatorPlayers() {
             <div>
 
               <strong>
-                ${
-                  esc(
-                    player.name
-                  )
-                }
-                · Equipe ${
-                  player.team
-                }
+                ${esc(player.name)}
+                · Equipe ${player.team}
               </strong>
 
               <small>
-                ${
-                  esc(
-                    player.status
-                  )
-                } · ${
-                  player.lives
-                } vida(s) · ${
-                  player.hits
-                } hit(s)
+                ${esc(player.status)}
+                · ${player.lives} vida(s)
+                · ${player.hits} hit(s)
               </small>
 
             </div>
 
             <span>
               ${Math.round(
-                player.x *
-                  100
+                player.x * 100
               )}% ·
               ${Math.round(
-                player.y *
-                  100
+                player.y * 100
               )}%
             </span>
 
@@ -5531,6 +4863,10 @@ function renderRespawnQueue() {
   const holder =
     $('respawnQueue');
 
+  if (!holder) {
+    return;
+  }
+
   const pending =
     (
       state.match.players ||
@@ -5541,10 +4877,7 @@ function renderRespawnQueue() {
         'AGUARDANDO BASE'
     );
 
-  if (
-    !pending.length
-  ) {
-
+  if (!pending.length) {
     holder.innerHTML =
       `
         <div class="log-item">
@@ -5558,34 +4891,25 @@ function renderRespawnQueue() {
   const bases =
     state.match.map.marks.filter(
       mark =>
-        mark.type ===
-        'base'
+        mark.type === 'base'
     );
 
   holder.innerHTML =
     pending
       .map(
         player => {
-
           const buttons =
             bases
               .map(
                 base =>
                   `
                   <button
+                    type="button"
                     class="tool-btn"
-                    data-respawn-player="${esc(
-                      player.id
-                    )}"
-                    data-respawn-base="${esc(
-                      base.id
-                    )}"
+                    data-respawn-player="${esc(player.id)}"
+                    data-respawn-base="${esc(base.id)}"
                   >
-                    ${
-                      esc(
-                        base.label
-                      )
-                    }
+                    ${esc(base.label)}
                   </button>
                   `
               )
@@ -5597,14 +4921,8 @@ function renderRespawnQueue() {
               <div>
 
                 <strong>
-                  ${
-                    esc(
-                      player.name
-                    )
-                  }
-                  · Equipe ${
-                    player.team
-                  }
+                  ${esc(player.name)}
+                  · Equipe ${player.team}
                 </strong>
 
                 <small>
@@ -5637,29 +4955,20 @@ function renderRespawnQueue() {
     )
     .forEach(
       button => {
-
         button.addEventListener(
           'click',
           () => {
-
             const player =
               state.match.players.find(
                 item =>
                   item.id ===
-                  button
-                    .dataset
-                    .respawnPlayer
+                  button.dataset.respawnPlayer
               );
 
-            if (
-              player
-            ) {
-
+            if (player) {
               respawnPlayer(
                 player,
-                button
-                  .dataset
-                  .respawnBase
+                button.dataset.respawnBase
               );
             }
           }
@@ -5671,6 +4980,10 @@ function renderRespawnQueue() {
 function renderOperatorBomb() {
   const card =
     $('operatorBombCard');
+
+  if (!card) {
+    return;
+  }
 
   const enabled =
     state.match.modes.includes(
@@ -5704,39 +5017,31 @@ function renderOperatorBomb() {
             (
               bomb.expiresAt -
               Date.now()
-            ) /
-              1000
+            ) / 1000
           )
         )
       : 0;
 
-  $('operatorBombState')
-    .innerHTML =
+  const holder =
+    $('operatorBombState');
+
+  if (!holder) {
+    return;
+  }
+
+  holder.innerHTML =
     `
       <div class="info-line">
-
-        <span>
-          Portador
-        </span>
-
+        <span>Portador</span>
         <strong>
-          ${
-            esc(
-              carrier?.name ||
-              '—'
-            )
-          }
+          ${esc(
+            carrier?.name || '—'
+          )}
         </strong>
-
       </div>
 
-
       <div class="info-line">
-
-        <span>
-          Estado
-        </span>
-
+        <span>Estado</span>
         <strong>
           ${
             bomb.planted
@@ -5744,43 +5049,26 @@ function renderOperatorBomb() {
               : 'NÃO ARMADA'
           }
         </strong>
-
       </div>
 
-
       <div class="info-line">
-
-        <span>
-          Tempo
-        </span>
-
+        <span>Tempo</span>
         <strong>
           ${
             bomb.planted
               ? formatTime(
                   remaining
                 )
-              : `${
-                  bomb.durationMin
-                } min`
+              : `${bomb.durationMin} min`
           }
         </strong>
-
       </div>
 
-
       <div class="info-line">
-
-        <span>
-          Raio
-        </span>
-
+        <span>Raio</span>
         <strong>
-          ${
-            bomb.blastRadius
-          } m
+          ${bomb.blastRadius} m
         </strong>
-
       </div>
     `;
 }
@@ -5788,6 +5076,10 @@ function renderOperatorBomb() {
 function renderControlLog() {
   const holder =
     $('controlLog');
+
+  if (!holder) {
+    return;
+  }
 
   holder.innerHTML =
     (
@@ -5800,20 +5092,16 @@ function renderControlLog() {
           <div class="log-item">
 
             <time>
-              ${
-                new Date(
-                  log.at
-                ).toLocaleTimeString(
-                  'pt-BR'
-                )
-              }
+              ${new Date(
+                log.at
+              ).toLocaleTimeString(
+                'pt-BR'
+              )}
             </time>
 
-            ${
-              esc(
-                log.text
-              )
-            }
+            ${esc(
+              log.text
+            )}
 
           </div>
           `
@@ -5826,17 +5114,14 @@ function renderControlLog() {
     `;
 }
 
-
 /* =========================
    OPERATOR ACTIONS
 ========================= */
 
 function transferBomb() {
   if (
-    state.match.bomb
-      .planted
+    state.match.bomb.planted
   ) {
-
     toast(
       'A BOMBA JÁ FOI ARMADA. O PORTADOR NÃO PODE SER TROCADO.'
     );
@@ -5845,30 +5130,21 @@ function transferBomb() {
   }
 
   const team =
-    state.match.bomb
-      .armedByTeam;
+    state.match.bomb.armedByTeam;
 
   const list =
     state.match.players.filter(
       player =>
         player.status !==
-          'FORA DA OPERAÇÃO' &&
-        player.team ===
-          team
+        'FORA DA OPERAÇÃO' &&
+        player.team === team
     );
 
   const text =
     list
       .map(
-        (
-          player,
-          index
-        ) =>
-          `${
-            index + 1
-          }. ${
-            player.name
-          }`
+        (player, index) =>
+          `${index + 1}. ${player.name}`
       )
       .join('\n');
 
@@ -5876,9 +5152,7 @@ function transferBomb() {
     list.findIndex(
       player =>
         player.id ===
-        state.match
-          .bomb
-          .carrierId
+        state.match.bomb.carrierId
     );
 
   const value =
@@ -5892,25 +5166,16 @@ function transferBomb() {
       )
     );
 
-  if (
-    value ===
-    null
-  ) {
+  if (value === null) {
     return;
   }
 
   const player =
     list[
-      Number(
-        value
-      ) -
-        1
+      Number(value) - 1
     ];
 
-  if (
-    !player
-  ) {
-
+  if (!player) {
     toast(
       'PORTADOR INVÁLIDO.'
     );
@@ -5927,28 +5192,23 @@ function transferBomb() {
   player.carryingBomb =
     true;
 
-  state.match.bomb
-    .carrierId =
+  state.match.bomb.carrierId =
     player.id;
 
-  state.match.bomb
-    .armedByTeam =
+  state.match.bomb.armedByTeam =
     player.team;
-
-  saveState();
 
   addLog(
     `Bomba transferida para ${player.name}.`
   );
 
+  saveState();
+
   toast(
-    `BOMBA ENTREGUE A ${
-      player.name.toUpperCase()
-    }.`
+    `BOMBA ENTREGUE A ${player.name.toUpperCase()}.`
   );
 
   renderControl();
-
   renderPlayer();
 }
 
@@ -5957,16 +5217,11 @@ function changeBombTime() {
     prompt(
       'Novo tempo da bomba em minutos:',
       String(
-        state.match
-          .bomb
-          .durationMin
+        state.match.bomb.durationMin
       )
     );
 
-  if (
-    value ===
-    null
-  ) {
+  if (value === null) {
     return;
   }
 
@@ -5977,12 +5232,9 @@ function changeBombTime() {
     !Number.isFinite(
       minutes
     ) ||
-    minutes <
-      1 ||
-    minutes >
-      120
+    minutes < 1 ||
+    minutes > 120
   ) {
-
     toast(
       'INFORME ENTRE 1 E 120 MINUTOS.'
     );
@@ -5990,20 +5242,15 @@ function changeBombTime() {
     return;
   }
 
-  state.match.bomb
-    .durationMin =
+  state.match.bomb.durationMin =
     minutes;
 
   if (
-    state.match.bomb
-      .planted
+    state.match.bomb.planted
   ) {
-
-    state.match.bomb
-      .expiresAt =
+    state.match.bomb.expiresAt =
       Date.now() +
-      minutes *
-        60000;
+      minutes * 60000;
   }
 
   addLog(
@@ -6017,26 +5264,30 @@ function changeBombTime() {
   );
 
   renderControl();
-
   renderPlayer();
 }
 
 function applyLiveRules() {
-  state.match
-    .respawnDelay =
-    clamp(
-      $('liveRespawnDelay')
-        .value,
-      0,
-      900,
-      60
-    );
+  const delay =
+    $('liveRespawnDelay');
 
-  state.match
-    .respawnPolicy =
-    $(
-      'liveRespawnPolicy'
-    ).value;
+  const policy =
+    $('liveRespawnPolicy');
+
+  if (delay) {
+    state.match.respawnDelay =
+      clamp(
+        delay.value,
+        0,
+        900,
+        60
+      );
+  }
+
+  if (policy) {
+    state.match.respawnPolicy =
+      policy.value;
+  }
 
   addLog(
     'Regras de respawn atualizadas durante a partida.'
@@ -6050,7 +5301,6 @@ function applyLiveRules() {
 
   renderControl();
 }
-
 
 /* =========================
    END MATCH
@@ -6089,32 +5339,24 @@ function endMatch(
   );
 
   showScreen(
-    role() ===
-      'organizer'
+    role() === 'organizer'
       ? 'control'
       : 'player'
   );
 }
 
-
 /* =========================
    LOG
 ========================= */
 
-function addLog(
-  text
-) {
+function addLog(text) {
   state.match.logs ||=
     [];
 
-  state.match.logs.unshift(
-    {
-      at:
-        Date.now(),
-
-      text
-    }
-  );
+  state.match.logs.unshift({
+    at: Date.now(),
+    text
+  });
 
   state.match.logs =
     state.match.logs.slice(
@@ -6122,7 +5364,6 @@ function addLog(
       60
     );
 }
-
 
 /* =========================
    GPS
@@ -6132,10 +5373,10 @@ function requestGps() {
   if (
     !navigator.geolocation
   ) {
-
-    $('gpsMessage')
-      .textContent =
-      'Este navegador não oferece localização.';
+    setText(
+      'gpsMessage',
+      'Este navegador não oferece localização.'
+    );
 
     openOverlay(
       'gpsGate'
@@ -6146,19 +5387,15 @@ function requestGps() {
 
   navigator.geolocation.getCurrentPosition(
     position => {
-
       state.gps = {
         lat:
-          position.coords
-            .latitude,
+          position.coords.latitude,
 
         lng:
-          position.coords
-            .longitude,
+          position.coords.longitude,
 
         accuracy:
-          position.coords
-            .accuracy,
+          position.coords.accuracy,
 
         updatedAt:
           Date.now()
@@ -6170,10 +5407,7 @@ function requestGps() {
             player.isMe
         );
 
-      if (
-        me
-      ) {
-
+      if (me) {
         me.lat =
           state.gps.lat;
 
@@ -6200,17 +5434,16 @@ function requestGps() {
     },
 
     error => {
+      setText(
+        'gpsMessage',
+        error.code === 1
+          ? 'Permissão negada. Você ainda pode navegar pelo protótipo neste aparelho; ative o GPS para os recursos de localização.'
+          : 'Não foi possível obter a localização agora.'
+      );
 
       openOverlay(
         'gpsGate'
       );
-
-      $('gpsMessage')
-        .textContent =
-        error.code ===
-        1
-          ? 'Permissão negada. Ative a localização do navegador para continuar.'
-          : 'Não foi possível obter a localização agora.';
     },
 
     {
@@ -6228,8 +5461,7 @@ function requestGps() {
 
 function startGpsWatch() {
   if (
-    currentGpsWatch !==
-      null ||
+    currentGpsWatch !== null ||
     !navigator.geolocation
   ) {
     return;
@@ -6238,19 +5470,15 @@ function startGpsWatch() {
   currentGpsWatch =
     navigator.geolocation.watchPosition(
       position => {
-
         state.gps = {
           lat:
-            position.coords
-              .latitude,
+            position.coords.latitude,
 
           lng:
-            position.coords
-              .longitude,
+            position.coords.longitude,
 
           accuracy:
-            position.coords
-              .accuracy,
+            position.coords.accuracy,
 
           updatedAt:
             Date.now()
@@ -6262,10 +5490,7 @@ function startGpsWatch() {
               player.isMe
           );
 
-        if (
-          me
-        ) {
-
+        if (me) {
           me.lat =
             state.gps.lat;
 
@@ -6286,7 +5511,12 @@ function startGpsWatch() {
         }
       },
 
-      () => {},
+      error => {
+        console.warn(
+          '[DF] GPS watch:',
+          error
+        );
+      },
 
       {
         enableHighAccuracy:
@@ -6297,7 +5527,6 @@ function startGpsWatch() {
       }
     );
 }
-
 
 /* =========================
    MOCK
@@ -6321,76 +5550,60 @@ function simulatePlayers() {
         player.mock
     )
     .forEach(
-      (
-        player,
-        index
-      ) => {
-
+      (player, index) => {
         const offset =
-          player.team ===
-          'A'
+          player.team === 'A'
             ? 0
             : Math.PI;
 
         const centerX =
-          player.team ===
-          'A'
+          player.team === 'A'
             ? .28
             : .72;
 
         const centerY =
-          player.team ===
-          'A'
+          player.team === 'A'
             ? .68
             : .32;
 
         player.x =
           Math.max(
             .04,
-
             Math.min(
               .96,
-
               centerX +
                 Math.cos(
                   time *
-                    (
-                      .5 +
-                      index *
-                        .03
-                    ) +
-                    index +
-                    offset
-                ) *
-                  .08
+                  (
+                    .5 +
+                    index * .03
+                  ) +
+                  index +
+                  offset
+                ) * .08
             )
           );
 
         player.y =
           Math.max(
             .04,
-
             Math.min(
               .96,
-
               centerY +
                 Math.sin(
                   time *
-                    (
-                      .55 +
-                      index *
-                        .02
-                    ) +
-                    index +
-                    offset
-                ) *
-                  .07
+                  (
+                    .55 +
+                    index * .02
+                  ) +
+                  index +
+                  offset
+                ) * .07
             )
           );
       }
     );
 }
-
 
 /* =========================
    RESET
@@ -6399,13 +5612,9 @@ function simulatePlayers() {
 function resetAll() {
   openConfirm(
     'Reset total?',
-
     'Isso apaga partida, mapa, configurações e perfil salvos neste navegador.',
-
     'RESET',
-
     () => {
-
       localStorage.removeItem(
         STORAGE_KEY
       );
@@ -6419,61 +5628,59 @@ function resetAll() {
   );
 }
 
-
 /* =========================
-   EVENTS
+   EVENTOS
 ========================= */
 
+function bindEvents() {
 
-/*
-  Perfil
-*/
+  /* PERFIL */
 
-$$(
-  '.role-card'
-).forEach(
-  button => {
+  onSelector(
+    '.role-card',
+    'click',
+    event => {
+      const button =
+        event.currentTarget;
 
-    button.addEventListener(
-      'click',
-      () => {
+      const selectedRole =
+        button.dataset.role;
 
-        setRole(
-          button
-            .dataset
-            .role
-        );
-
-        $$('.role-card')
-          .forEach(
-            item =>
-              item.classList.toggle(
-                'selected',
-                item ===
-                  button
-              )
-          );
-
-        showScreen(
-          button
-            .dataset
-            .role ===
-            'player'
-            ? 'player'
-            : 'organizer'
-        );
+      if (
+        selectedRole !==
+          'player' &&
+        selectedRole !==
+          'organizer'
+      ) {
+        return;
       }
-    );
-  }
-);
 
+      setRole(
+        selectedRole
+      );
 
-/*
-  DEV
-*/
+      $$('.role-card')
+        .forEach(
+          item =>
+            item.classList.toggle(
+              'selected',
+              item === button
+            )
+        );
 
-$('devBtn')
-  .addEventListener(
+      showScreen(
+        selectedRole ===
+          'player'
+          ? 'player'
+          : 'organizer'
+      );
+    }
+  );
+
+  /* DEV */
+
+  on(
+    'devBtn',
     'click',
     () =>
       withPending(
@@ -6484,11 +5691,10 @@ $('devBtn')
       )
   );
 
-$('devPlayer')
-  .addEventListener(
+  on(
+    'devPlayer',
     'click',
     () => {
-
       setRole(
         'player'
       );
@@ -6499,18 +5705,16 @@ $('devPlayer')
     }
   );
 
-$('devOrg')
-  .addEventListener(
+  on(
+    'devOrg',
     'click',
     () => {
-
       setRole(
         'organizer'
       );
 
       showScreen(
-        state.match
-          .status ===
+        state.match.status ===
           'live'
           ? 'control'
           : 'organizer'
@@ -6518,14 +5722,14 @@ $('devOrg')
     }
   );
 
-$('devReset')
-  .addEventListener(
+  on(
+    'devReset',
     'click',
     resetAll
   );
 
-$('devBack')
-  .addEventListener(
+  on(
+    'devBack',
     'click',
     () =>
       showScreen(
@@ -6536,135 +5740,115 @@ $('devBack')
       )
   );
 
+  /* GPS */
 
-/*
-  GPS
-*/
-
-$('gpsRetry')
-  .addEventListener(
+  on(
+    'gpsRetry',
     'click',
     requestGps
   );
 
-$('gpsDeny')
-  .addEventListener(
+  on(
+    'gpsDeny',
     'click',
     () => {
-      closeOverlay('gpsGate');
+      closeOverlay(
+        'gpsGate'
+      );
+
       toast(
-        'LOCALIZAÇÃO NÃO ATIVADA.'
+        'GPS NÃO ATIVADO.'
       );
     }
   );
 
+  /* ABRIR MODAIS */
 
-/*
-  Menus
-*/
-
-$$(
-  '[data-open-modal]'
-).forEach(
-  button => {
-
-    button.addEventListener(
-      'click',
-      () =>
-        openConfig(
-          button
-            .dataset
-            .openModal
-        )
-    );
-  }
-);
-
-
-/*
-  Fechar
-*/
-
-$$(
-  '[data-close-modal]'
-).forEach(
-  button => {
-
-    button.addEventListener(
-      'click',
-      () =>
-        closeConfig(
-          button
-            .dataset
-            .closeModal
-        )
-    );
-  }
-);
-
-
-/*
-  Aplicar modais
-*/
-
-$$(
-  '[data-apply-modal]'
-).forEach(
-  button => {
-
-    button.addEventListener(
-      'click',
-      () => {
-
-        if (
-          button
-            .dataset
-            .applyModal ===
-          'rulesModal'
-        ) {
-          readRulesForm();
-        }
-
-        appliedSnapshot =
-          deepClone(
-            draft
-          );
-
-        state.match =
-          deepClone(
-            draft
-          );
-
-        saveState();
-
-        updateHeader();
-
-        renderOperatorMenu();
-
-        closeOverlay(
-          button
-            .dataset
-            .applyModal
-        );
-
-        toast(
-          'ALTERAÇÕES APLICADAS.'
+  $$('[data-open-modal]')
+    .forEach(
+      button => {
+        button.addEventListener(
+          'click',
+          () =>
+            openConfig(
+              button.dataset.openModal
+            )
         );
       }
     );
-  }
-);
 
+  /* FECHAR MODAIS */
 
-/*
-  Modos
-*/
+  $$('[data-close-modal]')
+    .forEach(
+      button => {
+        button.addEventListener(
+          'click',
+          () =>
+            closeConfig(
+              button.dataset.closeModal
+            )
+        );
+      }
+    );
 
-$('mergeModes')
-  .addEventListener(
+  /* APLICAR MODAIS */
+
+  $$('[data-apply-modal]')
+    .forEach(
+      button => {
+        button.addEventListener(
+          'click',
+          () => {
+            const modalId =
+              button.dataset.applyModal;
+
+            if (
+              modalId ===
+              'rulesModal'
+            ) {
+              readRulesForm();
+            }
+
+            appliedSnapshot =
+              deepClone(
+                draft
+              );
+
+            state.match =
+              deepClone(
+                draft
+              );
+
+            state.match.players =
+              createPlayers(
+                state.match.playerCount,
+                state.match.players
+              );
+
+            saveState();
+
+            updateHeader();
+            renderOperatorMenu();
+
+            closeOverlay(
+              modalId
+            );
+
+            toast(
+              'ALTERAÇÕES APLICADAS.'
+            );
+          }
+        );
+      }
+    );
+
+  /* MODOS */
+
+  on(
+    'mergeModes',
     'change',
     () => {
-
       draft.mergeModes =
         $('mergeModes')
           .checked;
@@ -6673,74 +5857,61 @@ $('mergeModes')
     }
   );
 
-$$(
-  '.choice-card'
-).forEach(
-  button => {
+  onSelector(
+    '.choice-card',
+    'click',
+    event => {
+      const button =
+        event.currentTarget;
 
-    button.addEventListener(
-      'click',
-      () => {
+      const mode =
+        button.dataset.mode;
 
-        const mode =
-          button
-            .dataset
-            .mode;
+      if (!mode) {
+        return;
+      }
+
+      if (!draft.mergeModes) {
+        draft.modes =
+          [mode];
+      } else {
+        draft.modes =
+          draft.modes.includes(
+            mode
+          )
+            ? draft.modes.filter(
+                item =>
+                  item !==
+                  mode
+              )
+            : [
+                ...draft.modes,
+                mode
+              ];
 
         if (
-          !draft.mergeModes
+          !draft.modes.length
         ) {
-
           draft.modes =
-            [mode];
-
-        } else {
-
-          draft.modes =
-            draft.modes.includes(
-              mode
-            )
-              ? draft.modes.filter(
-                  item =>
-                    item !==
-                    mode
-                )
-              : [
-                  ...draft.modes,
-                  mode
-                ];
-
-          if (
-            !draft.modes.length
-          ) {
-            draft.modes =
-              ['flag'];
-          }
+            ['flag'];
         }
-
-        renderModeModal();
       }
-    );
-  }
-);
 
+      renderModeModal();
+    }
+  );
 
-/*
-  Mapa
-*/
+  /* MAPA */
 
-$('mapFile')
-  .addEventListener(
+  on(
+    'mapFile',
     'change',
     event => {
-
       const file =
-        event.target
+        event.currentTarget
           .files?.[0];
 
-      if (
-        file
-      ) {
+      if (file) {
         onMapFile(
           file
         );
@@ -6748,51 +5919,44 @@ $('mapFile')
     }
   );
 
-$('btnGenMap')
-  .addEventListener(
+  on(
+    'btnGenMap',
     'click',
     generateMap
   );
 
-$('btnOpenMapEditor')
-  .addEventListener(
+  on(
+    'btnOpenMapEditor',
     'click',
     openEditor
   );
 
-$('btnPreviewEditor')
-  .addEventListener(
+  on(
+    'btnPreviewEditor',
     'click',
     openEditor
   );
 
-$('btnClearMarks')
-  .addEventListener(
+  on(
+    'btnClearMarks',
     'click',
     clearMarks
   );
 
+  /* START */
 
-/*
-  Start
-*/
-
-$('btnStartMatch')
-  .addEventListener(
+  on(
+    'btnStartMatch',
     'click',
     startMatch
   );
 
+  /* SALVAR */
 
-/*
-  Salvar
-*/
-
-$('btnSaveDraft')
-  .addEventListener(
+  on(
+    'btnSaveDraft',
     'click',
     () => {
-
       readRulesForm();
 
       appliedSnapshot =
@@ -6805,6 +5969,12 @@ $('btnSaveDraft')
           draft
         );
 
+      state.match.players =
+        createPlayers(
+          state.match.playerCount,
+          state.match.players
+        );
+
       saveState();
 
       renderOperatorMenu();
@@ -6815,13 +5985,10 @@ $('btnSaveDraft')
     }
   );
 
+  /* NAVEGAÇÃO OPERADOR */
 
-/*
-  Navegação operador
-*/
-
-$('btnOrgBack')
-  .addEventListener(
+  on(
+    'btnOrgBack',
     'click',
     () =>
       withPending(
@@ -6832,8 +5999,8 @@ $('btnOrgBack')
       )
   );
 
-$('openControlFromMenu')
-  .addEventListener(
+  on(
+    'openControlFromMenu',
     'click',
     () =>
       showScreen(
@@ -6841,22 +6008,16 @@ $('openControlFromMenu')
       )
   );
 
+  /* ENCERRAR */
 
-/*
-  Encerrar
-*/
-
-$('btnEnd')
-  .addEventListener(
+  on(
+    'btnEnd',
     'click',
     () =>
       openConfirm(
         'Encerrar partida?',
-
         'A operação será encerrada neste aparelho.',
-
         'ENCERRAR',
-
         () =>
           endMatch(
             'PARTIDA ENCERRADA PELO OPERADOR.'
@@ -6864,8 +6025,8 @@ $('btnEnd')
       )
   );
 
-$('btnControlBack')
-  .addEventListener(
+  on(
+    'btnControlBack',
     'click',
     () =>
       showScreen(
@@ -6873,17 +6034,14 @@ $('btnControlBack')
       )
   );
 
-$('btnControlEnd')
-  .addEventListener(
+  on(
+    'btnControlEnd',
     'click',
     () =>
       openConfirm(
         'Encerrar partida?',
-
         'A operação será encerrada.',
-
         'ENCERRAR',
-
         () =>
           endMatch(
             'PARTIDA ENCERRADA PELO OPERADOR.'
@@ -6891,39 +6049,32 @@ $('btnControlEnd')
       )
   );
 
+  /* BOMBA */
 
-/*
-  Controle bomba
-*/
-
-$('btnTransferBomb')
-  .addEventListener(
+  on(
+    'btnTransferBomb',
     'click',
     transferBomb
   );
 
-$('btnChangeBombTime')
-  .addEventListener(
+  on(
+    'btnChangeBombTime',
     'click',
     changeBombTime
   );
 
-$('btnApplyLiveRules')
-  .addEventListener(
+  on(
+    'btnApplyLiveRules',
     'click',
     applyLiveRules
   );
 
+  /* PLAYER */
 
-/*
-  Player
-*/
-
-$('btnConfirm')
-  .addEventListener(
+  on(
+    'btnConfirm',
     'click',
     () => {
-
       const player =
         currentPlayer();
 
@@ -6944,22 +6095,18 @@ $('btnConfirm')
     }
   );
 
-$('btnEnter')
-  .addEventListener(
+  on(
+    'btnEnter',
     'click',
     () => {
-
       if (
         state.match.status ===
         'live'
       ) {
-
         showScreen(
           'player'
         );
-
       } else {
-
         toast(
           'AGUARDE O OPERADOR INICIAR.'
         );
@@ -6967,8 +6114,8 @@ $('btnEnter')
     }
   );
 
-$('btnPlayerBack')
-  .addEventListener(
+  on(
+    'btnPlayerBack',
     'click',
     () =>
       showScreen(
@@ -6976,8 +6123,8 @@ $('btnPlayerBack')
       )
   );
 
-$('btnPlayerBackReady')
-  .addEventListener(
+  on(
+    'btnPlayerBackReady',
     'click',
     () =>
       showScreen(
@@ -6985,8 +6132,8 @@ $('btnPlayerBackReady')
       )
   );
 
-$('btnLeave')
-  .addEventListener(
+  on(
+    'btnLeave',
     'click',
     () =>
       showScreen(
@@ -6994,14 +6141,14 @@ $('btnLeave')
       )
   );
 
-$('btnHit')
-  .addEventListener(
+  on(
+    'btnHit',
     'click',
     hitPlayer
   );
 
-$('btnOrgFromGame')
-  .addEventListener(
+  on(
+    'btnOrgFromGame',
     'click',
     () =>
       showScreen(
@@ -7009,17 +6156,14 @@ $('btnOrgFromGame')
       )
   );
 
-$('btnEndFromGame')
-  .addEventListener(
+  on(
+    'btnEndFromGame',
     'click',
     () =>
       openConfirm(
         'Encerrar partida?',
-
         'A operação será encerrada.',
-
         'ENCERRAR',
-
         () =>
           endMatch(
             'PARTIDA ENCERRADA PELO OPERADOR.'
@@ -7027,19 +6171,21 @@ $('btnEndFromGame')
       )
   );
 
+  /* PENDING */
 
-/*
-  Pending modal
-*/
-
-$('pendingApply')
-  .addEventListener(
+  on(
+    'pendingApply',
     'click',
     () => {
-
       state.match =
         deepClone(
           draft
+        );
+
+      state.match.players =
+        createPlayers(
+          state.match.playerCount,
+          state.match.players
         );
 
       appliedSnapshot =
@@ -7067,11 +6213,10 @@ $('pendingApply')
     }
   );
 
-$('pendingDiscard')
-  .addEventListener(
+  on(
+    'pendingDiscard',
     'click',
     () => {
-
       restoreDraft();
 
       const action =
@@ -7092,11 +6237,10 @@ $('pendingDiscard')
     }
   );
 
-$('pendingCancel')
-  .addEventListener(
+  on(
+    'pendingCancel',
     'click',
     () => {
-
       pendingAction =
         null;
 
@@ -7106,22 +6250,18 @@ $('pendingCancel')
     }
   );
 
+  /* CONFIRM */
 
-/*
-  Confirm modal
-*/
-
-$('confirmCancel')
-  .addEventListener(
+  on(
+    'confirmCancel',
     'click',
     closeConfirm
   );
 
-$('confirmOk')
-  .addEventListener(
+  on(
+    'confirmOk',
     'click',
     () => {
-
       const callback =
         confirmCallback;
 
@@ -7131,16 +6271,12 @@ $('confirmOk')
     }
   );
 
+  /* EDITOR */
 
-/*
-  Map editor
-*/
-
-$('mapEditorApply')
-  .addEventListener(
+  on(
+    'mapEditorApply',
     'click',
     () => {
-
       closeOverlay(
         'mapEditorModal'
       );
@@ -7153,8 +6289,8 @@ $('mapEditorApply')
     }
   );
 
-$('mapEditorClose')
-  .addEventListener(
+  on(
+    'mapEditorClose',
     'click',
     () =>
       closeOverlay(
@@ -7162,48 +6298,38 @@ $('mapEditorClose')
       )
   );
 
-
-/*
-  Zoom editor
-*/
-
-$('zoomIn')
-  .addEventListener(
+  on(
+    'zoomIn',
     'click',
     () => {
-
       editor.zoom =
         Math.min(
           4,
-          editor.zoom +
-            0.25
+          editor.zoom + .25
         );
 
       drawEditor();
     }
   );
 
-$('zoomOut')
-  .addEventListener(
+  on(
+    'zoomOut',
     'click',
     () => {
-
       editor.zoom =
         Math.max(
           .75,
-          editor.zoom -
-            0.25
+          editor.zoom - .25
         );
 
       drawEditor();
     }
   );
 
-$('zoomReset')
-  .addEventListener(
+  on(
+    'zoomReset',
     'click',
     () => {
-
       editor.zoom =
         1;
 
@@ -7217,20 +6343,14 @@ $('zoomReset')
     }
   );
 
-
-/*
-  Tool mover
-*/
-
-$('toolPan')
-  .addEventListener(
+  on(
+    'toolPan',
     'click',
     () => {
-
       editor.mode =
         'pan';
 
-      $$('.tool-btn')
+      $$('.editor-tools .tool-btn')
         .forEach(
           button =>
             button.classList.remove(
@@ -7238,50 +6358,36 @@ $('toolPan')
             )
         );
 
-      $(
-        'toolPan'
-      ).classList.add(
-        'selected'
-      );
+      $('toolPan')
+        ?.classList.add(
+          'selected'
+        );
     }
   );
 
-
-/*
-  Tool apagar
-*/
-
-$('toolErase')
-  .addEventListener(
+  on(
+    'toolErase',
     'click',
     () => {
-
       editor.mode =
         editor.mode ===
         'erase'
           ? 'pan'
           : 'erase';
 
-      $(
-        'toolErase'
-      ).classList.toggle(
-        'selected',
-        editor.mode ===
+      $('toolErase')
+        ?.classList.toggle(
+          'selected',
+          editor.mode ===
           'erase'
-      );
+        );
     }
   );
 
-
-/*
-  Centralizar
-*/
-
-$('toolResetView')
-  .addEventListener(
+  on(
+    'toolResetView',
     'click',
     () => {
-
       editor.zoom =
         1;
 
@@ -7295,48 +6401,40 @@ $('toolResetView')
     }
   );
 
+  /* PLAYER ZOOM */
 
-/*
-  Zoom jogador
-*/
-
-$('playerZoomIn')
-  .addEventListener(
+  on(
+    'playerZoomIn',
     'click',
     () => {
-
       playerViewer.zoom =
         Math.min(
           4,
-          playerViewer.zoom +
-            .25
+          playerViewer.zoom + .25
         );
 
       drawPlayerMap();
     }
   );
 
-$('playerZoomOut')
-  .addEventListener(
+  on(
+    'playerZoomOut',
     'click',
     () => {
-
       playerViewer.zoom =
         Math.max(
           .75,
-          playerViewer.zoom -
-            .25
+          playerViewer.zoom - .25
         );
 
       drawPlayerMap();
     }
   );
 
-$('playerMapCenter')
-  .addEventListener(
+  on(
+    'playerMapCenter',
     'click',
     () => {
-
       playerViewer.zoom =
         1;
 
@@ -7350,245 +6448,356 @@ $('playerMapCenter')
     }
   );
 
+  /* EDITOR POINTER */
 
-/*
-  Map editor pointer
-*/
+  const editorCanvas =
+    $('mapEditorCanvas');
 
-$('mapEditorCanvas')
-  .addEventListener(
-    'pointerdown',
-    event => {
+  if (editorCanvas) {
 
-      const canvas =
-        $('mapEditorCanvas');
-
-      canvas.setPointerCapture?.(
-        event.pointerId
-      );
-
-      const position =
-        normalizedPoint(
-          event,
-          canvas
+    editorCanvas.addEventListener(
+      'pointerdown',
+      event => {
+        editorCanvas.setPointerCapture?.(
+          event.pointerId
         );
 
-      const mark =
-        findMarkAt(
-          position.x,
-          position.y
-        );
-
-
-      if (
-        editor.mode ===
-        'erase'
-      ) {
-
-        if (
-          mark
-        ) {
-          deleteMark(
-            mark.id
-          );
-        }
-
-        return;
-      }
-
-
-      if (
-        TOOLS[
-          editor.mode
-        ]
-      ) {
-
-        addMapMark(
-          editor.mode,
-          position.x,
-          position.y
-        );
-
-        editor.mode =
-          'pan';
-
-        $(
-          'toolPan'
-        ).classList.add(
-          'selected'
-        );
-
-        return;
-      }
-
-
-      editor.selectedId =
-        mark?.id ||
-        null;
-
-
-      editor.drag = {
-        x:
-          event.clientX,
-
-        y:
-          event.clientY,
-
-        mode:
-          mark
-            ? 'mark'
-            : 'pan',
-
-        markId:
-          mark?.id,
-
-        markX:
-          mark?.x,
-
-        markY:
-          mark?.y,
-
-        panX:
-          editor.panX,
-
-        panY:
-          editor.panY
-      };
-
-
-      renderInspector();
-
-      drawEditor();
-    }
-  );
-
-
-$('mapEditorCanvas')
-  .addEventListener(
-    'pointermove',
-    event => {
-
-      if (
-        !editor.drag
-      ) {
-        return;
-      }
-
-      const canvas =
-        $('mapEditorCanvas');
-
-      const rect =
-        canvas.getBoundingClientRect();
-
-      const dx =
-        event.clientX -
-        editor.drag.x;
-
-      const dy =
-        event.clientY -
-        editor.drag.y;
-
-
-      if (
-        editor.drag.mode ===
-        'mark'
-      ) {
-
-        const box =
-          mapBox(
-            rect.width,
-            rect.height,
-            editor.zoom,
-            editor.panX,
-            editor.panY
+        const position =
+          normalizedPoint(
+            event,
+            editorCanvas
           );
 
         const mark =
-          mapMarks().find(
-            item =>
-              item.id ===
-              editor.drag
-                .markId
+          findMarkAt(
+            position.x,
+            position.y
           );
 
         if (
-          mark
+          editor.mode ===
+          'erase'
         ) {
+          if (mark) {
+            deleteMark(
+              mark.id
+            );
+          }
 
-          mark.x =
-            Math.max(
-              0,
-              Math.min(
-                1,
-                editor.drag
-                  .markX +
-                  dx /
-                    box.width
-              )
+          return;
+        }
+
+        if (
+          TOOLS[
+            editor.mode
+          ]
+        ) {
+          addMapMark(
+            editor.mode,
+            position.x,
+            position.y
+          );
+
+          editor.mode =
+            'pan';
+
+          $('toolPan')
+            ?.classList.add(
+              'selected'
             );
 
-          mark.y =
-            Math.max(
-              0,
-              Math.min(
-                1,
-                editor.drag
-                  .markY +
-                  dy /
-                    box.height
-              )
+          return;
+        }
+
+        editor.selectedId =
+          mark?.id ||
+          null;
+
+        editor.drag = {
+          x:
+            event.clientX,
+
+          y:
+            event.clientY,
+
+          mode:
+            mark
+              ? 'mark'
+              : 'pan',
+
+          markId:
+            mark?.id,
+
+          markX:
+            mark?.x,
+
+          markY:
+            mark?.y,
+
+          panX:
+            editor.panX,
+
+          panY:
+            editor.panY
+        };
+
+        renderInspector();
+        drawEditor();
+      }
+    );
+
+    editorCanvas.addEventListener(
+      'pointermove',
+      event => {
+        if (!editor.drag) {
+          return;
+        }
+
+        const rect =
+          editorCanvas.getBoundingClientRect();
+
+        const dx =
+          event.clientX -
+          editor.drag.x;
+
+        const dy =
+          event.clientY -
+          editor.drag.y;
+
+        if (
+          editor.drag.mode ===
+          'mark'
+        ) {
+          const box =
+            mapBox(
+              rect.width,
+              rect.height,
+              editor.zoom,
+              editor.panX,
+              editor.panY
             );
+
+          const mark =
+            mapMarks().find(
+              item =>
+                item.id ===
+                editor.drag
+                  .markId
+            );
+
+          if (mark) {
+            mark.x =
+              Math.max(
+                0,
+                Math.min(
+                  1,
+                  editor.drag.markX +
+                    dx / box.width
+                )
+              );
+
+            mark.y =
+              Math.max(
+                0,
+                Math.min(
+                  1,
+                  editor.drag.markY +
+                    dy / box.height
+                )
+              );
+
+            drawEditor();
+          }
+        } else {
+          editor.panX =
+            editor.drag.panX +
+            dx;
+
+          editor.panY =
+            editor.drag.panY +
+            dy;
 
           drawEditor();
         }
-
-      } else {
-
-        editor.panX =
-          editor.drag.panX +
-          dx;
-
-        editor.panY =
-          editor.drag.panY +
-          dy;
-
-        drawEditor();
       }
+    );
+
+    [
+      'pointerup',
+      'pointercancel'
+    ].forEach(
+      eventName => {
+        editorCanvas.addEventListener(
+          eventName,
+          () => {
+            if (
+              editor.drag?.mode ===
+              'mark'
+            ) {
+              drawPreview();
+            }
+
+            editor.drag =
+              null;
+          }
+        );
+      }
+    );
+  }
+
+  /* CROP */
+
+  on(
+    'cropOk',
+    'click',
+    applyCrop
+  );
+
+  on(
+    'cropCancel',
+    'click',
+    () => {
+      cropImage =
+        null;
+
+      closeOverlay(
+        'cropModal'
+      );
     }
   );
 
+  const cropBox =
+    $('cropBox');
 
-[
-  'pointerup',
-  'pointercancel'
-].forEach(
-  eventName => {
+  const cropStage =
+    $('cropStage');
 
-    $('mapEditorCanvas')
-      .addEventListener(
-        eventName,
-        () => {
+  if (
+    cropBox &&
+    cropStage
+  ) {
+    cropBox.addEventListener(
+      'pointerdown',
+      event => {
+        event.preventDefault();
 
-          if (
-            editor.drag
-              ?.mode ===
-            'mark'
-          ) {
+        const rect =
+          cropBox.getBoundingClientRect();
 
-            drawPreview();
-          }
+        cropBoxDrag = {
+          x:
+            event.clientX,
 
-          editor.drag =
-            null;
+          y:
+            event.clientY,
+
+          rect:
+            deepClone(
+              cropRect
+            ),
+
+          resize:
+            event.clientX >
+              rect.right - 24 &&
+            event.clientY >
+              rect.bottom - 24
+        };
+      }
+    );
+
+    cropStage.addEventListener(
+      'pointermove',
+      event => {
+        if (!cropBoxDrag) {
+          return;
         }
-      );
+
+        const rect =
+          cropStage.getBoundingClientRect();
+
+        const dx =
+          (
+            event.clientX -
+            cropBoxDrag.x
+          ) /
+          rect.width *
+          100;
+
+        const dy =
+          (
+            event.clientY -
+            cropBoxDrag.y
+          ) /
+          rect.height *
+          100;
+
+        if (
+          cropBoxDrag.resize
+        ) {
+          cropRect.w =
+            Math.max(
+              12,
+              Math.min(
+                100 - cropRect.x,
+                cropBoxDrag.rect.w +
+                  dx
+              )
+            );
+
+          cropRect.h =
+            Math.max(
+              12,
+              Math.min(
+                100 - cropRect.y,
+                cropBoxDrag.rect.h +
+                  dy
+              )
+            );
+        } else {
+          cropRect.x =
+            Math.max(
+              0,
+              Math.min(
+                100 - cropRect.w,
+                cropBoxDrag.rect.x +
+                  dx
+              )
+            );
+
+          cropRect.y =
+            Math.max(
+              0,
+              Math.min(
+                100 - cropRect.h,
+                cropBoxDrag.rect.y +
+                  dy
+              )
+            );
+        }
+
+        positionCrop();
+      }
+    );
+
+    cropStage.addEventListener(
+      'pointerup',
+      () =>
+        cropBoxDrag =
+          null
+    );
+
+    cropStage.addEventListener(
+      'pointercancel',
+      () =>
+        cropBoxDrag =
+          null
+    );
   }
-);
+}
 
-
-/*
-  Map coordinate
-*/
+/* =========================
+   MAP COORDINATE
+========================= */
 
 function normalizedPoint(
   event,
@@ -7615,12 +6824,9 @@ function normalizedPoint(
     );
 
   if (
-    box.width <=
-      0 ||
-    box.height <=
-      0
+    box.width <= 0 ||
+    box.height <= 0
   ) {
-
     return {
       x: .5,
       y: .5
@@ -7636,8 +6842,7 @@ function normalizedPoint(
           (
             px -
             box.left
-          ) /
-            box.width
+          ) / box.width
         )
       ),
 
@@ -7649,200 +6854,47 @@ function normalizedPoint(
           (
             py -
             box.top
-          ) /
-            box.height
+          ) / box.height
         )
       )
   };
 }
 
+/* =========================
+   GLOBAL ERRORS
+========================= */
 
-/*
-  Crop
-*/
+window.addEventListener(
+  'error',
+  event => {
+    console.error(
+      '[DF] Erro JavaScript:',
+      event.error || event.message
+    );
 
-$('cropOk')
-  .addEventListener(
-    'click',
-    applyCrop
-  );
+    toast(
+      'ERRO NO APLICATIVO · VEJA O CONSOLE.'
+    );
+  }
+);
 
-$('cropCancel')
-  .addEventListener(
-    'click',
-    () => {
-
-      cropImage =
-        null;
-
-      closeOverlay(
-        'cropModal'
-      );
-    }
-  );
-
-
-$('cropBox')
-  .addEventListener(
-    'pointerdown',
-    event => {
-
-      event.preventDefault();
-
-      const box =
-        $('cropBox');
-
-      const rect =
-        box.getBoundingClientRect();
-
-      cropBoxDrag = {
-        x:
-          event.clientX,
-
-        y:
-          event.clientY,
-
-        rect:
-          deepClone(
-            cropRect
-          ),
-
-        resize:
-          event.clientX >
-            rect.right -
-              24 &&
-          event.clientY >
-            rect.bottom -
-              24
-      };
-    }
-  );
-
-
-$('cropStage')
-  .addEventListener(
-    'pointermove',
-    event => {
-
-      if (
-        !cropBoxDrag
-      ) {
-        return;
-      }
-
-      const rect =
-        $('cropStage')
-          .getBoundingClientRect();
-
-      const dx =
-        (
-          event.clientX -
-          cropBoxDrag.x
-        ) /
-          rect.width *
-          100;
-
-      const dy =
-        (
-          event.clientY -
-          cropBoxDrag.y
-        ) /
-          rect.height *
-          100;
-
-
-      if (
-        cropBoxDrag.resize
-      ) {
-
-        cropRect.w =
-          Math.max(
-            12,
-            Math.min(
-              100 -
-                cropRect.x,
-              cropBoxDrag
-                .rect
-                .w +
-                dx
-            )
-          );
-
-        cropRect.h =
-          Math.max(
-            12,
-            Math.min(
-              100 -
-                cropRect.y,
-              cropBoxDrag
-                .rect
-                .h +
-                dy
-            )
-          );
-
-      } else {
-
-        cropRect.x =
-          Math.max(
-            0,
-            Math.min(
-              100 -
-                cropRect.w,
-
-              cropBoxDrag
-                .rect
-                .x +
-                dx
-            )
-          );
-
-        cropRect.y =
-          Math.max(
-            0,
-            Math.min(
-              100 -
-                cropRect.h,
-
-              cropBoxDrag
-                .rect
-                .y +
-                dy
-            )
-          );
-      }
-
-      positionCrop();
-    }
-  );
-
-
-$('cropStage')
-  .addEventListener(
-    'pointerup',
-    () =>
-      cropBoxDrag =
-        null
-  );
-
-$('cropStage')
-  .addEventListener(
-    'pointercancel',
-    () =>
-      cropBoxDrag =
-        null
-  );
-
+window.addEventListener(
+  'unhandledrejection',
+  event => {
+    console.error(
+      '[DF] Promise rejeitada:',
+      event.reason
+    );
+  }
+);
 
 /* =========================
-   TIMER / MOCK LOOP
+   TIMER
 ========================= */
 
 setInterval(
   () => {
-
     simulatePlayers();
-
     updateHeader();
 
     if (
@@ -7858,11 +6910,9 @@ setInterval(
     ) {
       renderControl();
     }
-
   },
   1000
 );
-
 
 /* =========================
    RESIZE
@@ -7871,23 +6921,26 @@ setInterval(
 window.addEventListener(
   'resize',
   () => {
-
     drawPreview();
 
+    const editorModal =
+      $('mapEditorModal');
+
     if (
-      !$(
-        'mapEditorModal'
-      ).classList.contains(
+      editorModal &&
+      !editorModal.classList.contains(
         'hidden'
       )
     ) {
       drawEditor();
     }
 
+    const cropModal =
+      $('cropModal');
+
     if (
-      !$(
-        'cropModal'
-      ).classList.contains(
+      cropModal &&
+      !cropModal.classList.contains(
         'hidden'
       )
     ) {
@@ -7903,13 +6956,11 @@ window.addEventListener(
   }
 );
 
-
 /* =========================
    INIT
 ========================= */
 
-(function init() {
-
+function init() {
   state.match.players =
     createPlayers(
       state.match.playerCount,
@@ -7928,42 +6979,57 @@ window.addEventListener(
 
   saveState();
 
+  bindEvents();
+
   updateHeader();
 
   const savedRole =
     role();
 
   if (
-    savedRole ===
-      'player' ||
-    savedRole ===
-      'organizer'
+    savedRole === 'player' ||
+    savedRole === 'organizer'
   ) {
-
     setRole(
       savedRole
     );
 
     showScreen(
-      savedRole ===
-        'organizer' &&
-      state.match.status ===
-        'live'
+      savedRole === 'organizer' &&
+      state.match.status === 'live'
         ? 'control'
         : savedRole
     );
-
   } else {
-
     showScreen(
       'role'
     );
   }
 
   renderModeModal();
-
   syncDraftFields();
 
-  requestGps();
+  /*
+    O GPS é solicitado depois
+    da interface estar pronta.
+  */
+  setTimeout(
+    requestGps,
+    150
+  );
+}
 
-})();
+if (
+  document.readyState ===
+  'loading'
+) {
+  document.addEventListener(
+    'DOMContentLoaded',
+    init,
+    {
+      once: true
+    }
+  );
+} else {
+  init();
+}
