@@ -250,7 +250,7 @@ function startGpsWatch() {
 
 // --- TERRENO E DESENHOS NO MAPA ---
 function drawMarks(ctx, w, h, marks) {
-  (marks || []).forEach(mk => {
+  (marks || []).forEach((mk) => {
     const x = mk.x * w;
     const y = mk.y * h;
 
@@ -271,7 +271,6 @@ function drawMarks(ctx, w, h, marks) {
       ctx.font = "bold 11px system-ui";
       ctx.textAlign = "center";
       ctx.fillText("Z", x, y + 4);
-
     } else if (mk.type === "base") {
       const s = 24;
 
@@ -286,7 +285,6 @@ function drawMarks(ctx, w, h, marks) {
       ctx.font = "bold 14px system-ui";
       ctx.textAlign = "center";
       ctx.fillText("BASE", x, y + 5);
-
     } else if (mk.type === "flag") {
       ctx.strokeStyle = "#d4b84a";
       ctx.lineWidth = 2.5;
@@ -304,7 +302,6 @@ function drawMarks(ctx, w, h, marks) {
       ctx.lineTo(x, y - 2);
       ctx.closePath();
       ctx.fill();
-
     } else if (mk.type === "bomb") {
       ctx.beginPath();
       ctx.arc(x, y, 11, 0, Math.PI * 2);
@@ -320,7 +317,6 @@ function drawMarks(ctx, w, h, marks) {
       ctx.font = "bold 11px system-ui";
       ctx.textAlign = "center";
       ctx.fillText("💣", x, y + 4);
-
     } else {
       ctx.beginPath();
       ctx.arc(x, y, 7, 0, Math.PI * 2);
@@ -339,8 +335,7 @@ function drawYou(ctx, w, h, nx, ny) {
   const x = nx * w;
   const y = ny * h;
 
-  const pulse =
-    0.55 + 0.45 * Math.sin(Date.now() / 350);
+  const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 350);
 
   ctx.beginPath();
   ctx.arc(x, y, 18 * pulse, 0, Math.PI * 2);
@@ -364,10 +359,7 @@ function drawYou(ctx, w, h, nx, ny) {
 
 function sizeCanvas(canvas, wrap) {
   if (!canvas || !wrap) {
-    return {
-      w: 0,
-      h: 0
-    };
+    return { w: 0, h: 0 };
   }
 
   const r = wrap.getBoundingClientRect();
@@ -414,7 +406,6 @@ function paintOrg() {
     ctx.fillStyle = "#8b9a6a";
     ctx.font = "13px system-ui";
     ctx.textAlign = "center";
-
     ctx.fillText(
       "Envie um mapa tático",
       w / 2,
@@ -450,7 +441,7 @@ function paintPlayer() {
 
   drawMarks(ctx, w, h, state.match.marks);
 
-  Object.keys(state.otherPlayers).forEach(key => {
+  Object.keys(state.otherPlayers).forEach((key) => {
     const p = state.otherPlayers[key];
 
     if (
@@ -472,7 +463,13 @@ function paintPlayer() {
       oy = Math.max(0.1, Math.min(0.9, oy));
 
       ctx.beginPath();
-      ctx.arc(ox * w, oy * h, 6, 0, Math.PI * 2);
+      ctx.arc(
+        ox * w,
+        oy * h,
+        6,
+        0,
+        Math.PI * 2
+      );
 
       ctx.fillStyle = "#5b8def";
       ctx.fill();
@@ -488,11 +485,13 @@ function paintPlayer() {
   if (state.gps.ok && state.gps.lat != null) {
     px =
       0.5 +
-      ((state.gps.lat % 0.001) / 0.001 - 0.5) * 0.1;
+      ((state.gps.lat % 0.001) / 0.001 - 0.5) *
+        0.1;
 
     py =
       0.5 +
-      ((state.gps.lng % 0.001) / 0.001 - 0.5) * 0.1;
+      ((state.gps.lng % 0.001) / 0.001 - 0.5) *
+        0.1;
 
     px = Math.max(0.1, Math.min(0.9, px));
     py = Math.max(0.1, Math.min(0.9, py));
@@ -590,33 +589,42 @@ function renderPlayer() {
 
       if (m.bomb.exploded) {
         $("#bombTimerUI").textContent = "BOOM!";
-        $("#bombStatusText").textContent = "ÁREA DESTRUÍDA";
+        $("#bombStatusText").textContent =
+          "ÁREA DESTRUÍDA";
+
         $("#btnPlantBomb").classList.add("hidden");
         $("#btnDefuseBomb").classList.add("hidden");
-
       } else if (m.bomb.defused) {
         $("#bombTimerUI").textContent = "00:00";
-        $("#bombStatusText").textContent = "BOMBA DESARMADA";
-        $("#bombStatusText").style.color = "var(--live)";
+        $("#bombStatusText").textContent =
+          "BOMBA DESARMADA";
+
+        $("#bombStatusText").style.color =
+          "var(--live)";
+
         $("#btnPlantBomb").classList.add("hidden");
         $("#btnDefuseBomb").classList.add("hidden");
-
       } else if (m.bomb.planted) {
         $("#bombStatusText").textContent =
           "ARMADA - CORRA!";
 
         $("#btnPlantBomb").classList.add("hidden");
-        $("#btnDefuseBomb").classList.remove("hidden");
-
+        $("#btnDefuseBomb").classList.remove(
+          "hidden"
+        );
       } else {
         $("#bombTimerUI").textContent = "10:00";
         $("#bombStatusText").textContent =
           "AGUARDANDO PLANT";
 
-        $("#btnPlantBomb").classList.remove("hidden");
-        $("#btnDefuseBomb").classList.add("hidden");
-      }
+        $("#btnPlantBomb").classList.remove(
+          "hidden"
+        );
 
+        $("#btnDefuseBomb").classList.add(
+          "hidden"
+        );
+      }
     } else {
       bombModule?.classList.add("hidden");
     }
@@ -694,7 +702,7 @@ function fillOrg() {
     $("#oBriefing").value = m.briefing || "";
   }
 
-  $(".obj-btn:not(:disabled)").forEach(b => {
+  $(".obj-btn:not(:disabled)").forEach((b) => {
     b.classList.toggle(
       "active",
       b.dataset.obj === m.objective
@@ -824,12 +832,15 @@ function startTimer() {
   stopTimer();
 
   timerId = setInterval(() => {
-    if (state.match.status !== "live") return;
+    if (state.match.status !== "live") {
+      return;
+    }
 
     const now = Date.now();
 
     const elapsed = Math.floor(
-      (now - (state.match.startedAt || now)) / 1000
+      (now - (state.match.startedAt || now)) /
+        1000
     );
 
     if (
@@ -839,7 +850,8 @@ function startTimer() {
       !state.match.bomb.exploded
     ) {
       const bombElapsed = Math.floor(
-        (now - state.match.bomb.plantedAt) / 1000
+        (now - state.match.bomb.plantedAt) /
+          1000
       );
 
       const timeLeft = 600 - bombElapsed;
@@ -913,8 +925,12 @@ function onMapTap(e) {
   }
 
   const canvas = $("#mapCanvas");
+
   const rect = canvas.getBoundingClientRect();
-  const t = e.touches ? e.touches[0] : e;
+
+  const t = e.touches
+    ? e.touches[0]
+    : e;
 
   const x =
     (t.clientX - rect.left) /
@@ -936,13 +952,12 @@ function onMapTap(e) {
   if (state.tool === "erase") {
     state.match.marks =
       (state.match.marks || []).filter(
-        m =>
+        (m) =>
           Math.hypot(
             m.x - x,
             m.y - y
           ) > 0.05
       );
-
   } else if (state.tool === "zone") {
     state.match.marks.push({
       type: "zone",
@@ -950,28 +965,24 @@ function onMapTap(e) {
       y,
       r: 0.09
     });
-
   } else if (state.tool === "base") {
     state.match.marks.push({
       type: "base",
       x,
       y
     });
-
   } else if (state.tool === "flag") {
     state.match.marks.push({
       type: "flag",
       x,
       y
     });
-
   } else if (state.tool === "bomb") {
     state.match.marks.push({
       type: "bomb",
       x,
       y
     });
-
   } else {
     state.match.marks.push({
       type: "point",
@@ -994,71 +1005,87 @@ $("#gpsDeny")?.addEventListener(
   "click",
   () => {
     showGpsGate();
-    toast("Sem localização o app não funciona.");
+    toast(
+      "Sem localização o app não funciona."
+    );
   }
 );
 
-document.addEventListener("click", (e) => {
-  const role = e.target.closest("[data-role]");
+document.addEventListener(
+  "click",
+  (e) => {
+    const role =
+      e.target.closest("[data-role]");
 
-  if (role) {
-    if (!state.gps.ok) {
-      showGpsGate();
+    if (role) {
+      if (!state.gps.ok) {
+        showGpsGate();
+        return;
+      }
+
+      state.role =
+        role.dataset.role;
+
+      saveRole();
+
+      show(
+        state.role === "organizer"
+          ? "organizer"
+          : "player"
+      );
+
       return;
     }
 
-    state.role = role.dataset.role;
-    saveRole();
+    const tool =
+      e.target.closest("[data-tool]");
 
-    show(
-      state.role === "organizer"
-        ? "organizer"
-        : "player"
-    );
+    if (tool) {
+      state.tool = tool.dataset.tool;
 
-    return;
+      $(".tool-btn[data-tool]").forEach(
+        (b) =>
+          b.classList.toggle(
+            "active",
+            b === tool
+          )
+      );
+
+      return;
+    }
+
+    const obj =
+      e.target.closest(
+        ".obj-btn:not(:disabled)"
+      );
+
+    if (
+      obj &&
+      obj.dataset.obj
+    ) {
+      state.match.objective =
+        obj.dataset.obj;
+
+      $(".obj-btn:not(:disabled)").forEach(
+        (b) =>
+          b.classList.toggle(
+            "active",
+            b === obj
+          )
+      );
+
+      saveMatchData();
+
+      toast(
+        "Objetivo: " +
+          (OBJ_LABELS[
+            obj.dataset.obj
+          ] ||
+            obj.dataset.obj)
+      );
+    }
   }
-
-  const tool = e.target.closest("[data-tool]");
-
-  if (tool) {
-    state.tool = tool.dataset.tool;
-
-    $(".tool-btn[data-tool]").forEach(b =>
-      b.classList.toggle(
-        "active",
-        b === tool
-      )
-    );
-
-    return;
-  }
-
-  const obj =
-    e.target.closest(
-      ".obj-btn:not(:disabled)"
-    );
-
-  if (obj && obj.dataset.obj) {
-    state.match.objective =
-      obj.dataset.obj;
-
-    $(".obj-btn:not(:disabled)").forEach(b =>
-      b.classList.toggle(
-        "active",
-        b === obj
-      )
-    );
-
-    saveMatchData();
-
-    toast(
-      "Objetivo: " +
-      (OBJ_LABELS[obj.dataset.obj] ||
-        obj.dataset.obj)
-    );
-  }
-});
+);
 
 // --- CROP MAPA (CORTE IMAGEM) ---
 let cropImg = null;
@@ -1099,15 +1126,19 @@ function drawCropStage() {
   const canvas = $("#cropCanvas");
   const stage = $("#cropStage");
 
-  if (!canvas || !stage || !cropImg) {
+  if (
+    !canvas ||
+    !stage ||
+    !cropImg
+  ) {
     return;
   }
 
-  const r = stage.getBoundingClientRect();
-  const dpr = Math.min(
-    devicePixelRatio || 1,
-    2
-  );
+  const r =
+    stage.getBoundingClientRect();
+
+  const dpr =
+    Math.min(devicePixelRatio || 1, 2);
 
   canvas.width =
     Math.floor(r.width * dpr);
@@ -1121,7 +1152,8 @@ function drawCropStage() {
   canvas.style.height =
     r.height + "px";
 
-  const ctx = canvas.getContext("2d");
+  const ctx =
+    canvas.getContext("2d");
 
   ctx.clearRect(
     0,
@@ -1186,81 +1218,118 @@ function placeCropBox() {
   const box = $("#cropBox");
   const stage = $("#cropStage");
 
-  if (!box || !stage) return;
+  if (!box || !stage) {
+    return;
+  }
 
   const r =
     stage.getBoundingClientRect();
 
   box.style.left =
-    cropRect.x * r.width + "px";
+    cropRect.x *
+      r.width +
+    "px";
 
   box.style.top =
-    cropRect.y * r.height + "px";
+    cropRect.y *
+      r.height +
+    "px";
 
   box.style.width =
-    cropRect.w * r.width + "px";
+    cropRect.w *
+      r.width +
+    "px";
 
   box.style.height =
-    cropRect.h * r.height + "px";
+    cropRect.h *
+      r.height +
+    "px";
 }
 
 function applyCrop() {
   if (!cropImg) return;
 
-  const canvas = $("#cropCanvas");
-  const layout = canvas?._imgLayout;
+  const canvas =
+    $("#cropCanvas");
+
+  const layout =
+    canvas?._imgLayout;
 
   if (!layout) return;
 
   const stage =
-    $("#cropStage").getBoundingClientRect();
+    $("#cropStage")
+      .getBoundingClientRect();
 
   const sx =
-    cropRect.x * stage.width;
+    cropRect.x *
+    stage.width;
 
   const sy =
-    cropRect.y * stage.height;
+    cropRect.y *
+    stage.height;
 
   const sw =
-    cropRect.w * stage.width;
+    cropRect.w *
+    stage.width;
 
   const sh =
-    cropRect.h * stage.height;
+    cropRect.h *
+    stage.height;
 
   const scaleX =
-    canvas.width / stage.width;
+    canvas.width /
+    stage.width;
 
   const scaleY =
-    canvas.height / stage.height;
+    canvas.height /
+    stage.height;
 
-  const cx = sx * scaleX;
-  const cy = sy * scaleY;
-  const cw = sw * scaleX;
-  const ch = sh * scaleY;
+  const cx =
+    sx * scaleX;
+
+  const cy =
+    sy * scaleY;
+
+  const cw =
+    sw * scaleX;
+
+  const ch =
+    sh * scaleY;
 
   const ix =
-    Math.max(cx, layout.dx);
+    Math.max(
+      cx,
+      layout.dx
+    );
 
   const iy =
-    Math.max(cy, layout.dy);
+    Math.max(
+      cy,
+      layout.dy
+    );
 
   const ix2 =
     Math.min(
       cx + cw,
-      layout.dx + layout.dw
+      layout.dx +
+        layout.dw
     );
 
   const iy2 =
     Math.min(
       cy + ch,
-      layout.dy + layout.dh
+      layout.dy +
+        layout.dh
     );
 
   if (
     ix2 <= ix ||
     iy2 <= iy
   ) {
-    return toast("Área inválida");
+    return toast(
+      "Área inválida"
+    );
   }
 
   const relX =
@@ -1280,19 +1349,25 @@ function applyCrop() {
     layout.dh;
 
   const srcX =
-    relX * cropImg.width;
+    relX *
+    cropImg.width;
 
   const srcY =
-    relY * cropImg.height;
+    relY *
+    cropImg.height;
 
   const srcW =
-    relW * cropImg.width;
+    relW *
+    cropImg.width;
 
   const srcH =
-    relH * cropImg.height;
+    relH *
+    cropImg.height;
 
   const out =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
 
   out.width =
     Math.max(
@@ -1330,9 +1405,8 @@ function applyCrop() {
 
   saveMatchData();
 
-  $("#cropModal")?.classList.add(
-    "hidden"
-  );
+  $("#cropModal")
+    ?.classList.add("hidden");
 
   updateMarkPanel();
   paintOrg();
@@ -1381,9 +1455,8 @@ $("#cropOk")?.addEventListener(
 $("#cropCancel")?.addEventListener(
   "click",
   () => {
-    $("#cropModal")?.classList.add(
-      "hidden"
-    );
+    $("#cropModal")
+      ?.classList.add("hidden");
 
     cropImg = null;
   }
@@ -1401,10 +1474,9 @@ $("#cropCancel")?.addEventListener(
   const onDown = (e) => {
     e.preventDefault();
 
-    const t =
-      e.touches
-        ? e.touches[0]
-        : e;
+    const t = e.touches
+      ? e.touches[0]
+      : e;
 
     const br =
       box.getBoundingClientRect();
@@ -1415,10 +1487,9 @@ $("#cropCancel")?.addEventListener(
       t.clientY >
         br.bottom - 20;
 
-    mode =
-      nearBR
-        ? "resize"
-        : "move";
+    mode = nearBR
+      ? "resize"
+      : "move";
 
     start = {
       x: t.clientX,
@@ -1434,10 +1505,9 @@ $("#cropCancel")?.addEventListener(
 
     e.preventDefault();
 
-    const t =
-      e.touches
-        ? e.touches[0]
-        : e;
+    const t = e.touches
+      ? e.touches[0]
+      : e;
 
     const sr =
       stage.getBoundingClientRect();
@@ -1540,7 +1610,9 @@ $("#btnGenMap")?.addEventListener(
     updateMarkPanel();
     paintOrg();
 
-    toast("Limpou mapa anterior.");
+    toast(
+      "Limpou mapa anterior."
+    );
   }
 );
 
@@ -1614,7 +1686,9 @@ $("#btnConfirm")?.addEventListener(
     savePlayerData();
     render();
 
-    toast("Presença confirmada");
+    toast(
+      "Presença confirmada"
+    );
   }
 );
 
@@ -1627,7 +1701,9 @@ $("#btnEnter")?.addEventListener(
       );
     }
 
-    if (state.match.status !== "live") {
+    if (
+      state.match.status !== "live"
+    ) {
       return toast(
         "Aguarde o início"
       );
@@ -1661,7 +1737,9 @@ $("#btnLeave")?.addEventListener(
     savePlayerData();
     show("player");
 
-    toast("Abandonou a operação");
+    toast(
+      "Abandonou a operação"
+    );
   }
 );
 
@@ -1704,18 +1782,16 @@ $("#btnShowBriefing")?.addEventListener(
       state.match.briefing ||
       "Nenhuma instrução adicional.";
 
-    $("#briefingModal")?.classList.remove(
-      "hidden"
-    );
+    $("#briefingModal")
+      ?.classList.remove("hidden");
   }
 );
 
 $("#btnCloseBriefing")?.addEventListener(
   "click",
   () => {
-    $("#briefingModal")?.classList.add(
-      "hidden"
-    );
+    $("#briefingModal")
+      ?.classList.add("hidden");
   }
 );
 
