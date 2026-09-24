@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'df_airsoft_state_v7';
+nst STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
 const MODE_DEFS = {
@@ -6550,10 +6550,12 @@ $('gpsRetry')
 $('gpsDeny')
   .addEventListener(
     'click',
-    () =>
+    () => {
+      closeOverlay('gpsGate');
       toast(
-        'A localização continua disponível pelo botão acima.'
-      )
+        'LOCALIZAÇÃO NÃO ATIVADA.'
+      );
+    }
   );
 
 
