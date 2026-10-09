@@ -1555,3 +1555,34 @@ h2{
   }
 
 }
+
+/* Incremental multiplayer navigation and guided configuration. */
+.session-toolbar { max-width:700px; margin:0 auto; padding:10px 14px; display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.session-toolbar small { flex-basis:100%; color:var(--muted); }
+.session-toolbar .mini-btn { min-height:40px; white-space:normal; }
+#participantName { font-size:12px; flex-basis:100%; }
+#loginError { color:var(--danger); min-height:20px; }
+#historyList { display:grid; gap:8px; margin:12px 0; }
+#historyList .log-item { font-size:13px; padding:12px; overflow-wrap:anywhere; }
+#historyList time { font-size:11px; }
+#historyList small { font-size:10px; }
+.operator-intro { width:min(640px,calc(100% - 24px)); padding:30px; }
+#tutorialShade { position:fixed; inset:0; pointer-events:none; background:rgba(24,21,17,.45); z-index:1100; }
+.tutorial-highlight { position:relative; z-index:1102; outline:3px solid var(--gold); outline-offset:4px; box-shadow:0 0 0 6px rgba(226,202,97,.2); background:var(--surface2); scroll-margin-bottom:200px; }
+#tutorialCard { position:fixed; z-index:1200; bottom:12px; left:50%; transform:translateX(-50%); width:min(620px,calc(100% - 24px)); background:var(--surface2); border:2px solid var(--gold); border-radius:8px; padding:14px; box-shadow:0 6px 30px #0004; font-size:13px; }
+#tutorialCard p { line-height:1.45; margin:8px 0; }
+.tutorial-controls { display:flex; flex-wrap:wrap; gap:8px; }
+.tutorial-controls button { min-height:40px; }
+body:has(#tutorialCard:not(.hidden)) .modal-content { padding-bottom:240px; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+button:focus-visible, summary:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }
+@media(max-width:420px) { .operator-intro { padding:22px; } .header-actions { gap:4px; } .session-toolbar { padding:8px 10px; } #tutorialCard { font-size:12px; bottom:6px; padding:10px; } .field input,.field select { font-size:16px; min-height:44px; } }
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
+
+#tutorialShade { inset:auto; background:transparent; border:3px solid var(--gold); box-shadow:0 0 0 100vmax rgba(24,21,17,.55); border-radius:6px; }
+body:has(#tutorialCard:not(.hidden)) .modal-window,
+body:has(#tutorialCard:not(.hidden)) .editor-shell { height:calc(100dvh - var(--tutorial-space, 190px)); align-self:flex-start; }
+body:has(#tutorialCard:not(.hidden)) .modal-content { padding-bottom:24px; }
+body:has(#tutorialCard:not(.hidden)) .editor-stage { height:auto; }
+/* Keep the scoreboard below zoom controls on the tactical map. */
+.hud-score { top:52px; }

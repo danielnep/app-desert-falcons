@@ -53,12 +53,22 @@
         SEM PARTIDA
       </span>
 
-      <button class="mini-btn" id="devBtn">
+      <button class="mini-btn hidden" id="devBtn">
         DEV
       </button>
     </div>
   </header>
 
+  <div class="session-toolbar">
+    <small id="connectionStatus" role="status" aria-live="polite">Conectando ao servidor…</small>
+    <button class="mini-btn" id="reconnectButton">Reconectar</button>
+    <span id="participantName"></span>
+    <div id="modeSwitch" class="hidden"><button class="mini-btn" id="modePlayer">JOGADOR</button><button class="mini-btn" id="modeOperator">OPERADOR</button></div>
+    <button class="mini-btn" id="definitionsButton">Definições da partida</button>
+    <button class="mini-btn" id="historyButton">HISTÓRICO</button><button class="mini-btn" id="gpsButton">Ativar GPS</button>
+    <button class="mini-btn hidden" id="tutorialAgain">Tutorial</button>
+    <button class="mini-btn hidden" id="newMatch">Nova partida</button><button class="mini-btn hidden" id="joinAgain">Entrar na partida</button>
+  </div>
   <main id="main">
 
     <!-- =========================
@@ -72,7 +82,7 @@
       <h1>Quem é você?</h1>
 
       <p class="screen-copy">
-        Escolha o perfil. O acesso fica salvo neste aparelho.
+        Escolha como deseja entrar na partida. O operador precisa de uma chave de acesso.
       </p>
 
       <div class="role-list">
@@ -134,7 +144,7 @@
         </h2>
 
         <p>
-          O operador ainda não abriu uma operação neste aparelho.
+          Aguarde o operador configurar e iniciar a partida.
         </p>
 
         <button class="btn ghost" id="btnPlayerBack">
@@ -387,6 +397,8 @@
         ></div>
 
 
+        <div id="objectiveActions" class="quick-actions"></div>
+        <details class="card"><summary>Atualizar minha posição no mapa</summary><p>Este mapa é uma imagem sem georreferenciamento. Informe a posição real no campo em porcentagem; o GPS não posiciona você automaticamente nesta imagem.</p><div class="grid-2"><label class="field"><span>Horizontal (0–100%)</span><input id="positionX" type="number" min="0" max="100" value="50"></label><label class="field"><span>Vertical (0–100%)</span><input id="positionY" type="number" min="0" max="100" value="50"></label></div><button id="positionSubmit" class="btn secondary">ATUALIZAR POSIÇÃO</button></details>
         <div class="hit-row">
 
           <button
@@ -426,6 +438,8 @@
     </section>
 
 
+    <section class="screen" data-screen="definitions"><p class="eyebrow">DEFINIÇÕES DA PARTIDA</p><h2>Definidas pelo operador</h2><div class="card" id="definitionsList"></div><button class="btn secondary hidden" id="editDefinitions">EDITAR DEFINIÇÕES</button><button class="btn ghost" id="definitionsBack">VOLTAR</button></section>
+    <section class="screen" data-screen="history"><p class="eyebrow">REGISTROS PERSISTENTES</p><h2>HISTÓRICO</h2><label class="field"><span>Partida</span><select id="historyMatch"><option value="">Todas as partidas</option></select></label><label class="field"><span>Buscar evento ou participante</span><input id="historySearch" type="search"></label><p id="historyStatus" role="status"></p><div id="historyList"></div><button class="btn ghost" id="historyBack">VOLTAR</button></section>
     <!-- =========================
          OPERADOR
          MENU
@@ -450,7 +464,7 @@
 
           <p class="screen-copy">
             Cada configuração abre sua própria tela.
-            Nada de sequência infinita de campos.
+            Use o tutorial para orientar a configuração.
           </p>
 
         </div>
@@ -608,11 +622,11 @@
         <div class="section-title">
 
           <h3>
-            Resumo atual
+            DEFINIÇÕES DA PARTIDA
           </h3>
 
           <span>
-            APLICADO
+            Definidas pelo operador
           </span>
 
         </div>
@@ -943,6 +957,7 @@
         ENCERRAR PARTIDA
       </button>
 
+      <div class="card"><h3>Benefício de visibilidade</h3><p>Disponível quando a regra de visibilidade estiver definida como benefício temporário. Usa o tempo configurado em segundos.</p><div class="grid-2"><label class="field"><span>Equipe beneficiada</span><select id="benefitTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label><label class="field"><span>Visibilidade</span><select id="benefitKind"><option value="enemy">Adversários</option><option value="team">Própria equipe</option></select></label></div><button class="btn secondary" id="grantBenefit">CONCEDER BENEFÍCIO</button></div>
     </section>
 
 
@@ -2079,7 +2094,7 @@
           class="btn primary"
           id="btnStartMatch"
         >
-          CONFIRMAR E INICIAR OPERAÇÃO
+          CONCLUIR CONFIGURAÇÃO E INICIAR PARTIDA
         </button>
 
       </div>
@@ -2461,6 +2476,9 @@
 
 </div>
 
+<div class="overlay hidden" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form class="dialog large" id="loginForm"><h2 id="loginTitle">Entrar na partida</h2><input type="hidden" id="loginRole"><label class="field"><span>Seu nome</span><input id="loginName" required maxlength="80" autocomplete="name"></label><label class="field"><span>Equipe</span><select id="loginTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label><div id="operatorKeyField"><label class="field"><span>Chave do operador</span><input id="loginKey" type="password" autocomplete="current-password"></label><label class="check-row"><input id="importLegacy" type="checkbox" checked><span>Importar configurações antigas deste navegador, se ainda não houver partida.</span></label></div><p id="loginError" role="alert"></p><button id="loginSubmit" class="btn primary" type="submit">ENTRAR</button><button id="loginCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
+<div class="overlay hidden" id="operatorIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="operatorIntroTitle"><div class="dialog operator-intro"><p class="eyebrow">TUTORIAL GUIADO</p><h2 id="operatorIntroTitle">VOCÊ ESTÁ NO MODO OPERADOR</h2><p>Você é responsável por configurar e iniciar a partida. Vamos orientar você em cada etapa para garantir que tudo esteja pronto antes de começar.</p><button class="btn primary" id="tutorialBegin">COMEÇAR TUTORIAL</button><button class="btn ghost" id="tutorialSkip">CONFIGURAR SEM TUTORIAL</button></div></div>
+<div id="tutorialShade" class="hidden"></div><aside id="tutorialCard" class="hidden" aria-live="polite"><strong id="tutorialProgress"></strong><p id="tutorialText"></p><div class="tutorial-controls"><button class="mini-btn" id="tutorialPrevious">Voltar</button><button class="mini-btn" id="tutorialNext">Próxima etapa</button><button class="mini-btn" id="tutorialClose">Fechar tutorial</button></div></aside>
 <script type="module" src="app.js"></script>
 
 </body>

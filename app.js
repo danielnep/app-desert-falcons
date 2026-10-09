@@ -339,40 +339,10 @@ function loadState() {
   }
 }
 
-function saveState() {
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(state)
-    );
-  } catch (error) {
-    console.warn(
-      '[DF] Não foi possível salvar:',
-      error
-    );
-  }
-}
+function saveState() { return persistChanges(); }
 
-function role() {
-  return (
-    localStorage.getItem(
-      ROLE_KEY
-    ) ||
-    state.role ||
-    null
-  );
-}
-
-function setRole(value) {
-  state.role = value;
-
-  localStorage.setItem(
-    ROLE_KEY,
-    value
-  );
-
-  saveState();
-}
+function role() { return identity?.role || null; }
+function setRole() {}
 
 function formatTime(seconds) {
   seconds = Math.max(
@@ -490,6 +460,7 @@ function closeOverlay(id) {
 ========================= */
 
 function showScreen(name) {
+  if (["organizer", "control", "dev"].includes(name) && !isOperator()) { toast("ACESSO EXCLUSIVO DO OPERADOR."); return; }
   $$('.screen').forEach(
     screen => {
       screen.classList.toggle(
@@ -506,6 +477,7 @@ function showScreen(name) {
   updateHeader();
 
   if (name === 'player') {
+    renderPlayerExtras();
     renderPlayer();
   }
 
@@ -622,27 +594,12 @@ function draftDirty() {
   );
 }
 
-function applyDraft() {
-  state.match =
-    deepClone(draft);
-
-  state.match.players =
-    createPlayers(
-      state.match.playerCount,
-      state.match.players
-    );
-
-  appliedSnapshot =
-    deepClone(draft);
-
-  saveState();
-
-  updateHeader();
-  renderOperatorMenu();
-
-  toast(
-    'ALTERAÇÕES APLICADAS.'
-  );
+async function applyDraft() {
+  if (!isOperator()) return false;
+  if (!$('rulesModal').classList.contains('hidden') && !validateRuleInputs()) return false;
+  const ok = await configure(draft);
+  if (ok) { appliedSnapshot = deepClone(draft); toast('DEFINIÇÕES SALVAS.'); }
+  return ok;
 }
 
 function restoreDraft() {
@@ -744,7 +701,7 @@ function createPlayers(
 
         lives:
           previousPlayer?.lives ??
-          state.match.livesPerPlayer,
+          DEFAULT_STATE.match.livesPerPlayer,
 
         hits:
           previousPlayer?.hits ??
@@ -790,7 +747,7 @@ function createPlayers(
 
         bombsRemaining:
           previousPlayer?.bombsRemaining ??
-          state.match.bomb.bombsPerPlayer,
+          DEFAULT_STATE.match.bomb.bombsPerPlayer,
 
         respawnPendingUntil:
           previousPlayer?.respawnPendingUntil ??
@@ -806,15 +763,7 @@ function createPlayers(
   return list;
 }
 
-function currentPlayer() {
-  return (
-    state.match.players.find(
-      player =>
-        player.isMe
-    ) ||
-    state.match.players[0]
-  );
-}
+function currentPlayer() { return state.match.players.find(p => p.id === identity?.playerId); }
 
 /* =========================
    MODES
@@ -884,6 +833,7 @@ function objectiveLabel(
 ========================= */
 
 function syncDraftFields() {
+  for (const id of ["playerCount","livesPerPlayer"]) if ($(id)) $(id).disabled = state.match.status === "live";
   const fields = {
     oName: draft.name || '',
     oLoc: draft.location || '',
@@ -982,13 +932,9 @@ function readRulesForm() {
   const value = id =>
     $(id)?.value;
 
-  draft.name =
-    value('oName')?.trim() ||
-    'Operação Desert Falcons';
+  draft.name = value('oName')?.trim() || '';
 
-  draft.location =
-    value('oLoc')?.trim() ||
-    'Campo';
+  draft.location = value('oLoc')?.trim() || '';
 
   draft.durationMin =
     clamp(
@@ -1132,6 +1078,9 @@ function renderRuleAvailability() {
 ========================= */
 
 function renderModeModal() {
+  const locked=state.match.status === "live";
+  $$(".choice-card").forEach(button=>button.disabled=locked);
+  if ($("mergeModes")) $("mergeModes").disabled=locked;
   const merge =
     $('mergeModes');
 
@@ -1330,6 +1279,7 @@ function renderOperatorMenu() {
 ========================= */
 
 function openConfig(id) {
+  if (!isOperator()) return toast("ACESSO EXCLUSIVO DO OPERADOR.");
   if (id === 'rulesModal') {
     syncDraftFields();
   }
@@ -1451,6 +1401,7 @@ function renderReview() {
 }
 
 function validateStart() {
+  if (!validateRuleInputs()) return false;
   readRulesForm();
 
   if (!draft.map.dataUrl) {
@@ -1979,19 +1930,7 @@ function drawMapMarks(
     ctx.restore();
   }
 
-  (
-    state.match.players || []
-  )
-    .filter(
-      player =>
-        player.status !==
-          'FORA DA OPERAÇÃO' &&
-        player.team ===
-          (
-            me?.team ||
-            'A'
-          )
-    )
+  (state.match.players || []).filter(player => player.status !== 'FORA DA OPERAÇÃO' && player.visible !== false)
     .forEach(
       player =>
         drawPlayerMark(
@@ -2007,6 +1946,7 @@ function drawPlayerMark(
   player,
   box
 ) {
+  if (!player.joined || !Number.isFinite(player.x) || !Number.isFinite(player.y)) return;
   const x =
     box.left +
     player.x *
@@ -2039,9 +1979,7 @@ function drawPlayerMark(
   );
 
   ctx.fillStyle =
-    player.isMe
-      ? '#e2ca61'
-      : '#8b6b4a';
+    player.isMe ? '#e2ca61' : player.team === currentPlayer()?.team ? '#8b6b4a' : '#a04848';
 
   ctx.strokeStyle =
     '#fff';
@@ -3423,7 +3361,8 @@ function renderPlayer() {
     'hidden'
   );
 
-  renderPlayerLive();
+  if (me && !me.left) renderPlayerLive();
+  else { live.classList.add('hidden'); wait.classList.remove('hidden'); }
 }
 
 function matchElapsed() {
@@ -3526,14 +3465,8 @@ function renderPlayerLive() {
     role() !== 'organizer'
   );
 
-  if (
-    matchRemaining() <= 0 &&
-    state.match.status === 'live'
-  ) {
-    endMatch(
-      'TEMPO DA PARTIDA ENCERRADO.'
-    );
-  }
+  // Match expiration is processed by the persistent server clock.
+
 }
 
 function renderAllies() {
@@ -3554,10 +3487,7 @@ function renderAllies() {
     )
       .filter(
         player =>
-          player.team ===
-          (
-            me?.team || 'A'
-          )
+          player.joined && player.team === (me?.team || 'A')
       )
       .map(
         player =>
@@ -3701,8 +3631,8 @@ function renderBombHud() {
       </div>
 
       <div class="live-copy">
-        Localização GPS ativa · aproximadamente
-        ${distance} m.
+        Distância estimada · aproximadamente
+        ${Number.isFinite(distance) ? distance + ' m (GPS)' : 'indisponível — ative o GPS' }.
 
         ${
           enemy
@@ -3726,13 +3656,9 @@ function renderBombHud() {
       }
     `;
 
-  on(
-    'quickDisarm',
-    'click',
-    startDisarm
-  );
+  if ($('quickDisarm')) on('quickDisarm', 'click', startDisarm);
 
-  if (enemy) {
+  if (enemy && Number.isFinite(distance)) {
     bombBeep(
       distance
     );
@@ -3815,27 +3741,7 @@ function bombDistance(
     );
   }
 
-  return Math.round(
-    Math.hypot(
-      (
-        player?.x ??
-        0.5
-      ) -
-      (
-        bomb?.x ??
-        0.5
-      ),
-
-      (
-        player?.y ??
-        0.5
-      ) -
-      (
-        bomb?.y ??
-        0.5
-      )
-    ) * 120
-  );
+  return null; // Sem GPS, a imagem não permite estimar metros.
 }
 
 function bombBeep(distance) {
@@ -3972,11 +3878,7 @@ function renderQuickActions() {
   holder.innerHTML =
     html;
 
-  on(
-    'quickArm',
-    'click',
-    armBomb
-  );
+  if ($('quickArm')) on('quickArm', 'click', armBomb);
 }
 
 function armBomb() {
@@ -4397,58 +4299,7 @@ function renderZoneHud() {
       team: null
     };
 
-  if (
-    !progress.startedAt &&
-    !progress.captured
-  ) {
-    progress.startedAt =
-      Date.now();
-
-    progress.team =
-      me.team;
-
-    state.match.zones[key] =
-      progress;
-
-    saveState();
-  }
-
-  const elapsed =
-    Math.floor(
-      (
-        Date.now() -
-        progress.startedAt
-      ) / 1000
-    );
-
-  if (
-    !progress.captured &&
-    elapsed >=
-    state.match.zoneCaptureSeconds
-  ) {
-    progress.captured =
-      true;
-
-    state.match.scores[me.team] =
-      (
-        state.match.scores[me.team] ||
-        0
-      ) +
-      Number(
-        state.match.zonePoints ||
-        0
-      );
-
-    addLog(
-      `${zone.label} capturada pela equipe ${me.team}.`
-    );
-
-    saveState();
-
-    toast(
-      `${zone.label.toUpperCase()} CAPTURADA.`
-    );
-  }
+  const elapsed = progress.startedAt ? Math.floor((Date.now() - progress.startedAt) / 1000) : 0;
 
   holder.innerHTML =
     `
@@ -5437,7 +5288,7 @@ function requestGps() {
       setText(
         'gpsMessage',
         error.code === 1
-          ? 'Permissão negada. Você ainda pode navegar pelo protótipo neste aparelho; ative o GPS para os recursos de localização.'
+          ? 'Permissão negada. Ative o GPS para os recursos de localização. A posição no mapa deve ser informada manualmente quando o mapa não tem georreferenciamento.'
           : 'Não foi possível obter a localização agora.'
       );
 
@@ -5655,25 +5506,7 @@ function bindEvents() {
         return;
       }
 
-      setRole(
-        selectedRole
-      );
-
-      $$('.role-card')
-        .forEach(
-          item =>
-            item.classList.toggle(
-              'selected',
-              item === button
-            )
-        );
-
-      showScreen(
-        selectedRole ===
-          'player'
-          ? 'player'
-          : 'organizer'
-      );
+      openLogin(selectedRole);
     }
   );
 
@@ -5810,34 +5643,7 @@ function bindEvents() {
               readRulesForm();
             }
 
-            appliedSnapshot =
-              deepClone(
-                draft
-              );
-
-            state.match =
-              deepClone(
-                draft
-              );
-
-            state.match.players =
-              createPlayers(
-                state.match.playerCount,
-                state.match.players
-              );
-
-            saveState();
-
-            updateHeader();
-            renderOperatorMenu();
-
-            closeOverlay(
-              modalId
-            );
-
-            toast(
-              'ALTERAÇÕES APLICADAS.'
-            );
+            applyDraft().then(ok => { if (ok) { closeOverlay(modalId); tutorialCompleted(modalId); } });
           }
         );
       }
@@ -5953,37 +5759,7 @@ function bindEvents() {
 
   /* SALVAR */
 
-  on(
-    'btnSaveDraft',
-    'click',
-    () => {
-      readRulesForm();
-
-      appliedSnapshot =
-        deepClone(
-          draft
-        );
-
-      state.match =
-        deepClone(
-          draft
-        );
-
-      state.match.players =
-        createPlayers(
-          state.match.playerCount,
-          state.match.players
-        );
-
-      saveState();
-
-      renderOperatorMenu();
-
-      toast(
-        'ALTERAÇÕES APLICADAS.'
-      );
-    }
-  );
+  on('btnSaveDraft', 'click', async () => { readRulesForm(); await applyDraft(); });
 
   /* NAVEGAÇÃO OPERADOR */
 
@@ -6016,7 +5792,7 @@ function bindEvents() {
     () =>
       openConfirm(
         'Encerrar partida?',
-        'A operação será encerrada neste aparelho.',
+        'A operação será encerrada para todos os participantes.',
         'ENCERRAR',
         () =>
           endMatch(
@@ -6071,29 +5847,7 @@ function bindEvents() {
 
   /* PLAYER */
 
-  on(
-    'btnConfirm',
-    'click',
-    () => {
-      const player =
-        currentPlayer();
-
-      if (!player) {
-        return;
-      }
-
-      player.confirmed =
-        true;
-
-      saveState();
-
-      renderPlayer();
-
-      toast(
-        'PRESENÇA CONFIRMADA.'
-      );
-    }
-  );
+  on('btnConfirm', 'click', () => command('confirm', {}, 'PRESENÇA CONFIRMADA.'));
 
   on(
     'btnEnter',
@@ -6173,45 +5927,7 @@ function bindEvents() {
 
   /* PENDING */
 
-  on(
-    'pendingApply',
-    'click',
-    () => {
-      state.match =
-        deepClone(
-          draft
-        );
-
-      state.match.players =
-        createPlayers(
-          state.match.playerCount,
-          state.match.players
-        );
-
-      appliedSnapshot =
-        deepClone(
-          draft
-        );
-
-      saveState();
-
-      const action =
-        pendingAction;
-
-      pendingAction =
-        null;
-
-      closeOverlay(
-        'pendingModal'
-      );
-
-      toast(
-        'ALTERAÇÕES APLICADAS.'
-      );
-
-      action?.();
-    }
-  );
+  on('pendingApply', 'click', async () => { if (!await applyDraft()) return; const action = pendingAction; pendingAction = null; closeOverlay('pendingModal'); action?.(); });
 
   on(
     'pendingDiscard',
@@ -6284,7 +6000,7 @@ function bindEvents() {
       drawPreview();
 
       toast(
-        'MAPA ATUALIZADO.'
+        'MAPA AJUSTADO · APLIQUE AS DEFINIÇÕES PARA SALVAR.'
       );
     }
   );
@@ -6894,7 +6610,7 @@ window.addEventListener(
 
 setInterval(
   () => {
-    simulatePlayers();
+    // Game timers and positions are authoritative on the server.
     updateHeader();
 
     if (
@@ -6956,67 +6672,281 @@ window.addEventListener(
   }
 );
 
+/* Persistent multiplayer integration. Visual role is separate from authorization. */
+let identity = null;
+let authoritative = null;
+let stream = null;
+let saving = false;
+let pendingPosition = false;
+let tutorialStep = -1;
+let lastScreen = 'player';
+const configurationKeys = ['name','location','durationMin','playerCount','modes','mergeModes','livesPerPlayer','respawnDelay','respawnPolicy','teamVisibility','enemyVisibility','enemyVisibilitySeconds','zoneCaptureSeconds','zonePoints','map'];
+const bombConfigurationKeys = ['bombsPerPlayer','durationMin','disarmSeconds','blastRadius','armPolicy','timingPolicy','carrierId'];
+function isOperator() { return identity?.role === 'organizer'; }
+function validateRuleInputs() {
+  for(const input of $$('#rulesModal input')) if(input.offsetParent!==null && !input.checkValidity()){input.reportValidity();input.focus();toast('CORRIJA OS CAMPOS DESTACADOS.');return false;}
+  return true;
+}
+function configOf(m) {
+  const result = Object.fromEntries(configurationKeys.map(k => [k, deepClone(m[k])]));
+  result.bomb = Object.fromEntries(bombConfigurationKeys.map(k => [k, deepClone(m.bomb[k])]));
+  return result;
+}
+function mergeConfiguration(current, next) {
+  const result = deepClone(current);
+  for (const key of configurationKeys) result[key] = deepClone(next[key]);
+  for (const key of bombConfigurationKeys) result.bomb[key] = deepClone(next.bomb[key]);
+  return result;
+}
+function connectionStatus(text) { setText('connectionStatus', text); }
+async function request(path, body) {
+  const response = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
+  return data;
+}
+function receive(data) {
+  const clean = !draftDirty();
+  const gps = state.gps;
+  authoritative = deepClone(data.match); identity = data.identity;
+  state = {gps, role:identity?.role, match:deepClone(data.match)};
+  if (clean || !isOperator()) { draft = deepClone(state.match); appliedSnapshot = deepClone(draft); }
+
+  updateHeader();
+  toggleHidden('modeSwitch', !isOperator());
+  toggleHidden('tutorialAgain', !isOperator());
+  toggleHidden('devBtn', !isOperator());
+  toggleHidden('joinAgain', !identity || Boolean(identity.playerId && !currentPlayer()?.left));
+  toggleHidden('newMatch', !isOperator() || state.match.status !== 'ended');
+  if (activeScreen === 'player') renderPlayer();
+  if (activeScreen === 'organizer') renderOperatorMenu();
+  if (activeScreen === 'control') renderControl();
+  if (activeScreen === 'definitions') renderDefinitions();
+  if (activeScreen === 'history') loadHistory();
+  const ended = state.match.status === 'ended';
+  if ($('playerWait')) {
+    $('playerWait').querySelector('h2').textContent = ended ? 'Partida encerrada' : 'Aguardando o operador';
+    $('playerWait').querySelector('p:not(.eyebrow)').textContent = ended ? 'Os registros estão disponíveis no Histórico. Aguarde uma nova partida.' : 'Aguarde a configuração e a confirmação de início. Esta tela será atualizada automaticamente.';
+  }
+  toggleHidden('btnStartMatch', state.match.status !== 'open');
+  document.querySelectorAll('[data-open-modal="modesModal"], [data-open-modal="mapModal"]').forEach(el => el.disabled = state.match.status === 'live');
+  if (clean && isOperator() && !$('rulesModal').classList.contains('hidden')) syncDraftFields();
+  renderPlayerExtras();
+}
+function connect() {
+  stream?.close();
+  stream = new EventSource('/api/stream');
+  stream.onopen = () => connectionStatus('Conectado · atualizações em tempo real');
+  stream.onmessage = event => receive(JSON.parse(event.data));
+  stream.onerror = () => connectionStatus('Reconectando · confirme conexão antes de agir');
+}
+async function command(action, values = {}, success) {
+  try {
+    connectionStatus('Salvando…');
+    const data = await request('/api/command', {action, ...values});
+    receive(data); connectionStatus('Conectado · dados salvos');
+    if (success) toast(success);
+    return true;
+  } catch(error) {
+    connectionStatus('Ação não salva · tente novamente'); toast(error.message, 5000);
+    try { receive(await request('/api/state')); } catch {}
+    return false;
+  }
+}
+async function configure(next) {
+  if (!isOperator()) return false;
+  const config = configOf(next);
+  const ok = await command('configure', {config, revision:authoritative.revision});
+  if (ok) { draft = deepClone(state.match); appliedSnapshot = deepClone(draft); renderOperatorMenu(); }
+  return ok;
+}
+async function persistChanges() {
+  // Legacy GPS callbacks persist only the authenticated participant's coordinates.
+  if (saving) { pendingPosition = true; return; }
+  const me = currentPlayer();
+  if (!identity || !me || !state.gps.updatedAt) return;
+  saving = true;
+  await command('position', {lat:state.gps.lat, lng:state.gps.lng});
+  saving = false;
+  if (pendingPosition) { pendingPosition = false; persistChanges(); }
+}
+function openLogin(selectedRole) {
+  $('loginRole').value = selectedRole;
+  toggleHidden('operatorKeyField', selectedRole !== 'organizer');
+  setText('loginTitle', selectedRole === 'organizer' ? 'Acesso do operador' : 'Entrar como jogador');
+  $('loginName').value = identity?.name || localStorage.getItem('df_display_name') || '';
+  $('loginKey').value = '';
+  setText('loginError', ''); openOverlay('loginModal'); $('loginName').focus();
+}
+function renderDefinitions() {
+  const m = state.match;
+  const rows = Object.entries(configOf(m)).filter(([k]) => !['map','bomb'].includes(k));
+  const labels={name:'Nome',location:'Local',durationMin:'Duração (min)',playerCount:'Vagas por equipe',modes:'Modos',mergeModes:'Mesclar modos',livesPerPlayer:'Vidas iniciais',respawnDelay:'Respawn (s)',respawnPolicy:'Base de respawn',teamVisibility:'Visibilidade da equipe',enemyVisibility:'Visibilidade adversária',enemyVisibilitySeconds:'Visibilidade temporária (s)',zoneCaptureSeconds:'Captura de zona (s)',zonePoints:'Pontos por zona'};
+  const values={nearest:'Mais próxima',choice:'Escolha do jogador',operator:'Escolha do operador',always:'Sempre',benefit:'Benefício temporário',off:'Desativada',areas:'Áreas do mapa',anywhere:'Qualquer local',predefined:'Predefinido',arming:'Definido ao armar'};
+  rows.push(['map', `${m.map.marks.length} elementos no mapa`]);
+  if(m.modes.includes('bomb')) for(const [k,v] of Object.entries(configOf(m).bomb)) rows.push([k,v]);
+  Object.assign(labels,{bombsPerPlayer:'Bombas por jogador',disarmSeconds:'Desarme (s)',blastRadius:'Raio de explosão (m)',armPolicy:'Local de armamento',timingPolicy:'Tempo da bomba',carrierId:'Portador'});
+  $('definitionsList').innerHTML = rows.map(([k,v]) => `<div class="info-line"><span>${esc(labels[k] || k)}</span><strong>${esc(k==='modes'?objectiveLabel():typeof v==='boolean'?(v?'Sim':'Não'):values[v]||v)}</strong></div>`).join('');
+  toggleHidden('editDefinitions', !isOperator());
+}
+async function loadHistory() {
+  setText('historyStatus', 'Carregando registros…');
+  try {
+    const filter = $('historyMatch').value;
+    const data = await request('/api/events' + (filter ? '?match=' + encodeURIComponent(filter) : ''));
+    const select = $('historyMatch');
+    select.innerHTML = '<option value="">Todas as partidas</option>' + data.matches.map(m=>`<option value="${esc(m.id)}">${esc(m.name)} · ${esc(m.id.slice(0,8))}</option>`).join('');
+    select.value = filter;
+    const query = $('historySearch').value.toLocaleLowerCase();
+    const events = data.events.filter(e => `${e.actor} ${e.description} ${e.type}`.toLocaleLowerCase().includes(query));
+    $('historyList').innerHTML = events.map(e=>`<article class="log-item"><time>${esc(new Date(e.at).toLocaleString('pt-BR'))}</time><strong>${esc(e.type)} · ${esc(e.actor)}</strong><p>${esc(e.description)}</p><small>Partida ${esc(e.match_id)}</small></article>`).join('');
+    setText('historyStatus', events.length ? `${events.length} registro(s) · ordem cronológica` : 'Nenhum registro encontrado.');
+  } catch(error) { setText('historyStatus', error.message); }
+}
+const tutorialSteps = [
+  {modal:'modesModal',selector:'.choice-list',text:'Escolha o modo de jogo. Para combinar modos, ative Mesclar modos. Aplique sua escolha para continuar.'},
+  {modal:'rulesModal',selector:'#rulesModal .form-section',text:'Informe o nome, local e duração da partida. Preencha os campos reais abaixo e aplique as definições.'},
+  {modal:'mapModal',selector:'.file-btn',text:'Envie a imagem do campo. Você também pode gerar um mapa de referência e ajustar seus elementos.'},
+  {modal:'mapEditorModal',selector:'#mapEditorCanvas',text:'Use as ferramentas para posicionar os objetivos e bases necessários. Clique em aplicar quando terminar.'},
+  {modal:'reviewModal',selector:'#reviewSummary',text:'Confira todas as definições da partida e confirme que revisou o briefing e o mapa.'},
+  {modal:'reviewModal',selector:'#btnStartMatch',text:'Confira as definições da partida. Quando tudo estiver correto, clique neste botão para concluir a configuração e iniciar o jogo. Os participantes que estiverem aguardando serão direcionados para a partida.'}
+];
+function endTutorial() { tutorialStep = -1; document.querySelectorAll('.tutorial-highlight').forEach(el=>el.classList.remove('tutorial-highlight')); toggleHidden('tutorialShade',true); toggleHidden('tutorialCard',true); }
+function tutorialGo(step) {
+  document.querySelectorAll('.tutorial-highlight').forEach(el=>el.classList.remove('tutorial-highlight'));
+  tutorialStep = Math.max(0,Math.min(5,step));
+  const current = tutorialSteps[tutorialStep];
+  for(const id of ['modesModal','rulesModal','mapModal','mapEditorModal','reviewModal']) closeOverlay(id);
+  if(current.modal==='mapEditorModal') {
+    if(!draft.map.dataUrl) { tutorialStep=2; openConfig('mapModal'); }
+    else openEditor();
+  } else openConfig(current.modal);
+  const actual = tutorialSteps[tutorialStep];
+  toggleHidden('tutorialShade',false);toggleHidden('tutorialCard',false);
+  setText('tutorialProgress',`Etapa ${tutorialStep+1} de 6`);setText('tutorialText',actual.text);
+  $('tutorialPrevious').disabled=tutorialStep===0;
+  $('tutorialNext').textContent=tutorialStep===5?'Aguardar confirmação':'Próxima etapa';
+  $('tutorialNext').disabled=tutorialStep===5;
+  requestAnimationFrame(()=>{
+    const target=document.querySelector(actual.selector);
+    if(target) { target.classList.add('tutorial-highlight');target.scrollIntoView({behavior:'smooth',block:'center'}); updateTutorialHole(); }
+  });
+}
+function updateTutorialHole() {
+  if(tutorialStep<0)return; document.documentElement.style.setProperty('--tutorial-space',`${$('tutorialCard').getBoundingClientRect().height+30}px`); const target=document.querySelector(tutorialSteps[tutorialStep].selector);if(!target)return;
+  const r=target.getBoundingClientRect();const shade=$('tutorialShade');
+  Object.assign(shade.style,{left:`${Math.max(0,r.left-6)}px`,top:`${Math.max(0,r.top-6)}px`,width:`${Math.min(innerWidth,r.width+12)}px`,height:`${Math.min(innerHeight,r.height+12)}px`});
+}
+window.addEventListener('scroll',updateTutorialHole,true);window.addEventListener('resize',updateTutorialHole);
+function tutorialCompleted(modal) {
+  if(tutorialStep<0)return;
+  if(tutorialSteps[tutorialStep].modal===modal) tutorialGo(tutorialStep+1);
+}
+function renderPlayerExtras() {
+  if(!identity)return;
+  const m=state.match, me=currentPlayer();
+  setText('participantName',me ? `${identity.name} · Equipe ${me.team}` : identity.name);
+  const actions=$('objectiveActions');
+  if(!actions)return;
+  actions.innerHTML='';
+  if(m.status!=='live'||!me||me.left)return;
+  if(me.status==='AGUARDANDO BASE'&&m.respawnPolicy==='choice') {
+    for(const base of m.map.marks.filter(x=>x.type==='base')) {
+      const btn=document.createElement('button');btn.className='quick-action';btn.textContent=`Respawn: ${base.label}`;btn.onclick=()=>command('respawn',{baseId:base.id},'RESPAWN CONCLUÍDO.');actions.append(btn);
+    }
+  }
+  if(m.modes.includes('flag')&&me.status==='ATIVO') for(const flag of m.map.marks.filter(x=>x.type==='flag')) {
+    const btn=document.createElement('button');btn.className='quick-action';btn.textContent=`Capturar ${flag.label}`;btn.disabled=Boolean(m.flagCarriers?.[flag.id]);btn.onclick=()=>command('flag',{flagId:flag.id},'BANDEIRA CAPTURADA.');actions.append(btn);
+  }
+}
+function bindEnhancements() {
+  on('loginForm','submit',async event=>{
+    event.preventDefault(); const button=$('loginSubmit');button.disabled=true;setText('loginError','');
+    try {
+      const legacy=localStorage.getItem(STORAGE_KEY);
+      const payload={role:$('loginRole').value,name:$('loginName').value,team:$('loginTeam').value,key:$('loginKey').value};
+      if(!state.match.id && legacy && $('importLegacy').checked) payload.legacy=JSON.parse(legacy).match;
+      const data=await request('/api/login',payload);receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);localStorage.setItem('df_display_name',identity.name);closeOverlay('loginModal');connect();
+      showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
+      if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
+    }catch(error){setText('loginError',error.message);}finally{button.disabled=false;}
+  });
+  on('loginCancel','click',()=>closeOverlay('loginModal'));
+  on('modePlayer','click',()=>{endTutorial();showScreen('player');});
+  on('modeOperator','click',()=>{if(isOperator())showScreen('organizer');});
+  on('definitionsButton','click',()=>{lastScreen=activeScreen;showScreen('definitions');renderDefinitions();});
+  on('historyButton','click',()=>{lastScreen=activeScreen;showScreen('history');loadHistory();});
+  on('definitionsBack','click',()=>showScreen(lastScreen));
+  on('historyBack','click',()=>showScreen(lastScreen));
+  on('editDefinitions','click',()=>{showScreen('organizer');restoreDraft();openConfig('rulesModal');});
+  on('historyMatch','change',loadHistory);on('historySearch','input',loadHistory);
+  on('reconnectButton','click',async()=>{try{receive(await request('/api/state'));if(identity)connect();}catch(error){toast(error.message);}});
+  on('tutorialAgain','click',()=>{if(isOperator()){showScreen('organizer');openOverlay('operatorIntro');}});
+  on('tutorialBegin','click',()=>{closeOverlay('operatorIntro');tutorialGo(0);});
+  on('tutorialSkip','click',()=>closeOverlay('operatorIntro'));
+  on('tutorialPrevious','click',()=>tutorialGo(tutorialStep-1));
+  on('tutorialNext','click',()=>{
+    if(tutorialStep===1){readRulesForm();if(!$('oName').value.trim()||!$('oLoc').value.trim())return toast('PREENCHA NOME E LOCAL.');}
+    if(tutorialStep===2&&!draft.map.dataUrl)return toast('CONFIGURE O MAPA.');
+    if(tutorialStep===4&&!$('confirmStart').checked)return toast('CONFIRME A REVISÃO DO BRIEFING.');
+    if(tutorialStep===4){tutorialGo(5);return;}
+    applyDraft().then(ok=>{if(ok)tutorialGo(tutorialStep+1);});
+  });
+  on('tutorialClose','click',endTutorial);
+  on('mapEditorApply','click',()=>tutorialCompleted('mapEditorModal'));
+  on('confirmStart','change',()=>{if(tutorialStep===4&&$('confirmStart').checked)tutorialGo(5);});
+  on('positionSubmit','click',()=>command('position',{x:Number($('positionX').value)/100,y:Number($('positionY').value)/100},'POSIÇÃO NO MAPA ATUALIZADA.'));
+  on('newMatch','click',async()=>{if(await command('new',{},'NOVA CONFIGURAÇÃO CRIADA.')){restoreDraft();showScreen('organizer');openOverlay('operatorIntro');}});
+  on('gpsButton','click',requestGps);
+  on('joinAgain','click',()=>openLogin(identity?.role || 'player'));
+  on('grantBenefit','click',()=>command('benefit',{team:$('benefitTeam').value,kind:$('benefitKind').value},'BENEFÍCIO CONCEDIDO.'));
+  // Leaving is recorded without terminating the match; operator visual switching does not use this action.
+  for(const id of ['btnLeave','btnPlayerBackReady']) on(id,'click',()=>command('leave',{},'SAÍDA REGISTRADA.'));
+}
+// Preserve original buttons, with authoritative equivalents for every state-changing action.
+startMatch = async function() {
+  if(!isOperator()||!validateStart())return;
+  if(!await configure(draft))return;
+  if(await command('start',{confirmed:$('confirmStart').checked},'PARTIDA INICIADA.')) {closeOverlay('reviewModal');endTutorial();showScreen('player');}
+};
+endMatch = function() { if(isOperator())command('end',{},'PARTIDA ENCERRADA.'); };
+hitPlayer = function() {openConfirm('Confirmar HIT?','Uma vida será removida e o respawn seguirá as definições da partida.','CONFIRMAR',()=>command('hit',{},'HIT REGISTRADO.'));};
+respawnPlayer = function(player,baseId) {return command('respawn',{playerId:player.id,baseId},'RESPAWN CONCLUÍDO.');};
+armBomb = function() {
+  let minutes=state.match.bomb.durationMin;
+  if(state.match.bomb.timingPolicy==='arming'){const value=prompt('Tempo da bomba em minutos:',String(minutes));if(value===null)return;minutes=Number(value);}
+  command('arm',{minutes},'BOMBA ARMADA.');
+};
+let disarmTimer = null;
+startDisarm = async function() {
+  if(disarmTimer)return toast('DESARME JÁ EM ANDAMENTO.');
+  if(!await command('disarm_begin',{},'DESARME INICIADO.'))return;
+  disarmTimer=setInterval(async()=>{
+    const me=currentPlayer();
+    if(!me?.disarmStartedAt||!state.match.bomb.planted||me.status!=='ATIVO'){clearInterval(disarmTimer);disarmTimer=null;return toast('DESARME INTERROMPIDO.');}
+    const remaining=Math.ceil((me.disarmStartedAt+state.match.bomb.disarmSeconds*1000-Date.now())/1000);
+    connectionStatus(`Desarmando · ${Math.max(0,remaining)}s`);
+    if(remaining<=0){clearInterval(disarmTimer);disarmTimer=null;await command('disarm',{},'BOMBA DESARMADA.');}
+  },500);
+};
+explodeBomb = function() {}; // The persistent server timer performs detonation exactly once.
+transferBomb = function() {
+  const players=state.match.players.filter(p=>p.joined&&p.team===state.match.bomb.armedByTeam&&p.status==='ATIVO');
+  const value=prompt('Novo portador:\n'+players.map((p,i)=>`${i+1}. ${p.name}`).join('\n'),'1');if(value===null)return;
+  const player=players[Number(value)-1];if(!player)return toast('PORTADOR INVÁLIDO.');command('transfer',{playerId:player.id},'PORTADOR ATUALIZADO.');
+};
+changeBombTime = function() {const value=prompt('Tempo da bomba em minutos:',String(state.match.bomb.durationMin));if(value!==null)command('bomb_time',{minutes:Number(value)},'TEMPO ATUALIZADO.');};
+applyLiveRules = async function() {const next=deepClone(state.match);next.respawnDelay=Number($('liveRespawnDelay').value);next.respawnPolicy=$('liveRespawnPolicy').value;if(await configure(next))toast('REGRAS ATUALIZADAS.');};
+resetAll = function() {openConfirm('Reiniciar configuração?','A partida atual será arquivada. Uma nova configuração será criada; o histórico e os registros anteriores serão preservados.','REINICIAR',async()=>{if(await command('new',{},'NOVA CONFIGURAÇÃO CRIADA.')){restoreDraft();showScreen('organizer');}});};
+
 /* =========================
    INIT
 ========================= */
 
-function init() {
-  state.match.players =
-    createPlayers(
-      state.match.playerCount,
-      state.match.players
-    );
-
-  draft =
-    deepClone(
-      state.match
-    );
-
-  appliedSnapshot =
-    deepClone(
-      draft
-    );
-
-  saveState();
-
-  bindEvents();
-
-  updateHeader();
-
-  const savedRole =
-    role();
-
-  if (
-    savedRole === 'player' ||
-    savedRole === 'organizer'
-  ) {
-    setRole(
-      savedRole
-    );
-
-    showScreen(
-      savedRole === 'organizer' &&
-      state.match.status === 'live'
-        ? 'control'
-        : savedRole
-    );
-  } else {
-    showScreen(
-      'role'
-    );
-  }
-
-  renderModeModal();
-  syncDraftFields();
-
-  /*
-    O GPS é solicitado depois
-    da interface estar pronta.
-  */
-  setTimeout(
-    requestGps,
-    150
-  );
+async function init() {
+  bindEvents(); bindEnhancements(); renderModeModal(); syncDraftFields(); showScreen('role');
+  try { const data = await request('/api/state'); receive(data); connectionStatus('Conectado · dados atualizados'); if (identity) { showScreen(identity.role === 'organizer' && state.match.status !== 'live' ? 'organizer' : 'player'); connect(); } }
+  catch(error) { connectionStatus('Servidor indisponível — tente reconectar.'); toast(error.message, 5000); }
 }
 
 if (

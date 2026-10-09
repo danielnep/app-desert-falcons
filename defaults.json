@@ -1,0 +1,64 @@
+{
+  "role": null,
+  "gps": {
+    "lat": null,
+    "lng": null,
+    "accuracy": null,
+    "updatedAt": null
+  },
+  "match": {
+    "name": "",
+    "location": "",
+    "durationMin": 60,
+    "playerCount": 5,
+    "status": "none",
+    "startAt": null,
+    "endAt": null,
+    "modes": [
+      "flag"
+    ],
+    "mergeModes": false,
+    "livesPerPlayer": 3,
+    "respawnDelay": 60,
+    "respawnPolicy": "nearest",
+    "teamVisibility": "always",
+    "enemyVisibility": "off",
+    "enemyVisibilitySeconds": 60,
+    "zoneCaptureSeconds": 30,
+    "zonePoints": 100,
+    "bomb": {
+      "bombsPerPlayer": 3,
+      "durationMin": 10,
+      "disarmSeconds": 20,
+      "blastRadius": 20,
+      "armPolicy": "areas",
+      "timingPolicy": "predefined",
+      "carrierId": "A-3",
+      "planted": false,
+      "armedAt": null,
+      "expiresAt": null,
+      "armedByTeam": "A",
+      "x": 0.62,
+      "y": 0.48,
+      "lat": null,
+      "lng": null
+    },
+    "map": {
+      "dataUrl": "",
+      "naturalWidth": 0,
+      "naturalHeight": 0,
+      "marks": []
+    },
+    "scores": {
+      "A": 0,
+      "B": 0
+    },
+    "hits": {
+      "A": 0,
+      "B": 0
+    },
+    "zones": {},
+    "players": [],
+    "logs": []
+  }
+}
