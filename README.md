@@ -35,3 +35,9 @@ O servidor Node/SQLite continua em `server.js` como alternativa preservada e par
 ## Limites da validação
 
 Testes em emulador não demonstram que as regras, provedores e funções já foram implantados no projeto real. Não há credenciais administrativas Firebase disponíveis nesta sessão. Não houve deploy de produção. A validação física em Android/iPhone, GPS real, Safari e rede de campo continua necessária antes de usar numa partida real.
+
+## Recuperação do fluxo de conta
+
+O cadastro grava o nome no Firebase Authentication e não depende da Cloud Function. Se o e-mail já existe, a senha informada é autenticada antes de completar um nome ausente; contas existentes preservam seu nome. O login também independe da leitura do banco. O perfil privado é sincronizado ao entrar na partida. A função `airsoft`, as regras e a claim do operador continuam necessárias para jogar; não existe fallback local que simule uma partida conectada.
+
+Verificação em 09/10/2026: o endpoint configurado `https://us-central1-deseart-falcons-githib.cloudfunctions.net/airsoft` devolveu HTTP 404 à chamada sem autenticação (em vez da resposta JSON de autenticação esperada). Implantação administrativa pendente de acesso ao Firebase; publicar a interface no GitHub Pages não publica as Functions.

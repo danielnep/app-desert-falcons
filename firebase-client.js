@@ -10,21 +10,31 @@ const invoke=httpsCallable(functions,'airsoft');
 let stops=[],live=false;
 async function performRequest(path,body){
  if(path==='/api/register'){
-  if(!body.name?.trim())throw new Error('Informe seu nome.');
+  if(!body.name?.trim()||body.name.trim().length>80)throw new Error('Informe seu nome (até 80 caracteres).');
+  body.email=body.email.trim();let recovered=false;
+  try{
   if(auth.currentUser?.isAnonymous)await linkWithCredential(auth.currentUser,EmailAuthProvider.credential(body.email,body.key));
   else await createUserWithEmailAndPassword(auth,body.email,body.key);
-  await updateProfile(auth.currentUser,{displayName:body.name.trim()});await auth.currentUser.getIdToken(true);
-  await invoke({action:'register',name:body.name.trim()});await performRequest('/api/logout');return {registered:true};
+  }catch(error){
+   if(error.code!=='auth/email-already-in-use'&&error.code!=='auth/credential-already-in-use')throw error;
+   // Resume only after proving ownership with the supplied password.
+   await signInWithEmailAndPassword(auth,body.email,body.key);recovered=true;
+  }
+  // Authentication owns the account and name. The private database profile
+  // is synchronized by the backend on joining, never a prerequisite to signup.
+  if(!recovered||!auth.currentUser.displayName)await updateProfile(auth.currentUser,{displayName:body.name.trim()});
+  await performRequest('/api/logout');return {registered:true,recovered};
  }
  if(path==='/api/reset-password'){try{await sendPasswordResetEmail(auth,body.email);}catch(error){if(error.code!=='auth/user-not-found')throw error;}return {sent:true};}
- if(path==='/api/logout'){stops.forEach(stop=>stop());stops=[];live=false;if(auth.currentUser){try{await set(ref(db,'presence/'+auth.currentUser.uid),false);}catch{}await signOut(auth);}return {signedOut:true};}
+ if(path==='/api/logout'){stops.forEach(stop=>stop());stops=[];live=false;if(auth.currentUser){void set(ref(db,'presence/'+auth.currentUser.uid),false).catch(()=>{});await signOut(auth);}return {signedOut:true};}
  if(path==='/api/authenticate'){
   await signInWithEmailAndPassword(auth,body.email,body.key);
-  const token=await auth.currentUser.getIdTokenResult();
+  const token=await auth.currentUser.getIdTokenResult(true);
   if(body.role==='organizer'&&token.claims.operator!==true)throw new Error('Esta conta não está autorizada como operador.');
-  const profile=(await get(ref(db,'users/'+auth.currentUser.uid))).val();const name=profile?.displayName||auth.currentUser.displayName;
+  // Login must not fail because the separate game database is unavailable.
+  const name=auth.currentUser.displayName;
   if(!name)throw new Error('Sua conta ainda não tem um nome. Complete seu perfil no cadastro.');
-  return {name,team:profile?.preferredTeam||'A'};
+  return {name,team:'A'};
  }
  if(path==='/api/login'){
   if(!auth.currentUser||auth.currentUser.isAnonymous)throw new Error('Entre com seu e-mail e senha.');
@@ -41,4 +51,4 @@ export function connect(receive,status){stops.forEach(stop=>stop());stops=[];if(
 
 let ticking=false;setInterval(async()=>{if(ticking||!live||!auth.currentUser||document.hidden)return;ticking=true;try{await invoke({action:"tick"});}catch{}finally{ticking=false;}},2000);
 
-export async function request(path,body){try{return await performRequest(path,body);}catch(error){const messages={"auth/email-already-in-use":"Este e-mail já está cadastrado. Use o login ou recupere a senha.","auth/weak-password":"Escolha uma senha com pelo menos 6 caracteres.","auth/invalid-email":"Informe um e-mail válido.","auth/too-many-requests":"Muitas tentativas. Aguarde um pouco e tente novamente.","auth/wrong-password":"E-mail ou senha inválidos.","auth/user-not-found":"E-mail ou senha inválidos.","auth/invalid-credential":"E-mail ou senha inválidos.","auth/operation-not-allowed":"O administrador precisa habilitar o provedor de acesso no Firebase.","auth/network-request-failed":"Sem conexão com o Firebase. Verifique a internet.","functions/not-found":"O backend Firebase ainda não foi publicado. Consulte as instruções de implantação.","functions/internal":"Não foi possível concluir a ação no Firebase. Verifique a conexão e a implantação."};throw new Error(messages[error.code]||error.message);}}
+export async function request(path,body){try{return await performRequest(path,body);}catch(error){const messages={"auth/email-already-in-use":"Este e-mail já está cadastrado. Use o login ou recupere a senha.","auth/weak-password":"Escolha uma senha com pelo menos 6 caracteres.","auth/invalid-email":"Informe um e-mail válido.","auth/too-many-requests":"Muitas tentativas. Aguarde um pouco e tente novamente.","auth/wrong-password":"E-mail ou senha inválidos.","auth/user-not-found":"E-mail ou senha inválidos.","auth/invalid-credential":"E-mail ou senha inválidos.","auth/operation-not-allowed":"O administrador precisa habilitar o provedor de acesso no Firebase.","auth/network-request-failed":"Sem conexão com o Firebase. Verifique a internet.","functions/not-found":"O backend Firebase ainda não foi publicado. Consulte as instruções de implantação.","functions/internal":"Sua conta está autenticada, mas o servidor da partida não respondeu. O administrador precisa verificar a função airsoft no Firebase.","functions/unavailable":"Sua conta está autenticada. O servidor da partida está indisponível; tente entrar na partida novamente.","functions/permission-denied":"Sua conta não tem permissão para esta ação na partida.","PERMISSION_DENIED":"O banco da partida bloqueou o acesso. O administrador precisa publicar as regras do Realtime Database."};const failure=new Error(messages[error.code]||error.message);failure.code=error.code;throw failure;}}

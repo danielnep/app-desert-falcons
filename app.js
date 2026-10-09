@@ -1,5 +1,5 @@
 let firebaseTransportPromise;
-function firebaseTransport(){ return firebaseTransportPromise ||= import('./firebase-client.js').catch(error=>{firebaseTransportPromise=null;throw new Error('Não foi possível conectar ao Firebase. Verifique a internet e tente novamente.');}); }
+function firebaseTransport(){ return firebaseTransportPromise ||= import('./firebase-client.js?v=account-recovery-2').catch(error=>{firebaseTransportPromise=null;throw new Error('Não foi possível conectar ao Firebase. Verifique a internet e tente novamente.');}); }
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -6959,7 +6959,7 @@ function bindEnhancements() {
   on('registerForm','submit',async event=>{
     event.preventDefault();setText('registerError','');if($('registerPassword').value!==$('registerConfirm').value){setText('registerError','As senhas não coincidem.');$('registerConfirm').focus();return;}
     const button=$('registerSubmit');button.disabled=true;
-    try{const email=$('registerEmail').value.trim();await request('/api/register',{name:$('registerName').value.trim(),email,key:$('registerPassword').value});$('registerForm').reset();closeOverlay('registerModal');openLogin($('loginRole').value);$('loginEmail').value=email;setText('loginStatus','Cadastro concluído. Entre com seu e-mail e senha.');}
+    try{const email=$('registerEmail').value.trim();const registration=await request('/api/register',{name:$('registerName').value.trim(),email,key:$('registerPassword').value});$('registerForm').reset();closeOverlay('registerModal');openLogin($('loginRole').value);$('loginEmail').value=email;setText('loginStatus',registration.recovered?'Conta existente reconhecida. Entre com seu e-mail e senha.':'Cadastro concluído. Entre com seu e-mail e senha.');}
     catch(error){setText('registerError',error.message);}finally{button.disabled=false;}
   });
   on('forgotPassword','click',async()=>{if(!$('loginEmail').value.trim()||!$('loginEmail').checkValidity()){$('loginEmail').reportValidity();return;}
