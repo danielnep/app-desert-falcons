@@ -32,6 +32,31 @@ with tempfile.TemporaryDirectory() as temp:
    op.locator('#confirmStart').check();expect(op.locator('#tutorialProgress')).to_have_text('Etapa 6 de 6')
    player.locator('#btnConfirm').click();expect(player.locator('#btnConfirm')).to_contain_text('CONFIRMADA')
    op.locator('#btnStartMatch').click();expect(op.locator('#playerLive')).to_be_visible();expect(player.locator('#playerLive')).to_be_visible()
+   # Real touch gestures must scroll the page by default and pan only on request.
+   surface=player.locator('#playerMapSurface');canvas=player.locator('#playerMapCanvas')
+   bounds=canvas.bounding_box()
+   assert abs(bounds['width']/bounds['height'] - 1.6) < .04, 'map should fit image aspect ratio without tall empty area'
+   expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','false')
+   cdp=player_context.new_cdp_session(player)
+   def swipe(dx,dy):
+    box=canvas.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
+    cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':x,'y':y}]})
+    for i in range(1,9):
+     cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x+dx*i/8,'y':y+dy*i/8}]})
+     player.wait_for_timeout(35)
+    cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+    player.wait_for_timeout(350)
+   player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop=0')
+   swipe(0,-90)
+   assert player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop') > 25, 'touching map should not trap page scrolling'
+   player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop=0');player.wait_for_timeout(300)
+   for _ in range(4):player.locator('#playerZoomIn').click()
+   player.locator('#playerMapDragToggle').click();expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','true')
+   before_image=canvas.screenshot();before_scroll=player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop')
+   swipe(-60,-35)
+   assert canvas.screenshot()!=before_image, 'drag must move the zoomed map'
+   assert abs(player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop')-before_scroll)<5, 'map drag must not scroll page in map mode'
+   player.locator('#playerMapCenter').click();expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','false');expect(player.locator('#playerZoomValue')).to_have_text('100%')
    before=op.evaluate('fetch("/api/state").then(r=>r.json())')
    op.locator('#modeOperator').click();expect(op.locator('[data-screen="organizer"]')).to_be_visible();op.locator('#modePlayer').click();expect(op.locator('#playerLive')).to_be_visible()
    after=op.evaluate('fetch("/api/state").then(r=>r.json())')
@@ -47,7 +72,7 @@ with tempfile.TemporaryDirectory() as temp:
    op.set_viewport_size({'width':390,'height':844});op.locator('#tutorialAgain').click();op.locator('#tutorialBegin').click();expect(op.locator('#tutorialShade')).to_be_visible();expect(op.locator('.tutorial-highlight')).to_be_visible();Path(root/'tests/artifacts').mkdir(exist_ok=True);op.screenshot(path=str(root/'tests/artifacts/operator-mobile-tutorial.png'),full_page=True);op.locator('#tutorialClose').click()
    Path(temp+'/mobile.png').parent.mkdir(exist_ok=True);player.screenshot(path=str(root/'tests/artifacts/player-mobile.png'),full_page=True)
    assert not errors, errors
-   print(json.dumps({'result':'PASS','scenarios':['waiting before match','operator authentication','six-step interactive tutorial','configuration and map editor','player waiting','SSE automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial'],'page_errors':errors},ensure_ascii=False))
+   print(json.dumps({'result':'PASS','scenarios':['waiting before match','operator authentication','six-step interactive tutorial','configuration and map editor','player waiting','SSE automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial','touch scrolling over map','explicit map pan and recenter'],'page_errors':errors},ensure_ascii=False))
    browser.close()
  finally:
   server.terminate();server.wait(timeout=10)

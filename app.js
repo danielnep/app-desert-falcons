@@ -173,7 +173,9 @@ const editor = {
 const playerViewer = {
   zoom: 1,
   panX: 0,
-  panY: 0
+  panY: 0,
+  panEnabled: false,
+  drag: null
 };
 
 const $ = id => document.getElementById(id);
@@ -471,6 +473,7 @@ function showScreen(name) {
     }
   );
 
+  if (name !== "player") setPlayerPanMode(false);
   activeScreen =
     name;
 
@@ -1583,14 +1586,15 @@ function mapBox(
   height,
   zoom = 1,
   panX = 0,
-  panY = 0
+  panY = 0,
+  map = draft.map
 ) {
   const iw =
-    draft.map.naturalWidth ||
+    map.naturalWidth ||
     width;
 
   const ih =
-    draft.map.naturalHeight ||
+    map.naturalHeight ||
     height;
 
   const scale =
@@ -2071,7 +2075,8 @@ function drawCanvas(
       height,
       zoom,
       panX,
-      panY
+      panY,
+      options.live ? state.match.map : draft.map
     );
 
   const paint =
@@ -2108,7 +2113,8 @@ function drawCanvas(
           current.height,
           zoom,
           panX,
-          panY
+          panY,
+          options.live ? state.match.map : draft.map
         );
 
       if (image) {
@@ -2119,6 +2125,15 @@ function drawCanvas(
           currentBox.width,
           currentBox.height
         );
+      }
+
+      if (image) {
+        context.save();
+        context.strokeStyle = "#8b6b4a";
+        context.lineWidth = 2;
+        context.setLineDash([6, 4]);
+        context.strokeRect(currentBox.left + 1, currentBox.top + 1, currentBox.width - 2, currentBox.height - 2);
+        context.restore();
       }
 
       drawMapMarks(
@@ -2185,6 +2200,8 @@ function drawCanvas(
 }
 
 function drawPreview() {
+  const surface = $("mapCanvas")?.parentElement;
+  if (surface) surface.style.aspectRatio = `${draft.map.naturalWidth || 16} / ${draft.map.naturalHeight || 10}`;
   drawCanvas(
     $('mapCanvas'),
     draft.map.dataUrl,
@@ -2215,7 +2232,33 @@ function drawEditor() {
   );
 }
 
+function constrainPlayerPan() {
+  const canvas = $('playerMapCanvas');
+  if (!canvas) return;
+  const r = canvas.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  const box = mapBox(r.width,r.height,playerViewer.zoom,0,0,state.match.map);
+  const limitX = Math.max(0,(box.width-r.width)/2);
+  const limitY = Math.max(0,(box.height-r.height)/2);
+  playerViewer.panX = Math.max(-limitX,Math.min(limitX,playerViewer.panX));
+  playerViewer.panY = Math.max(-limitY,Math.min(limitY,playerViewer.panY));
+}
+function setPlayerPanMode(enabled) {
+  playerViewer.panEnabled = Boolean(enabled);
+  playerViewer.drag = null;
+  $('playerMapSurface')?.classList.toggle('map-pan-enabled',playerViewer.panEnabled);
+  $('playerMapDragToggle')?.setAttribute('aria-pressed',String(playerViewer.panEnabled));
+  setText('playerMapDragToggle',playerViewer.panEnabled ? 'Rolar tela' : 'Mover mapa');
+  setText('playerMapGestureHint',playerViewer.panEnabled ? 'Arraste dentro da delimitação para mover o mapa. Toque em “Rolar tela” para voltar à rolagem.' : 'Arraste para rolar a tela. Para navegar no mapa ampliado, ative “Mover mapa”.');
+}
+
 function drawPlayerMap() {
+  const surface = $("playerMapSurface");
+  const map = state.match.map;
+  if (surface) {
+    surface.style.aspectRatio = `${map.naturalWidth || 16} / ${map.naturalHeight || 10}`;
+    constrainPlayerPan();
+  }
   drawCanvas(
     $('playerMapCanvas'),
     state.match.map.dataUrl,
@@ -6151,6 +6194,7 @@ function bindEvents() {
     'playerMapCenter',
     'click',
     () => {
+      setPlayerPanMode(false);
       playerViewer.zoom =
         1;
 
@@ -6163,6 +6207,39 @@ function bindEvents() {
       drawPlayerMap();
     }
   );
+
+  /* Player gestures: scrolling is the default; map panning is explicit. */
+  on('playerMapDragToggle', 'click', () => setPlayerPanMode(!playerViewer.panEnabled));
+  const playerCanvas = $('playerMapCanvas');
+  if (playerCanvas) {
+    playerCanvas.addEventListener('pointerdown', event => {
+      if (!playerViewer.panEnabled || event.button !== 0 || !event.isPrimary) return;
+      const r = playerCanvas.getBoundingClientRect();
+      const box = mapBox(r.width, r.height, playerViewer.zoom, playerViewer.panX, playerViewer.panY, state.match.map);
+      const x = event.clientX - r.left, y = event.clientY - r.top;
+      if (x < box.left || x > box.left + box.width || y < box.top || y > box.top + box.height) return;
+      playerViewer.drag = {pointerId:event.pointerId,x:event.clientX,y:event.clientY,panX:playerViewer.panX,panY:playerViewer.panY};
+      playerCanvas.setPointerCapture(event.pointerId);
+    });
+    playerCanvas.addEventListener('pointermove', event => {
+      const drag = playerViewer.drag;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      playerViewer.panX = drag.panX + event.clientX - drag.x;
+      playerViewer.panY = drag.panY + event.clientY - drag.y;
+      drawPlayerMap();
+    });
+    for (const name of ['pointerup','pointercancel','lostpointercapture']) playerCanvas.addEventListener(name, event => {
+      if (playerViewer.drag?.pointerId === event.pointerId) playerViewer.drag = null;
+    });
+    const surface = $('playerMapSurface');
+    if (surface && window.ResizeObserver) new ResizeObserver(() => {
+      if (activeScreen === 'player' && state.match.status === 'live') drawPlayerMap();
+    }).observe(surface);
+  }
+  const previewSurface = $('mapCanvas')?.parentElement;
+  if (previewSurface && window.ResizeObserver) new ResizeObserver(() => {
+    if (!$('mapModal').classList.contains('hidden')) drawPreview();
+  }).observe(previewSurface);
 
   /* EDITOR POINTER */
 

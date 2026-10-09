@@ -258,9 +258,10 @@
             id="playerMapWrap"
           >
 
-            <canvas id="playerMapCanvas"></canvas>
+            <div class="player-map-surface" id="playerMapSurface"><canvas id="playerMapCanvas" aria-label="Mapa da partida"></canvas></div>
 
             <div class="map-corner-tools">
+              <button class="map-drag-toggle" id="playerMapDragToggle" type="button" aria-pressed="false">Mover mapa</button>
 
               <button
                 class="map-icon-btn selectable"
@@ -397,6 +398,7 @@
         ></div>
 
 
+        <p class="map-gesture-hint" id="playerMapGestureHint">Arraste para rolar a tela. Para navegar no mapa ampliado, ative “Mover mapa”.</p>
         <div id="objectiveActions" class="quick-actions"></div>
         <details class="card"><summary>Atualizar minha posição no mapa</summary><p>Este mapa é uma imagem sem georreferenciamento. Informe a posição real no campo em porcentagem; o GPS não posiciona você automaticamente nesta imagem.</p><div class="grid-2"><label class="field"><span>Horizontal (0–100%)</span><input id="positionX" type="number" min="0" max="100" value="50"></label><label class="field"><span>Vertical (0–100%)</span><input id="positionY" type="number" min="0" max="100" value="50"></label></div><button id="positionSubmit" class="btn secondary">ATUALIZAR POSIÇÃO</button></details>
         <div class="hit-row">

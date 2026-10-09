@@ -1586,3 +1586,41 @@ body:has(#tutorialCard:not(.hidden)) .modal-content { padding-bottom:24px; }
 body:has(#tutorialCard:not(.hidden)) .editor-stage { height:auto; }
 /* Keep the scoreboard below zoom controls on the tactical map. */
 .hud-score { top:52px; }
+
+/* A map image should not claim the empty space around its actual bounds. */
+.tactical-map {
+  height:auto;
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:"objective tools" "map map" "score score" "you time";
+  gap:8px;
+  padding:8px;
+  border:1px solid var(--border);
+  background:var(--surface2);
+}
+.player-map-surface {
+  grid-area:map;
+  position:relative;
+  width:100%;
+  aspect-ratio:16 / 10;
+  max-height:65dvh;
+  overflow:hidden;
+  border:2px solid var(--brown);
+  border-radius:var(--radius);
+  background:var(--surface);
+}
+.tactical-map .map-corner-tools { grid-area:tools; position:static; flex-wrap:wrap; justify-content:flex-end; border-radius:var(--radius); max-width:180px; }
+.tactical-map .hud-chip { position:static; max-width:none; box-shadow:none; min-width:0; }
+.tactical-map .hud-objective { grid-area:objective; }
+.tactical-map .hud-score { grid-area:score; display:flex; justify-content:space-between; align-items:center; }
+.tactical-map .hud-you { grid-area:you; }
+.tactical-map .hud-time { grid-area:time; }
+#pScoreA,#pScoreB { display:inline; }
+.map-drag-toggle { padding:6px 8px; min-height:36px; background:var(--brownSoft); color:var(--brownDark); border:1px solid var(--border); border-radius:var(--radius); cursor:pointer; font-size:10px; font-weight:800; }
+.map-drag-toggle[aria-pressed="true"] { background:var(--brownDark); color:#fff; }
+.tactical-map canvas,.map-preview canvas { touch-action:pan-y pinch-zoom; }
+.player-map-surface.map-pan-enabled canvas { touch-action:none; cursor:grab; }
+.player-map-surface.map-pan-enabled canvas:active { cursor:grabbing; }
+.map-gesture-hint { margin:10px 0; font-size:12px; color:var(--muted); line-height:1.5; }
+.map-preview { height:auto; min-height:0; aspect-ratio:16 / 10; max-height:65dvh; border:1px solid var(--border); }
