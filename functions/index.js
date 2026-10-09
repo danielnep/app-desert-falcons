@@ -23,6 +23,18 @@ export const airsoft=onCall({region:'us-central1',maxInstances:10},async request
   const uid=request.auth.uid,data=request.data||{};
   // Custom claim is assigned by the project administrator, never by the UI.
   const authorized=request.auth.token.operator===true;
+  if(data.action==='register'){
+    if(request.auth.token.firebase?.sign_in_provider!=='password')throw new HttpsError('failed-precondition','Cadastre sua conta com e-mail e senha.');
+    if(typeof data.name!=='string'||!data.name.trim()||data.name.length>80)throw new HttpsError('invalid-argument','Informe seu nome (até 80 caracteres).');
+    const profile=db.ref('users/'+uid);const existing=(await profile.get()).val();
+    await profile.update({displayName:data.name.trim(),email:request.auth.token.email,createdAt:existing?.createdAt||Date.now(),preferredTeam:existing?.preferredTeam||'A'});
+    return {registered:true};
+  }
+  if(data.action==='login'){
+    if(request.auth.token.firebase?.sign_in_provider!=='password')throw new HttpsError('failed-precondition','Entre com seu e-mail e senha.');
+    const profile=(await db.ref('users/'+uid).get()).val();
+    data.name=profile?.displayName||request.auth.token.name||data.name;
+  }
   if(data.action==='state'){const view=(await root.child('views/'+uid).get()).val();if(view)return view;const s=(await root.child('sessions/'+uid).get()).val();return {match:null,identity:s?{role:s.role,name:s.name,playerId:null}:null};}
   let problem=null;
   const legacy=data.action==='login'&&authorized?(await db.ref('match').get()).val():null;
@@ -63,6 +75,11 @@ export const airsoft=onCall({region:'us-central1',maxInstances:10},async request
   });
   if(!result.committed&&data.action==='tick'&&!problem)return (await root.child('views/'+uid).get()).val();
   if(!result.committed)throw new HttpsError('failed-precondition',problem||'Não foi possível salvar.');
+  if(data.action==='login'){
+    const session=result.snapshot.child('sessions/'+uid).val();
+    const profile=db.ref('users/'+uid);const existing=(await profile.get()).val();
+    await profile.update({displayName:session.name,preferredTeam:session.team,email:request.auth.token.email||null,createdAt:existing?.createdAt||Date.now(),lastLoginAt:Date.now()});
+  }
   return result.snapshot.child('views/'+uid).val()||{match:null,identity:{role:'player',name:data.name,playerId:null}};
 });
 function join(room,s){const m=room.match;let p=s.match_id===m.id&&m.players.find(p=>p.id===s.player_id);if(!p){p=m.players.find(p=>!p.joined&&p.team===s.team);if(!p)throw new Error('Equipe sem vagas disponíveis.');s.match_id=m.id;s.player_id=p.id;Object.assign(p,{joined:true,name:s.name});add(room,[{id:crypto.randomUUID(),match_id:m.id,at:Date.now(),type:'join',actor:s.name,description:`${s.name} entrou na equipe ${p.team}.`}]);}p.left=false;p.connected=true;}

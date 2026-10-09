@@ -1647,3 +1647,7 @@ body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-action
 .player-map-surface.map-pan-enabled canvas { touch-action:none; }
 .map-gesture-hint { font-size:11px; margin:8px 2px; }
 @media(orientation:landscape) { .player-map-surface { height:64dvh; min-height:180px; } }
+
+/* Account forms reuse the existing mobile dialogs. */
+#registerError, #joinError { color:var(--danger); min-height:20px; }
+#loginStatus { color:var(--success, #66d29b); }

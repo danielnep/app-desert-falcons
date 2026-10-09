@@ -22,9 +22,13 @@ with tempfile.TemporaryDirectory() as temp:
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.route('https://www.gstatic.com/firebasejs/10.10.0/*',lambda route:route.fulfill(path='/tmp/firebase-sdk/'+route.request.url.rsplit('/',1)[-1],content_type='text/javascript'))
     page.goto('http://127.0.0.1:3107/?emulator')
-   player.locator('[data-role="player"]').click();player.locator('#loginName').fill('Jogador móvel');player.locator('#loginTeam').select_option('B');player.locator('#loginSubmit').click()
+   player.locator('[data-role="player"]').click();player.locator('#openRegister').click();expect(player.locator('#registerModal')).to_be_visible()
+   player.locator('#registerName').fill('Jogador móvel');player.locator('#registerEmail').fill('mobile@example.test');player.locator('#registerPassword').fill('mobile-password-123');player.locator('#registerConfirm').fill('different-password');player.locator('#registerSubmit').click();expect(player.locator('#registerError')).to_have_text('As senhas não coincidem.')
+   player.locator('#registerConfirm').fill('mobile-password-123');player.locator('#registerSubmit').click();expect(player.locator('#loginModal')).to_be_visible();expect(player.locator('#loginEmail')).to_have_value('mobile@example.test');assert player.locator('#loginName').count()==0
+   player.locator('#loginKey').fill('wrong-password');player.locator('#loginSubmit').click();expect(player.locator('#loginError')).to_contain_text('inválidos')
+   player.locator('#forgotPassword').click();expect(player.locator('#loginStatus')).to_contain_text('instruções de recuperação');player.locator('#loginKey').fill('mobile-password-123');player.locator('#loginSubmit').click();expect(player.locator('#joinModal')).to_be_visible();expect(player.locator('#accountName')).to_contain_text('Jogador móvel');player.locator('#loginTeam').select_option('B');player.locator('#joinSubmit').click()
    expect(player.locator('#playerWait')).to_be_visible()
-   op.locator('[data-role="organizer"]').click();op.locator('#loginName').fill('Operador');op.locator('#loginEmail').fill('operator@example.test');op.locator('#loginKey').fill('test-password-123');op.locator('#loginSubmit').click()
+   op.locator('[data-role="organizer"]').click();op.locator('#loginEmail').fill('operator@example.test');op.locator('#loginKey').fill('test-password-123');op.locator('#loginSubmit').click();expect(op.locator('#joinModal')).to_be_visible();op.locator('#joinSubmit').click()
    expect(op.locator('#operatorIntro')).to_be_visible();op.locator('#tutorialBegin').click()
    expect(op.locator('#tutorialProgress')).to_have_text('Etapa 1 de 6')
    op.locator('[data-apply-modal="modesModal"]').click();expect(op.locator('#tutorialProgress')).to_have_text('Etapa 2 de 6')
@@ -83,12 +87,13 @@ with tempfile.TemporaryDirectory() as temp:
    player.locator('#btnHit').click();player.locator('#confirmOk').click();expect(player.locator('#pAlive')).to_contain_text('2 vida')
    player.reload();expect(player.locator('#playerLive')).to_be_visible();expect(player.locator('#pAlive')).to_contain_text('2 vida')
    action('historyButton');expect(player.locator('#historyList')).to_contain_text('Partida iniciada');expect(player.locator('#historyList')).to_contain_text('HIT registrado');player.locator('#historySearch').fill('HIT');expect(player.locator('#historyList')).to_contain_text('HIT');player.locator('#historyBack').click()
+   action('logoutAccount');expect(player.locator('[data-screen="role"]')).to_be_visible();player.locator('[data-role="player"]').click();player.locator('#loginEmail').fill('mobile@example.test');player.locator('#loginKey').fill('mobile-password-123');player.locator('#loginSubmit').click();expect(player.locator('#joinModal')).to_be_visible();expect(player.locator('#accountName')).to_contain_text('Jogador móvel');player.locator('#joinSubmit').click();expect(player.locator('#playerLive')).to_be_visible();expect(player.locator('#pAlive')).to_contain_text('2 vida')
    assert player.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'mobile horizontal overflow'
    # Repeat the tutorial against a mobile operator viewport, test real highlight positioning.
    op.set_viewport_size({'width':390,'height':844});op.locator('#tutorialAgain').click();op.locator('#tutorialBegin').click();expect(op.locator('#tutorialShade')).to_be_visible();expect(op.locator('.tutorial-highlight')).to_be_visible();Path(root/'tests/artifacts').mkdir(exist_ok=True);op.screenshot(path=str(root/'tests/artifacts/operator-mobile-tutorial.png'),full_page=True);op.locator('#tutorialClose').click()
    Path(temp+'/mobile.png').parent.mkdir(exist_ok=True);player.screenshot(path=str(root/'tests/artifacts/player-mobile.png'),full_page=True)
    assert not errors, errors
-   print(json.dumps({'result':'PASS','scenarios':['waiting before match','authorized Firebase operator login','six-step interactive tutorial','configuration and map editor','player waiting','Firebase realtime automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial','touch scrolling over map','automatic pinch and pan','automatic portrait and landscape orientation'],'page_errors':errors},ensure_ascii=False))
+   print(json.dumps({'result':'PASS','scenarios':['separate registration and login screens','password confirmation and invalid credentials','permanent profile and logout/login preserves lives','waiting before match','authorized Firebase operator login','six-step interactive tutorial','configuration and map editor','player waiting','Firebase realtime automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial','touch scrolling over map','automatic pinch and pan','automatic portrait and landscape orientation'],'page_errors':errors},ensure_ascii=False))
    browser.close()
  finally:
   server.terminate();server.wait(timeout=10)

@@ -6793,6 +6793,7 @@ function receive(data) {
   if (clean || !isOperator()) { draft = deepClone(state.match); appliedSnapshot = deepClone(draft); }
 
   updateHeader();
+  toggleHidden('logoutAccount', !identity);
   toggleHidden('modeSwitch', !isOperator());
   toggleHidden('tutorialAgain', !isOperator());
   toggleHidden('devBtn', !isOperator());
@@ -6847,13 +6848,11 @@ async function persistChanges() {
 }
 function openLogin(selectedRole) {
   $('loginRole').value = selectedRole;
-  toggleHidden('localOperatorNotice',true);
-  toggleHidden('operatorKeyField', selectedRole !== 'organizer');
-  setText('loginTitle', selectedRole === 'organizer' ? 'Acesso do operador' : 'Entrar como jogador');
-  $('loginName').value = identity?.name || localStorage.getItem('df_display_name') || '';
+  setText('loginTitle', selectedRole === 'organizer' ? 'Login do operador' : 'Entrar na sua conta');
   $('loginKey').value = '';
-  setText('loginError', ''); openOverlay('loginModal'); $('loginName').focus();
+  setText('loginError', '');setText('loginStatus',''); openOverlay('loginModal'); $('loginEmail').focus();
 }
+
 function renderDefinitions() {
   const m = state.match;
   const rows = Object.entries(configOf(m)).filter(([k]) => !['map','bomb'].includes(k));
@@ -6942,17 +6941,33 @@ function bindEnhancements() {
   on('sessionMenu','click',()=>{const expanded=$('sessionMenu').getAttribute('aria-expanded')==='true';$('sessionMenu').setAttribute('aria-expanded',String(!expanded));$('sessionActions').classList.toggle('expanded',!expanded);});
   for(const button of $$('#sessionActions button'))button.addEventListener('click',()=>{$('sessionMenu').setAttribute('aria-expanded','false');$('sessionActions').classList.remove('expanded');});
   on('loginForm','submit',async event=>{
-    event.preventDefault(); const button=$('loginSubmit');button.disabled=true;setText('loginError','');
-    try {
-      const legacy=localStorage.getItem(STORAGE_KEY);
-      const payload={role:$('loginRole').value,name:$('loginName').value,team:$('loginTeam').value,key:$('loginKey').value,email:$('loginEmail').value};
-      if(!state.match.id && legacy && $('importLegacy').checked) payload.legacy=JSON.parse(legacy).match;
-      const data=await request('/api/login',payload);receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);localStorage.setItem('df_display_name',identity.name);closeOverlay('loginModal');connect();
-      showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
-      if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
+    event.preventDefault();const button=$('loginSubmit');button.disabled=true;setText('loginError','');setText('loginStatus','');
+    try{const profile=await request('/api/authenticate',{email:$('loginEmail').value.trim(),key:$('loginKey').value,role:$('loginRole').value});
+      $('loginKey').value='';setText('accountName',`Olá, ${profile.name}. Escolha sua equipe.`);$('loginTeam').value=profile.team||'A';setText('joinError','');toggleHidden('importLegacyField',$('loginRole').value!=='organizer');closeOverlay('loginModal');openOverlay('joinModal');
     }catch(error){setText('loginError',error.message);}finally{button.disabled=false;}
   });
+  on('joinForm','submit',async event=>{
+    event.preventDefault();const button=$('joinSubmit');button.disabled=true;setText('joinError','');
+    try{const legacy=localStorage.getItem(STORAGE_KEY);const payload={role:$('loginRole').value,team:$('loginTeam').value};
+      if(payload.role==='organizer'&&!state.match.id&&legacy&&$('importLegacy').checked)payload.legacy=JSON.parse(legacy).match;
+      const data=await request('/api/login',payload);receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);localStorage.setItem('df_display_name',identity.name);closeOverlay('joinModal');connect();
+      showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
+    }catch(error){setText('joinError',error.message);}finally{button.disabled=false;}
+  });
+  on('openRegister','click',()=>{closeOverlay('loginModal');$('registerForm').reset();$('registerEmail').value=$('loginEmail').value;setText('registerError','');openOverlay('registerModal');$('registerName').focus();});
+  on('registerBack','click',()=>{closeOverlay('registerModal');openLogin($('loginRole').value);});
+  on('registerForm','submit',async event=>{
+    event.preventDefault();setText('registerError','');if($('registerPassword').value!==$('registerConfirm').value){setText('registerError','As senhas não coincidem.');$('registerConfirm').focus();return;}
+    const button=$('registerSubmit');button.disabled=true;
+    try{const email=$('registerEmail').value.trim();await request('/api/register',{name:$('registerName').value.trim(),email,key:$('registerPassword').value});$('registerForm').reset();closeOverlay('registerModal');openLogin($('loginRole').value);$('loginEmail').value=email;setText('loginStatus','Cadastro concluído. Entre com seu e-mail e senha.');}
+    catch(error){setText('registerError',error.message);}finally{button.disabled=false;}
+  });
+  on('forgotPassword','click',async()=>{if(!$('loginEmail').value.trim()||!$('loginEmail').checkValidity()){$('loginEmail').reportValidity();return;}
+    const button=$('forgotPassword');button.disabled=true;try{await request('/api/reset-password',{email:$('loginEmail').value.trim()});setText('loginError','');setText('loginStatus','Se houver uma conta para esse e-mail, você receberá as instruções de recuperação.');}catch(error){setText('loginError',error.message);}finally{button.disabled=false;}
+  });
   on('loginCancel','click',()=>closeOverlay('loginModal'));
+  on('joinCancel','click',()=>{closeOverlay('joinModal');openLogin($('loginRole').value);});
+  on('logoutAccount','click',async()=>{const button=$('logoutAccount');button.disabled=true;try{await request('/api/logout');endTutorial();receive({identity:null,match:deepClone(DEFAULT_STATE.match)});showScreen('role');toast('VOCÊ SAIU DA CONTA.');}catch(error){toast(error.message);}finally{button.disabled=false;}});
   on('modePlayer','click',()=>{endTutorial();showScreen('player');});
   on('modeOperator','click',()=>{if(isOperator())showScreen('organizer');});
   on('definitionsButton','click',()=>{lastScreen=activeScreen;showScreen('definitions');renderDefinitions();});

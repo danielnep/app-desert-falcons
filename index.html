@@ -65,7 +65,7 @@
     <span id="participantName"></span>
     <div id="modeSwitch" class="hidden"><button class="mini-btn" id="modePlayer">JOGADOR</button><button class="mini-btn" id="modeOperator">OPERADOR</button></div>
     <button class="mini-btn session-menu-toggle" id="sessionMenu" type="button" aria-expanded="false">Menu</button>
-    <div class="session-actions" id="sessionActions">
+    <div class="session-actions" id="sessionActions"><button class="mini-btn" id="logoutAccount" type="button">SAIR DA CONTA</button>
     <button class="mini-btn" id="definitionsButton">Definições da partida</button>
     <button class="mini-btn" id="historyButton">HISTÓRICO</button><button class="mini-btn" id="gpsButton">Ativar GPS</button>
     <button class="mini-btn hidden" id="shareMatch">Convidar jogadores</button>
@@ -2482,8 +2482,24 @@
 
 </div>
 
-<div class="overlay hidden" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle"><div class="dialog"><h2 id="inviteTitle">Convidar jogadores</h2><p>Os jogadores devem conectar-se à mesma rede Wi-Fi do operador e abrir este link.</p><label class="field"><span>Link da partida</span><select id="inviteUrl"></select></label><button class="btn primary" id="inviteShare">COMPARTILHAR LINK</button><button class="btn ghost" id="inviteClose">VOLTAR</button><p id="inviteStatus" role="status"></p></div></div>
-<div class="overlay hidden" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form class="dialog large" id="loginForm"><h2 id="loginTitle">Entrar na partida</h2><input type="hidden" id="loginRole"><label class="field"><span>Seu nome</span><input id="loginName" required maxlength="80" autocomplete="name"></label><label class="field"><span>Equipe</span><select id="loginTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label><div id="operatorKeyField"><label class="field"><span>E-mail do operador</span><input id="loginEmail" type="email" autocomplete="username"></label><label class="field"><span>Senha da conta do operador</span><input id="loginKey" type="password" autocomplete="current-password"></label><label class="check-row"><input id="importLegacy" type="checkbox" checked><span>Importar configurações antigas deste navegador, se ainda não houver partida.</span></label></div><p id="localOperatorNotice" class="hidden">Este dispositivo hospeda a partida. Seu acesso de operador será reconhecido automaticamente.</p><p id="loginError" role="alert"></p><button id="loginSubmit" class="btn primary" type="submit">ENTRAR</button><button id="loginCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
+<div class="overlay hidden" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle"><div class="dialog"><h2 id="inviteTitle">Convidar jogadores</h2><p>Compartilhe este link. Os jogadores podem entrar por qualquer conexão com a internet.</p><label class="field"><span>Link da partida</span><select id="inviteUrl"></select></label><button class="btn primary" id="inviteShare">COMPARTILHAR LINK</button><button class="btn ghost" id="inviteClose">VOLTAR</button><p id="inviteStatus" role="status"></p></div></div>
+<div class="overlay hidden" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form class="dialog large" id="loginForm">
+<h2 id="loginTitle">Entrar na sua conta</h2><input type="hidden" id="loginRole">
+<label class="field"><span>E-mail</span><input id="loginEmail" type="email" required maxlength="254" autocomplete="username"></label>
+<label class="field"><span>Senha</span><input id="loginKey" type="password" required maxlength="128" autocomplete="current-password"></label>
+<p id="loginStatus" role="status"></p><p id="loginError" role="alert"></p><button id="loginSubmit" class="btn primary" type="submit">ENTRAR</button>
+<button id="openRegister" class="btn secondary" type="button">CADASTRAR</button><button id="forgotPassword" class="btn ghost" type="button">ESQUECI MINHA SENHA</button><button id="loginCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
+<div class="overlay hidden" id="registerModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="registerTitle"><form class="dialog large" id="registerForm">
+<h2 id="registerTitle">Criar sua conta</h2><p>Cadastre-se uma vez. Depois, entre com seu e-mail e senha.</p>
+<label class="field"><span>Seu nome</span><input id="registerName" required maxlength="80" autocomplete="name"></label>
+<label class="field"><span>E-mail</span><input id="registerEmail" type="email" required maxlength="254" autocomplete="email"></label>
+<label class="field"><span>Senha (pelo menos 6 caracteres)</span><input id="registerPassword" type="password" required minlength="6" maxlength="128" autocomplete="new-password"></label>
+<label class="field"><span>Confirmar senha</span><input id="registerConfirm" type="password" required minlength="6" maxlength="128" autocomplete="new-password"></label>
+<p id="registerError" role="alert"></p><button id="registerSubmit" class="btn primary" type="submit">CRIAR CONTA</button><button id="registerBack" class="btn ghost" type="button">VOLTAR AO LOGIN</button></form></div>
+<div class="overlay hidden" id="joinModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="joinTitle"><form class="dialog large" id="joinForm">
+<h2 id="joinTitle">Entrar na partida</h2><p id="accountName"></p><label class="field"><span>Equipe</span><select id="loginTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label>
+<label id="importLegacyField" class="check-row"><input id="importLegacy" type="checkbox" checked><span>Importar configurações anteriores deste navegador, se ainda não houver partida.</span></label>
+<p id="joinError" role="alert"></p><button id="joinSubmit" class="btn primary" type="submit">ENTRAR NA PARTIDA</button><button id="joinCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
 <div class="overlay hidden" id="operatorIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="operatorIntroTitle"><div class="dialog operator-intro"><p class="eyebrow">TUTORIAL GUIADO</p><h2 id="operatorIntroTitle">VOCÊ ESTÁ NO MODO OPERADOR</h2><p>Você é responsável por configurar e iniciar a partida. Vamos orientar você em cada etapa para garantir que tudo esteja pronto antes de começar.</p><button class="btn primary" id="tutorialBegin">COMEÇAR TUTORIAL</button><button class="btn ghost" id="tutorialSkip">CONFIGURAR SEM TUTORIAL</button></div></div>
 <div id="tutorialShade" class="hidden"></div><aside id="tutorialCard" class="hidden" aria-live="polite"><strong id="tutorialProgress"></strong><p id="tutorialText"></p><div class="tutorial-controls"><button class="mini-btn" id="tutorialPrevious">Voltar</button><button class="mini-btn" id="tutorialNext">Próxima etapa</button><button class="mini-btn" id="tutorialClose">Fechar tutorial</button></div></aside>
 <script type="module" src="app.js"></script>
