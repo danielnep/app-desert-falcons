@@ -1719,3 +1719,23 @@ body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-menu-t
 body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-actions { display:flex; }
 .hidden, #modeSwitch.hidden, .session-toolbar.hidden, .session-actions.hidden { display:none!important; }
 @media(max-width:380px) { .brand-text strong { font-size:11px; } .screen { padding:18px 14px; } .session-toolbar { padding:10px 14px; } .session-menu-panel { padding:16px; } }
+
+/* Final checks at 360 and 390 px: status, review rows and reachable HIT. */
+.header .pill { display:inline-flex; font-size:9px; }
+#reviewSummary { display:grid; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.review-item { display:grid; grid-template-columns:110px 1fr; gap:12px; padding:10px 12px; background:var(--surface2); font-size:12px; align-items:start; }
+.review-item+.review-item { border-top:1px solid var(--soft); }
+.review-item span { color:var(--muted); }
+.review-item strong { line-height:1.4; overflow-wrap:anywhere; }
+.summary-item span { font-size:10px; }
+.summary-item strong { font-size:12px; line-height:1.5; }
+[data-screen="player"] { padding:14px; }
+.player-map-surface { height:42dvh; min-height:250px; max-height:460px; }
+.hit-row { display:block; margin:12px 0; }
+.hit-row .btn { width:100%; }
+.hit-row p { font-size:11px; color:var(--muted); line-height:1.5; margin:6px 2px 0; }
+.quick-action { font-size:12px; border-radius:10px; padding:10px; }
+#objectiveActions:empty { display:none; }
+#playerLive details summary { padding:8px 0; font-size:13px; cursor:pointer; }
+#playerLive details p { font-size:12px; line-height:1.6; color:var(--muted); margin:12px 0; }
+@media(orientation:landscape) { .player-map-surface { height:62dvh; min-height:180px; } }

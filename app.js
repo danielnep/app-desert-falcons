@@ -1,5 +1,5 @@
 let localTransportPromise;
-function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-3').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-4').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -1214,7 +1214,7 @@ function renderOperatorMenu() {
 
   toggleHidden(
     'btnEnd',
-    (!['open', 'live'].includes(state.match.status)||state.match.status==='open'&&!isOperator())
+    state.match.status !== 'live'
   );
 
   const ended = state.match.status === 'ended';
@@ -3289,7 +3289,7 @@ function renderPlayer() {
   }
 
   if (
-    (!['open', 'live'].includes(state.match.status)||state.match.status==='open'&&!isOperator())
+    state.match.status !== 'live'
   ) {
     wait.classList.remove(
       'hidden'
@@ -3489,12 +3489,12 @@ function renderPlayerLive() {
 
   toggleHidden(
     'btnOrgFromGame',
-    role() !== 'organizer'
+    true
   );
 
   toggleHidden(
     'btnEndFromGame',
-    role() !== 'organizer'
+    true
   );
 
   // Match expiration is processed by the persistent server clock.
@@ -4707,6 +4707,7 @@ function renderOperatorPlayers() {
       state.match.players ||
       []
     )
+      .filter(player => player.joined && !player.left)
       .map(
         player =>
           `
@@ -5919,15 +5920,6 @@ function bindEvents() {
   );
 
   on(
-    'btnLeave',
-    'click',
-    () =>
-      showScreen(
-        'role'
-      )
-  );
-
-  on(
     'btnHit',
     'click',
     hitPlayer
@@ -6863,7 +6855,7 @@ async function chooseRole(selectedRole) {
     receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);connect();
     showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
     if(isOperator() && state.match.status !== 'ended') showOperatorIntro();
-    else openOverlay('playerIntro');
+    else if(!isOperator()) openOverlay('playerIntro');
   }catch(error){setText('roleError',error.message);toast(error.message,5000);}
 }
 
@@ -6872,11 +6864,12 @@ function renderDefinitions() {
   const rows = Object.entries(configOf(m)).filter(([k]) => !['map','bomb'].includes(k));
   const labels={name:'Nome',location:'Local',durationMin:'Duração (min)',playerCount:'Vagas por equipe',modes:'Modos',mergeModes:'Mesclar modos',livesPerPlayer:'Vidas iniciais',respawnDelay:'Respawn (s)',respawnPolicy:'Base de respawn',teamVisibility:'Visibilidade da equipe',enemyVisibility:'Visibilidade adversária',enemyVisibilitySeconds:'Visibilidade temporária (s)',zoneCaptureSeconds:'Captura de zona (s)',zonePoints:'Pontos por zona'};
   const values={nearest:'Mais próxima',choice:'Escolha do jogador',operator:'Escolha do operador',always:'Sempre',benefit:'Benefício temporário',off:'Desativada',areas:'Áreas do mapa',anywhere:'Qualquer local',predefined:'Predefinido',arming:'Definido ao armar'};
+  labels.map='Mapa';
   rows.push(['map', `${m.map.marks.length} elementos no mapa`]);
   if(m.modes.includes('bomb')) for(const [k,v] of Object.entries(configOf(m).bomb)) rows.push([k,v]);
   Object.assign(labels,{bombsPerPlayer:'Bombas por jogador',disarmSeconds:'Desarme (s)',blastRadius:'Raio de explosão (m)',armPolicy:'Local de armamento',timingPolicy:'Tempo da bomba',carrierId:'Portador'});
   $('definitionsList').innerHTML = rows.map(([k,v]) => `<div class="info-line"><span>${esc(labels[k] || k)}</span><strong>${esc(k==='modes'?objectiveLabel():typeof v==='boolean'?(v?'Sim':'Não'):values[v]||v)}</strong></div>`).join('');
-  toggleHidden('editDefinitions', !isOperator());
+  toggleHidden('editDefinitions', !isOperator() || state.match.status === 'ended');
 }
 async function loadHistory() {
   setText('historyStatus', 'Carregando registros…');
@@ -6957,12 +6950,14 @@ function renderSessionNavigation() {
   const entry = activeScreen === 'role';
   document.querySelector('.session-toolbar').classList.toggle('hidden', entry);
   if(entry)closeOverlay('sessionActions');
-  const operatorView = ['organizer','control'].includes(activeScreen);
+  const panelScreen = ['definitions','history'].includes(activeScreen) ? lastScreen : activeScreen;
+  const operatorView = ['organizer','control'].includes(panelScreen);
   for(const [id,selected] of [['modePlayer',!operatorView],['modeOperator',operatorView]]) {
     $(id).classList.toggle('active',selected);
     $(id).setAttribute('aria-pressed',String(selected));
   }
   toggleHidden('tutorialAgain', !isOperator() || state.match.status !== 'open');
+  toggleHidden('btnLeave', !identity || !currentPlayer() || currentPlayer().left || state.match.status !== 'live');
 }
 function showOperatorIntro() {
   const live=state.match.status==='live';
@@ -7025,7 +7020,8 @@ function bindEnhancements() {
   on('joinAgain','click',()=>chooseRole(identity?.role||'player'));
   on('grantBenefit','click',()=>command('benefit',{team:$('benefitTeam').value,kind:$('benefitKind').value},'BENEFÍCIO CONCEDIDO.'));
   // Leaving is recorded without terminating the match; operator visual switching does not use this action.
-  for(const id of ['btnLeave','btnPlayerBackReady']) on(id,'click',()=>command('leave',{},'SAÍDA REGISTRADA.'));
+  on('btnLeave','click',()=>openConfirm('Sair da partida?','Sua saída será registrada. Você poderá escolher um perfil e entrar novamente.','SAIR',async()=>{if(await command('leave',{},'SAÍDA REGISTRADA.'))showScreen('role');}));
+  on('btnPlayerBackReady','click',()=>command('leave',{},'SAÍDA REGISTRADA.'));
 }
 // Preserve original buttons, with authoritative equivalents for every state-changing action.
 startMatch = async function() {
