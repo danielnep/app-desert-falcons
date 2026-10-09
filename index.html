@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#e8e6e2">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Desert Falcons</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=guided-entry-2">
 </head>
 
 <body>
@@ -89,6 +89,7 @@
         Escolha seu papel. Não precisa cadastrar uma conta nem informar senha.
       </p>
 
+      <p id="roleError" role="alert" style="color:#c04035"></p>
       <div class="role-list">
 
         <button
@@ -2485,9 +2486,9 @@
 
 <div class="overlay hidden" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle"><div class="dialog"><h2 id="inviteTitle">Convidar jogadores</h2><p>Compartilhe este link. Os jogadores podem entrar por qualquer conexão com a internet.</p><label class="field"><span>Link da partida</span><select id="inviteUrl"></select></label><button class="btn primary" id="inviteShare">COMPARTILHAR LINK</button><button class="btn ghost" id="inviteClose">VOLTAR</button><p id="inviteStatus" role="status"></p></div></div>
 <div class="overlay hidden" id="playerIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="playerIntroTitle"><div class="dialog large"><p class="eyebrow">GUIA DO JOGADOR</p><h2 id="playerIntroTitle">Você está no modo Jogador</h2><ol class="intro-steps"><li><strong>Aguarde o início.</strong> O operador define modos, regras e mapa e inicia a partida.</li><li><strong>Confira o mapa e o briefing.</strong> O mapa mostra o campo, as bases e os objetivos. As definições explicam as regras.</li><li><strong>Durante o jogo, registre o HIT.</strong> Confirme apenas quando for atingido; isso desconta uma vida.</li><li><strong>Acompanhe o respawn.</strong> O painel informa a espera e a base para retornar, conforme as regras.</li><li><strong>Siga o objetivo escolhido.</strong> Bandeira, bomba e zona mostram as ações disponíveis conforme a partida.</li></ol><p class="screen-copy">Nesta versão, os dados ficam neste navegador. Celulares diferentes ainda não compartilham a partida.</p><button class="btn primary" id="playerIntroClose">ENTENDI · ABRIR PAINEL</button></div></div>
-<div class="overlay hidden" id="operatorIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="operatorIntroTitle"><div class="dialog operator-intro"><p class="eyebrow">TUTORIAL GUIADO</p><h2 id="operatorIntroTitle">VOCÊ ESTÁ NO MODO OPERADOR</h2><p>Você é responsável por configurar e iniciar a partida. Vamos orientar você em cada etapa para garantir que tudo esteja pronto antes de começar.</p><button class="btn primary" id="tutorialBegin">COMEÇAR TUTORIAL</button><button class="btn ghost" id="tutorialSkip">CONFIGURAR SEM TUTORIAL</button></div></div>
+<div class="overlay hidden" id="operatorIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="operatorIntroTitle"><div class="dialog operator-intro"><p class="eyebrow">TUTORIAL GUIADO</p><h2 id="operatorIntroTitle">VOCÊ ESTÁ NO MODO OPERADOR</h2><p id="operatorIntroText">Você é responsável por configurar e iniciar a partida. Vamos orientar você em cada etapa para garantir que tudo esteja pronto antes de começar.</p><button class="btn primary" id="tutorialBegin">COMEÇAR TUTORIAL</button><button class="btn ghost" id="tutorialSkip">CONFIGURAR SEM TUTORIAL</button></div></div>
 <div id="tutorialShade" class="hidden"></div><aside id="tutorialCard" class="hidden" aria-live="polite"><strong id="tutorialProgress"></strong><p id="tutorialText"></p><div class="tutorial-controls"><button class="mini-btn" id="tutorialPrevious">Voltar</button><button class="mini-btn" id="tutorialNext">Próxima etapa</button><button class="mini-btn" id="tutorialClose">Fechar tutorial</button></div></aside>
-<script type="module" src="app.js?v=simple-roles-1"></script>
+<script type="module" src="app.js?v=guided-entry-2"></script>
 
 </body>
 </html>

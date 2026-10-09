@@ -1,5 +1,5 @@
 let localTransportPromise;
-function localTransport(){return localTransportPromise ||= import('./local-client.js?v=simple-roles-1');}
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=guided-entry-2').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -6846,13 +6846,14 @@ async function persistChanges() {
   if (pendingPosition) { pendingPosition = false; persistChanges(); }
 }
 async function chooseRole(selectedRole) {
+  setText('roleError','');
   try {
     const data=await request('/api/login',{role:selectedRole,team:'A'});
     receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);connect();
     showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
-    if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
+    if(isOperator()){openOverlay('operatorIntro');setText('operatorIntroText',state.match.status==='live'?'A partida já começou. Você participa pelo painel do jogador e usa os botões Jogador e Operador no topo para acessar os controles.':'Você configura e inicia a partida. O guia vai destacar cada campo, explicar o que ele faz e acompanhar você até o botão Concluir configuração e iniciar partida.');$('tutorialBegin').textContent=state.match.status==='live'?'ABRIR PAINEL DA PARTIDA':'COMEÇAR PASSO A PASSO';}
     else openOverlay('playerIntro');
-  }catch(error){toast(error.message,5000);}
+  }catch(error){setText('roleError',error.message);toast(error.message,5000);}
 }
 
 function renderDefinitions() {
@@ -6920,7 +6921,7 @@ function tutorialCompleted(modal) {
   if(tutorialSteps[tutorialStep].modal===modal) tutorialGo(tutorialStep+1);
 }
 function renderPlayerExtras() {
-  if(!identity)return;
+  if(!identity){setText('participantName','');return;}
   const m=state.match, me=currentPlayer();
   setText('participantName',me ? `${identity.name} · Equipe ${me.team}` : identity.name);
   const actions=$('objectiveActions');
@@ -6959,7 +6960,7 @@ function bindEnhancements() {
   on('historyMatch','change',loadHistory);on('historySearch','input',loadHistory);
   on('reconnectButton','click',async()=>{try{receive(await request('/api/state'));if(identity)connect();}catch(error){toast(error.message);}});
   on('tutorialAgain','click',()=>{if(isOperator()){showScreen('organizer');openOverlay('operatorIntro');}});
-  on('tutorialBegin','click',()=>{closeOverlay('operatorIntro');tutorialGo(0);});
+  on('tutorialBegin','click',()=>{closeOverlay('operatorIntro');if(state.match.status==='live')showScreen('player');else tutorialGo(0);});
   on('tutorialSkip','click',()=>closeOverlay('operatorIntro'));
   on('tutorialPrevious','click',()=>tutorialGo(tutorialStep-1));
   on('tutorialNext','click',()=>{
@@ -7022,7 +7023,7 @@ resetAll = function() {openConfirm('Reiniciar configuração?','A partida atual 
 
 async function init() {
   localStorage.setItem('df_empty_match',JSON.stringify(deepClone(DEFAULT_STATE.match))); bindEvents(); bindEnhancements(); renderModeModal(); syncDraftFields(); showScreen('role');
-  try { const data = await request('/api/state'); receive(data); connectionStatus('Modo local · salvo neste navegador'); if (identity) { showScreen(identity.role === 'organizer' && state.match.status !== 'live' ? 'organizer' : 'player'); connect(); if(identity.role==='organizer'&&state.match.status==='open')openOverlay('operatorIntro'); }else connect(); }
+  try { const data = await request('/api/state'); receive(data); connectionStatus('Modo local · salvo neste navegador'); connect();showScreen('role'); }
   catch(error) { connectionStatus('Não foi possível carregar os dados locais.'); toast(error.message, 5000); }
 }
 

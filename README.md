@@ -2,7 +2,7 @@
 
 A interface publicada usa `local-client.js` e `local-engine.js`. Ao abrir, escolha Jogador ou Operador. Não há cadastro, senha, Firebase ou Cloud Functions no fluxo ativo. O operador recebe um tutorial em seis etapas; o jogador recebe um guia e aguarda o início. Ao iniciar, o operador passa ao painel do jogador, mantendo os dois botões de alternância no topo.
 
-A partida, as configurações e o histórico são salvos no navegador. Abas do mesmo navegador e endereço compartilham o estado e reservam um único operador, com Web Locks para serializar alterações. O operador pode retornar após recarregar; Trocar perfil libera a reserva. Celulares ou navegadores diferentes são independentes: não existe sincronização entre dispositivos nesta versão. Os avisos da interface deixam esse limite claro e o compartilhamento de convite fica oculto.
+A partida, as configurações e o histórico são salvos no navegador. Abas do mesmo navegador e endereço compartilham o estado e reservam um único operador, com Web Locks para serializar alterações. A tela de escolha aparece a cada abertura; os guias abrem a cada escolha. Trocar perfil ou fechar a aba libera a reserva. Um pulso de atividade a cada cinco segundos expira reservas sem atividade após vinte segundos, incluindo reservas antigas sem pulso. Celulares ou navegadores diferentes são independentes: não existe sincronização entre dispositivos nesta versão. Os avisos da interface deixam esse limite claro e o compartilhamento de convite fica oculto.
 
 Os arquivos do Firebase e do servidor anterior estão preservados, mas não são carregados pela interface. `local-engine.js` é a cópia do motor existente, adaptada para IDs com Web Crypto; alterações futuras de regras devem manter os motores consistentes.
 

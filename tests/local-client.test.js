@@ -11,7 +11,7 @@ function environment(){
  const storage=map=>({getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v)});
  return {shared,client(session=new Map()){
   const listeners={};const context={fresh,execute,advance,structuredClone,crypto:webcrypto,URL,location:{href:'https://example.test/'},document:{hidden:false},localStorage:storage(shared),sessionStorage:storage(session),navigator:{locks:{request:(_name,cb)=>{const result=chain.then(cb);chain=result.catch(()=>{});return result;}}},addEventListener:(type,cb)=>listeners[type]=cb,setInterval:()=>{}};
-  const api=vm.runInNewContext(source+';({request,connect})',context);return {...api,session,emitStorage:()=>listeners.storage({key:'df_local_room_v1'})};
+  const api=vm.runInNewContext(source+';({request,connect})',context);return {...api,session,emitStorage:()=>listeners.storage({key:'df_local_room_v1'}),emitPageHide:()=>listeners.pagehide()};
  }};
 }
 const call=(client,action,data={})=>client.request('/api/command',{action,...data});
@@ -39,4 +39,11 @@ test('tabs receive state updates, devices remain independent',async()=>{
 test('browser engine stays equivalent to maintained engine except ID provider',()=>{
  const server=readFileSync(new URL('../functions/engine.js',import.meta.url),'utf8').split('\n').slice(1).join('\n').replaceAll("randomBytes(12).toString('hex')",'newId()');
  const browser=readFileSync(new URL('../local-engine.js',import.meta.url),'utf8').split('\n').slice(2).join('\n');assert.equal(browser,server);
+});
+
+test('old or abandoned operator reservations cannot lock entry forever',async()=>{
+ const e=environment(),old=e.client(),next=e.client();await old.request('/api/login',{role:'organizer'});
+ const room=JSON.parse(e.shared.get('df_local_room_v1'));delete room.operatorSeenAt;e.shared.set('df_local_room_v1',JSON.stringify(room));
+ assert.equal((await next.request('/api/state')).operatorTaken,false);await next.request('/api/login',{role:'organizer'});assert.equal((await old.request('/api/state')).identity.role,'player');
+ next.emitPageHide();assert.equal((await old.request('/api/login',{role:'organizer'})).identity.role,'organizer');
 });
