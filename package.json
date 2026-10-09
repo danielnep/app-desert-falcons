@@ -1,1 +1,19 @@
-{"name":"desert-falcons","private":true,"type":"module","scripts":{"start":"node server.js","phone":"node server.js --phone","test":"node --test tests/*.test.js","check":"node --check app.js && node --check server.js"},"engines":{"node":">=24"}}
+{
+  "name": "desert-falcons",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "firebase emulators:start --only hosting,auth,database,functions",
+    "phone": "node server.js --phone",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check app.js && node --check firebase-client.js && node --check functions/index.js && node --check functions/engine.js && node --check server.js",
+    "test:firebase": "firebase emulators:exec --only auth,database,functions \"node tests/firebase.integration.js\""
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.0.0",
+    "firebase": "^12.0.0"
+  }
+}

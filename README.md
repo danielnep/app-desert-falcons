@@ -1,70 +1,35 @@
-# Desert Falcons — Airsoft
+# Desert Falcons — Firebase e celulares
 
-Aprimoramento incremental do aplicativo original em HTML, CSS e JavaScript. A interface, os modos, o envio/recorte de mapas e o editor foram reaproveitados. A branch `feat/airsoft-functional-match` preserva `dev-experiments` e não faz deploy.
+Branch de trabalho: `feat/airsoft-functional-match`. A interface existente e seus componentes foram preservados.
 
-## Executar
+A aplicação principal agora usa o projeto Firebase original `deseart-falcons-airsof`. O operador pode usar Android ou iPhone; jogadores acessam o mesmo endereço HTTPS em Android, iPhone ou computador. O telefone administra a partida pelo navegador; não precisa executar Node nem funcionar como servidor HTTP. É necessária conexão com a internet para sincronizar. O mapa mantém destaque na tela do jogador, ajusta a orientação ao celular e permite rolar a página; ao ampliar, os gestos movem o mapa.
 
-Requer **Node.js 24 ou superior** (SQLite nativo). Não há dependências npm de produção.
+## Preparação do Firebase pelo administrador
 
-```sh
-export OPERATOR_KEY='defina-uma-chave-forte-com-pelo-menos-12-caracteres'
-export DATABASE_PATH='/caminho/persistente/airsoft.sqlite'
-npm start
-```
+1. Habilitar os provedores **Anônimo** e **E-mail/senha** no Firebase Authentication. Criar a conta do operador e adicionar o domínio da aplicação aos domínios autorizados.
+2. Instalar dependências: `npm install` e `npm ci --prefix functions`.
+3. Autenticar o Firebase CLI na conta administradora do projeto. Com credenciais administrativas de aplicação disponíveis, executar `node functions/set-operator.js EMAIL_DO_OPERADOR`. A permissão usa a claim `operator`; escolher o botão Operador não concede essa permissão. Nenhuma chave administrativa deve ir para o navegador.
+4. Executar os testes abaixo. Só depois publicar: `firebase deploy --only database,functions,hosting --project deseart-falcons-airsof`. Cloud Functions e o agendamento podem exigir o plano Blaze. Conferir custos e plano no projeto antes da implantação.
+5. Abrir o endereço HTTPS publicado. O operador entra com e-mail e senha uma vez; o Firebase preserva a sessão nesse navegador. Jogadores entram com nome e equipe. Compartilhar usa o próprio endereço da aplicação.
 
-Abra `http://localhost:3000`. Distribua a chave somente aos operadores autorizados. Jogadores entram com nome e equipe; escolher o cartão Operador nunca concede permissão sem validar a chave no servidor. A identidade fica em cookie HttpOnly com validade de sete dias. Trocar Jogador/Operador muda apenas a tela.
+As regras bloqueiam alterações diretas de jogadores nas configurações. As funções validam cada comando e publicam uma visão individual, ocultando coordenadas conforme as regras de visibilidade. Histórico e partidas anteriores ficam persistidos no Realtime Database. Os caminhos originais `match` e `players` são preservados. Na primeira criação, a configuração antiga em `match` é importada quando compatível, sem apagar os dados antigos; dados incompatíveis geram erro em vez de falsa confirmação.
 
-Variáveis: `PORT` (3000), `HOST` (0.0.0.0), `DATABASE_PATH` (`data/airsoft.sqlite`), `OPERATOR_KEY` (obrigatória), `SECURE_COOKIES` (`true` em HTTPS). O servidor recusa iniciar sem chave válida. Nenhuma chave deve ser adicionada ao Git.
+## Testes locais
 
-## Host temporário no dispositivo do operador
+`npm run check`: sintaxe.
 
-Foi acrescentado `npm run phone` para um dispositivo que **já tenha um runtime Node.js 24+**. Esse modo cria e conserva uma chave segura automaticamente, reconhece o operador somente em `127.0.0.1`/`localhost`, disponibiliza o servidor na rede local e apresenta **Convidar jogadores** com o endereço real da rede. Em Termux, também solicita a abertura do navegador local automaticamente. Jogadores na mesma rede usam o link compartilhado, nunca o seu próprio `localhost`.
+`npm test`: 11 testes do motor Firebase e regressões das funcionalidades anteriores.
 
-**Não é possível iniciar esse servidor apenas abrindo HTML no Chrome/Safari.** O runtime precisa ser instalado/executado no sistema. O modo foi testado em Node/Linux; inicialização em Android/Termux e iPhone não foi executada. É necessário confirmar o sistema do celular para integrar uma forma adequada de iniciar o host. Em iPhone, Node/Termux não oferece esse caminho; é necessária uma aplicação nativa compatível ou outro modelo de conexão.
+`npm run test:firebase`: emuladores reais de Authentication, Realtime Database e Functions, incluindo espera, permissões, configuração, início em tempo real, HIT, recarga e histórico. Requer Java 21 e Node compatível com o Firebase CLI.
 
-O link HTTP de rede local permite sincronização da partida, mas navegadores podem bloquear GPS fora de contexto seguro. GPS de jogadores nesse arranjo depende de integração nativa ou HTTPS confiável; isso ainda não foi validado no telefone.
+`FIREBASE_BROWSER_TEST=1 npm run test:firebase`: inclui o teste Chromium com operador e jogador em telas móveis (requer Python Playwright e Chromium). O SDK é baixado de gstatic e as operações usam os emuladores reais.
 
-## Mapa na área do jogador
+`npm start`: emuladores, interface em `http://127.0.0.1:5000/?emulator`. Não usar dados nem credenciais reais nos emuladores.
 
-O mapa é a área principal, com HUD sobreposto e menu compacto. Em celular vertical, uma imagem horizontal é apresentada verticalmente; ao girar o celular, volta à orientação original. Objetivos e participantes acompanham a mesma transformação, com textos legíveis. A visão inicial mostra todo o campo delimitado. Dois dedos ampliam; depois de ampliar, arrastar move o mapa automaticamente. Centralizar volta à visão completa, na qual arrastar rola a tela. Não há botão para alternar modos de gesto.
+O temporizador avança a cada dois segundos enquanto existe uma página conectada em primeiro plano. Um agendamento no Firebase recupera os prazos uma vez por minuto quando todos os navegadores estão suspensos; prazos absolutos são preservados e conferidos antes de cada ação. Essa recuperação não depende do Android do operador permanecer acordado.
 
-## Implantação
+O servidor Node/SQLite continua em `server.js` como alternativa preservada e para regressão; a interface padrão usa Firebase. Os testes anteriores em `tests/browser.py` referem-se à versão anterior do transporte e precisam ser executados contra a configuração correspondente; não comprovam a nova integração Firebase.
 
-1. Use um serviço que execute Node.js 24 continuamente e tenha disco persistente. GitHub Pages sozinho não executa o servidor.
-2. Configure as variáveis acima; use HTTPS e `SECURE_COOKIES=true` em produção. O GPS exige HTTPS (ou localhost).
-3. Faça proxy das rotas normais e `/api/stream` para o mesmo servidor. Preserve o cabeçalho Host original; desative buffering para SSE e permita conexões longas. Não exponha o arquivo SQLite.
-4. Execute uma única instância: este aplicativo possui uma partida corrente e usa SQLite local. Múltiplas instâncias precisariam de banco e canal de eventos compartilhados.
-5. Execute os testes antes de publicar. Faça backup do banco: pare o serviço e copie o arquivo SQLite e seus arquivos WAL/SHM, se existirem; alternativamente use backup online próprio do SQLite. Guarde backups fora do Git.
+## Limites da validação
 
-Não foi realizado deploy nem validado um provedor de hospedagem real.
-
-## Fluxos e preservação de dados
-
-- Operador cria uma partida aberta, recebe apresentação e tutorial de seis etapas. Configurar/aplicar não inicia o jogo. O botão final exige revisão confirmada, nome, local, mapa e objetivos necessários ao modo selecionado.
-- Jogadores aguardam na sala de espera; SSE atualiza as telas ao iniciar. Jogadores que chegam depois entram em uma vaga da equipe escolhida. Reconexões preservam a sessão, vidas, placar e horários.
-- Durante o jogo, mapa, modos, vagas e vidas iniciais ficam bloqueados para evitar invalidar a partida. Demais definições podem ser alteradas pelo operador, com registro e sincronização.
-- Definições são somente leitura para jogadores. HIT, respawn, bomba, captura de zonas e registro de bandeiras são processados no servidor. Cronômetros continuam após atualizar o navegador e retomam do horário persistido quando o servidor reinicia.
-- Benefícios de visibilidade são concedidos pelo operador quando a definição correspondente usa benefício temporário. A duração usa o campo existente de segundos. Coordenadas ocultas não são enviadas aos jogadores.
-- O Histórico consulta o SQLite, por partida e busca textual, incluindo registros antigos. Reset e Nova partida arquivam a partida anterior e preservam o histórico.
-- Os dados antigos em `df_airsoft_state_v7` ficam intactos no navegador. No primeiro acesso do operador, a opção de importação migra configurações, mapa, registros e, quando a partida estiver ao vivo, seu horário, placar e vidas. Dados simulados antigos são preservados como vagas sem movimentação fictícia. A migração só ocorre se ainda não há partida no servidor; nunca sobrescreve uma partida existente.
-- Migrações SQLite v1/v2 são aditivas e idempotentes. Sessões são vinculadas à partida e não podem controlar uma vaga em uma partida posterior sem entrar novamente.
-
-## Limites reais de localização
-
-O editor original utiliza uma imagem sem georreferenciamento. O GPS real é coletado pelo botão **Ativar GPS**, mas não é convertido ficticiamente em coordenadas da imagem. O participante informa sua posição horizontal/vertical no mapa para objetivos por área. Desarme e raio de explosão em metros usam somente coordenadas GPS reais; distância indisponível não é inventada. Os testes do navegador usam uma tela móvel simulada; GPS físico e uso em campo com aparelhos reais não foram validados.
-
-Bandeiras são registradas como objetivos capturados, sem inventar pontuação ou regras de transporte/entrega que não existiam na especificação. Caso o cliente tenha regras adicionais de bandeira ou georreferenciamento, elas precisam ser fornecidas para implementação.
-
-## Verificação
-
-```sh
-npm run check
-npm test
-python tests/browser.py
-```
-
-Os testes do navegador requerem Python, Playwright e Chromium em `/usr/bin/chromium`. Não são dependências de produção. Os testes criam bancos temporários e sessões isoladas; a chave de teste não é usada em produção.
-
-`tests/server.test.js`: autorização, fila de espera, SSE, validação, concorrência, isolamento de vagas, início único, HIT/respawn, persistência após reiniciar servidor, partidas anteriores, bomba/desarme, zonas, bandeiras, benefícios e importação de dados antigos.
-
-`tests/browser.py`: dois contextos Chromium independentes (operador e jogador móvel), tutorial real, configuração/editor, espera/início sem reload, troca de modo, definições, edição ao vivo, HIT, reload, histórico/busca e largura móvel. Detecta erros JavaScript não tratados.
+Testes em emulador não demonstram que as regras, provedores e funções já foram implantados no projeto real. Não há credenciais administrativas Firebase disponíveis nesta sessão. Não houve deploy de produção. A validação física em Android/iPhone, GPS real, Safari e rede de campo continua necessária antes de usar numa partida real.

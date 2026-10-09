@@ -1,0 +1,31 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "match": {
+      ".read": "auth != null && auth.token.operator === true"
+    },
+    "players": {
+      ".read": "auth != null && auth.token.operator === true"
+    },
+    "airsoftV2": {
+      "views": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid"
+        }
+      },
+      "events": {
+        ".read": "auth != null"
+      },
+      "matches": {
+        ".read": "auth != null"
+      }
+    },
+    "presence": {
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.isBoolean()"
+      }
+    }
+  }
+}

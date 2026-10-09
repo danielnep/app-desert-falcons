@@ -1,3 +1,5 @@
+let firebaseTransportPromise;
+function firebaseTransport(){ return firebaseTransportPromise ||= import('./firebase-client.js').catch(error=>{firebaseTransportPromise=null;throw new Error('Não foi possível conectar ao Firebase. Verifique a internet e tente novamente.');}); }
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -6776,16 +6778,14 @@ function connectionStatus(text) {
   if ($('connectionStatus')) $('connectionStatus').title=text;
   $('reconnectButton')?.classList.toggle('hidden',connected);
 }
-async function request(path, body) {
-  const response = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
-  if (!(response.headers.get("content-type") || "").includes("application/json")) throw new Error("Este endereço não está conectado à partida. Abra o link compartilhado pelo operador.");
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
-  return data;
-}
+async function request(path, body) { return (await firebaseTransport()).request(path,body); }
+
 function receive(data) {
+  if(!data.match) data.match=deepClone(DEFAULT_STATE.match);
+  data.host={joinUrls:[location.origin+location.pathname+'?join']};
   hostInfo=data.host || hostInfo;
   toggleHidden('shareMatch', !hostInfo?.joinUrls?.length || data.identity?.role !== 'organizer');
+  data.match={...DEFAULT_STATE.match,...data.match,bomb:{...DEFAULT_STATE.match.bomb,...data.match.bomb},map:{...DEFAULT_STATE.match.map,...data.match.map,marks:data.match.map?.marks||[]},players:data.match.players||[],logs:data.match.logs||[],zones:data.match.zones||{}};
   const clean = !draftDirty();
   const gps = state.gps;
   authoritative = deepClone(data.match); identity = data.identity;
@@ -6813,13 +6813,8 @@ function receive(data) {
   if (clean && isOperator() && !$('rulesModal').classList.contains('hidden')) syncDraftFields();
   renderPlayerExtras();
 }
-function connect() {
-  stream?.close();
-  stream = new EventSource('/api/stream');
-  stream.onopen = () => connectionStatus('Conectado · atualizações em tempo real');
-  stream.onmessage = event => receive(JSON.parse(event.data));
-  stream.onerror = () => connectionStatus('Reconectando · confirme conexão antes de agir');
-}
+async function connect() { (await firebaseTransport()).connect(receive,connectionStatus); }
+
 async function command(action, values = {}, success) {
   try {
     connectionStatus('Salvando…');
@@ -6852,8 +6847,8 @@ async function persistChanges() {
 }
 function openLogin(selectedRole) {
   $('loginRole').value = selectedRole;
-  toggleHidden('localOperatorNotice',selectedRole!=='organizer'||!hostInfo?.localOperator);
-  toggleHidden('operatorKeyField', selectedRole !== 'organizer' || hostInfo?.localOperator);
+  toggleHidden('localOperatorNotice',true);
+  toggleHidden('operatorKeyField', selectedRole !== 'organizer');
   setText('loginTitle', selectedRole === 'organizer' ? 'Acesso do operador' : 'Entrar como jogador');
   $('loginName').value = identity?.name || localStorage.getItem('df_display_name') || '';
   $('loginKey').value = '';
@@ -6943,14 +6938,14 @@ function renderPlayerExtras() {
 function bindEnhancements() {
   on('shareMatch','click',()=>{$('inviteUrl').innerHTML=(hostInfo?.joinUrls||[]).map(url=>`<option value="${esc(url)}">${esc(url)}</option>`).join('');setText('inviteStatus','');openOverlay('inviteModal');});
   on('inviteClose','click',()=>closeOverlay('inviteModal'));
-  on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida pela rede do operador',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
+  on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida Desert Falcons',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
   on('sessionMenu','click',()=>{const expanded=$('sessionMenu').getAttribute('aria-expanded')==='true';$('sessionMenu').setAttribute('aria-expanded',String(!expanded));$('sessionActions').classList.toggle('expanded',!expanded);});
   for(const button of $$('#sessionActions button'))button.addEventListener('click',()=>{$('sessionMenu').setAttribute('aria-expanded','false');$('sessionActions').classList.remove('expanded');});
   on('loginForm','submit',async event=>{
     event.preventDefault(); const button=$('loginSubmit');button.disabled=true;setText('loginError','');
     try {
       const legacy=localStorage.getItem(STORAGE_KEY);
-      const payload={role:$('loginRole').value,name:$('loginName').value,team:$('loginTeam').value,key:$('loginKey').value};
+      const payload={role:$('loginRole').value,name:$('loginName').value,team:$('loginTeam').value,key:$('loginKey').value,email:$('loginEmail').value};
       if(!state.match.id && legacy && $('importLegacy').checked) payload.legacy=JSON.parse(legacy).match;
       const data=await request('/api/login',payload);receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);localStorage.setItem('df_display_name',identity.name);closeOverlay('loginModal');connect();
       showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
@@ -7030,9 +7025,9 @@ resetAll = function() {openConfirm('Reiniciar configuração?','A partida atual 
 ========================= */
 
 async function init() {
-  bindEvents(); bindEnhancements(); renderModeModal(); syncDraftFields(); showScreen('role');
+  localStorage.setItem('df_empty_match',JSON.stringify(deepClone(DEFAULT_STATE.match))); bindEvents(); bindEnhancements(); renderModeModal(); syncDraftFields(); showScreen('role');
   try { const data = await request('/api/state'); receive(data); connectionStatus('Conectado · dados atualizados'); if (identity) { showScreen(identity.role === 'organizer' && state.match.status !== 'live' ? 'organizer' : 'player'); connect(); } }
-  catch(error) { connectionStatus('Servidor indisponível — tente reconectar.'); toast(error.message, 5000); }
+  catch(error) { connectionStatus('Firebase indisponível · tente reconectar.'); toast(error.message, 5000); }
 }
 
 if (

@@ -3,3 +3,8 @@ data/
 __pycache__/
 tests/artifacts/
 operator-key
+
+node_modules/
+functions/node_modules/
+*-debug.log
+.firebase/
