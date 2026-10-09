@@ -1,7 +1,9 @@
 import http from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
+import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -51,7 +53,7 @@ function distance(a,b) {
   // An uploaded image has no calibrated metric scale. Never invent meters.
   return Infinity;
 }
-export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data','airsoft.sqlite'), operatorKey = process.env.OPERATOR_KEY, secureCookies = process.env.SECURE_COOKIES === 'true'} = {}) {
+export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data','airsoft.sqlite'), operatorKey = process.env.OPERATOR_KEY, secureCookies = process.env.SECURE_COOKIES === 'true', phoneHost = false} = {}) {
   if (!operatorKey || operatorKey.length < 12) throw new Error('Configure OPERATOR_KEY com pelo menos 12 caracteres.');
   if (dbPath !== ':memory:') mkdirSync(dirname(dbPath),{recursive:true});
   const db = new DatabaseSync(dbPath);
@@ -79,6 +81,18 @@ export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data
     current=m.id;
   }
   function transaction(fn) { const previousCurrent=current;db.exec('BEGIN IMMEDIATE'); try { const result=fn(); db.exec('COMMIT'); return result; } catch(e) { db.exec('ROLLBACK');current=previousCurrent; throw e; } }
+  function localOperator(req) {
+    const peer=req.socket.remoteAddress;
+    const hostname=new URL('http://'+req.headers.host).hostname;
+    return phoneHost && ['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer) && ['localhost','127.0.0.1','[::1]'].includes(hostname);
+  }
+  function hostContext(req,s) {
+    const address=server.address();
+    const listeningOnLan=address && typeof address==='object' && ['0.0.0.0','::'].includes(address.address);
+    const canShare=phoneHost && (localOperator(req)||s?.role==='organizer');
+    const addresses=canShare&&listeningOnLan ? Object.entries(networkInterfaces()).filter(([name])=>!/^rmnet|^ccmni|^pdp_ip|^wwan|^tun|^docker|^veth/.test(name)).sort(([a],[b])=>Number(/wlan|wifi|^ap|bridge/.test(b))-Number(/wlan|wifi|^ap|bridge/.test(a))).flatMap(([,entries])=>entries||[]).filter(x=>x.family==='IPv4'&&!x.internal&&(/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/.test(x.address))).map(x=>`http://${x.address}:${address.port}`) : [];
+    return {phoneHost,localOperator:localOperator(req),joinUrls:[...new Set(addresses)]};
+  }
   function session(req) {
     const token=req.headers.cookie?.match(/(?:^|;\s*)df_session=([a-f0-9]{64})(?:;|$)/)?.[1];
     return token && db.prepare('SELECT * FROM sessions WHERE token=? AND expires_at>?').get(token,Date.now());
@@ -130,7 +144,7 @@ export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data
       let body={};
       if(req.method==='POST') { let raw='',bytes=0; for await(const chunk of req){bytes+=chunk.length;if(bytes>12*1024*1024) fail('Mapa muito grande.',413);raw+=chunk;} try{body=JSON.parse(raw||'{}');}catch{fail('JSON inválido.');} }
       let s=session(req);
-      if(url.pathname==='/api/state' && req.method==='GET') return send(200,publicState(load(),s));
+      if(url.pathname==='/api/state' && req.method==='GET') return send(200,{...publicState(load(),s),host:hostContext(req,s)});
       if(url.pathname==='/api/login' && req.method==='POST') {
         if(!['organizer','player'].includes(body.role)) fail('Perfil inválido.');
         if(typeof body.name!=='string'||!body.name.trim()||body.name.length>80) fail('Informe seu nome (até 80 caracteres).');
@@ -139,7 +153,7 @@ export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data
           if(Date.now()-attempt.at>60000){attempt.count=0;attempt.at=Date.now();}
           attempt.count++;loginAttempts.set(address,attempt);if(attempt.count>10)fail('Aguarde um minuto antes de tentar novamente.',429);
           const key=Buffer.from(String(body.key||'')),expected=Buffer.from(operatorKey);
-          if(key.length!==expected.length||!timingSafeEqual(key,expected)) fail('Chave de operador inválida.',403);
+          if(!localOperator(req) && (key.length!==expected.length||!timingSafeEqual(key,expected))) fail('Chave de operador inválida.',403);
         }
         const token=randomBytes(32).toString('hex');
         const previous=s;
@@ -177,7 +191,7 @@ export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data
           if(previous) db.prepare('DELETE FROM sessions WHERE token=?').run(previous.token);
         });
         res.setHeader('Set-Cookie',`df_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${secureCookies?'; Secure':''}`);
-        broadcast();return send(200,publicState(load(),s));
+        broadcast();return send(200,{...publicState(load(),s),host:hostContext(req,s)});
       }
       if(url.pathname==='/api/events' && req.method==='GET') {
         if(!s) fail('Identifique-se para consultar o histórico.',401);
@@ -315,6 +329,17 @@ export function createApp({dbPath = process.env.DATABASE_PATH || join(root,'data
   return {server,db,close:async()=>{clearInterval(timer);for(const res of clients.keys())res.end();await new Promise(resolve=>server.close(resolve));db.close();}};
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
-  const app=createApp();app.server.listen(Number(process.env.PORT)||3000,process.env.HOST||'0.0.0.0',()=>console.log('Desert Falcons disponível na porta '+(process.env.PORT||3000)));
+  const phoneHost=process.argv.includes('--phone');
+  const dbPath=process.env.DATABASE_PATH || join(root,'data','airsoft.sqlite');
+  let operatorKey=process.env.OPERATOR_KEY;
+  if(phoneHost&&!operatorKey) {
+    const folder=dirname(dbPath);mkdirSync(folder,{recursive:true});const keyPath=join(folder,'operator-key');
+    try{operatorKey=readFileSync(keyPath,'utf8').trim();}catch(error){if(error.code!=='ENOENT')throw error;operatorKey=randomBytes(32).toString('hex');writeFileSync(keyPath,operatorKey,{mode:0o600,flag:'wx'});}
+  }
+  const app=createApp({dbPath,operatorKey,phoneHost});
+  app.server.listen(Number(process.env.PORT)||3000,process.env.HOST||'0.0.0.0',()=>{
+    console.log('Desert Falcons disponível na porta '+(process.env.PORT||3000));
+    if(phoneHost){const url='http://127.0.0.1:'+(process.env.PORT||3000);console.log('Operador: '+url);if(process.env.TERMUX_VERSION){const opener=spawn('termux-open-url',[url],{stdio:'ignore'});opener.on('error',()=>console.log('Abra o endereço do operador no navegador.'));}}
+  });
   for(const signal of ['SIGINT','SIGTERM'])process.on(signal,async()=>{await app.close();process.exit(0);});
 }

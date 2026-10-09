@@ -64,10 +64,14 @@
     <button class="mini-btn" id="reconnectButton">Reconectar</button>
     <span id="participantName"></span>
     <div id="modeSwitch" class="hidden"><button class="mini-btn" id="modePlayer">JOGADOR</button><button class="mini-btn" id="modeOperator">OPERADOR</button></div>
+    <button class="mini-btn session-menu-toggle" id="sessionMenu" type="button" aria-expanded="false">Menu</button>
+    <div class="session-actions" id="sessionActions">
     <button class="mini-btn" id="definitionsButton">Definições da partida</button>
     <button class="mini-btn" id="historyButton">HISTÓRICO</button><button class="mini-btn" id="gpsButton">Ativar GPS</button>
+    <button class="mini-btn hidden" id="shareMatch">Convidar jogadores</button>
     <button class="mini-btn hidden" id="tutorialAgain">Tutorial</button>
     <button class="mini-btn hidden" id="newMatch">Nova partida</button><button class="mini-btn hidden" id="joinAgain">Entrar na partida</button>
+    </div>
   </div>
   <main id="main">
 
@@ -261,7 +265,7 @@
             <div class="player-map-surface" id="playerMapSurface"><canvas id="playerMapCanvas" aria-label="Mapa da partida"></canvas></div>
 
             <div class="map-corner-tools">
-              <button class="map-drag-toggle" id="playerMapDragToggle" type="button" aria-pressed="false">Mover mapa</button>
+
 
               <button
                 class="map-icon-btn selectable"
@@ -398,7 +402,7 @@
         ></div>
 
 
-        <p class="map-gesture-hint" id="playerMapGestureHint">Arraste para rolar a tela. Para navegar no mapa ampliado, ative “Mover mapa”.</p>
+        <p class="map-gesture-hint" id="playerMapGestureHint">Amplie com dois dedos. O mapa acompanha a posição do celular; centralizar mostra o campo inteiro.</p>
         <div id="objectiveActions" class="quick-actions"></div>
         <details class="card"><summary>Atualizar minha posição no mapa</summary><p>Este mapa é uma imagem sem georreferenciamento. Informe a posição real no campo em porcentagem; o GPS não posiciona você automaticamente nesta imagem.</p><div class="grid-2"><label class="field"><span>Horizontal (0–100%)</span><input id="positionX" type="number" min="0" max="100" value="50"></label><label class="field"><span>Vertical (0–100%)</span><input id="positionY" type="number" min="0" max="100" value="50"></label></div><button id="positionSubmit" class="btn secondary">ATUALIZAR POSIÇÃO</button></details>
         <div class="hit-row">
@@ -2478,7 +2482,8 @@
 
 </div>
 
-<div class="overlay hidden" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form class="dialog large" id="loginForm"><h2 id="loginTitle">Entrar na partida</h2><input type="hidden" id="loginRole"><label class="field"><span>Seu nome</span><input id="loginName" required maxlength="80" autocomplete="name"></label><label class="field"><span>Equipe</span><select id="loginTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label><div id="operatorKeyField"><label class="field"><span>Chave do operador</span><input id="loginKey" type="password" autocomplete="current-password"></label><label class="check-row"><input id="importLegacy" type="checkbox" checked><span>Importar configurações antigas deste navegador, se ainda não houver partida.</span></label></div><p id="loginError" role="alert"></p><button id="loginSubmit" class="btn primary" type="submit">ENTRAR</button><button id="loginCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
+<div class="overlay hidden" id="inviteModal" role="dialog" aria-modal="true" aria-labelledby="inviteTitle"><div class="dialog"><h2 id="inviteTitle">Convidar jogadores</h2><p>Os jogadores devem conectar-se à mesma rede Wi-Fi do operador e abrir este link.</p><label class="field"><span>Link da partida</span><select id="inviteUrl"></select></label><button class="btn primary" id="inviteShare">COMPARTILHAR LINK</button><button class="btn ghost" id="inviteClose">VOLTAR</button><p id="inviteStatus" role="status"></p></div></div>
+<div class="overlay hidden" id="loginModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="loginTitle"><form class="dialog large" id="loginForm"><h2 id="loginTitle">Entrar na partida</h2><input type="hidden" id="loginRole"><label class="field"><span>Seu nome</span><input id="loginName" required maxlength="80" autocomplete="name"></label><label class="field"><span>Equipe</span><select id="loginTeam"><option value="A">Equipe A</option><option value="B">Equipe B</option></select></label><div id="operatorKeyField"><label class="field"><span>Chave do operador</span><input id="loginKey" type="password" autocomplete="current-password"></label><label class="check-row"><input id="importLegacy" type="checkbox" checked><span>Importar configurações antigas deste navegador, se ainda não houver partida.</span></label></div><p id="localOperatorNotice" class="hidden">Este dispositivo hospeda a partida. Seu acesso de operador será reconhecido automaticamente.</p><p id="loginError" role="alert"></p><button id="loginSubmit" class="btn primary" type="submit">ENTRAR</button><button id="loginCancel" class="btn ghost" type="button">VOLTAR</button></form></div>
 <div class="overlay hidden" id="operatorIntro" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="operatorIntroTitle"><div class="dialog operator-intro"><p class="eyebrow">TUTORIAL GUIADO</p><h2 id="operatorIntroTitle">VOCÊ ESTÁ NO MODO OPERADOR</h2><p>Você é responsável por configurar e iniciar a partida. Vamos orientar você em cada etapa para garantir que tudo esteja pronto antes de começar.</p><button class="btn primary" id="tutorialBegin">COMEÇAR TUTORIAL</button><button class="btn ghost" id="tutorialSkip">CONFIGURAR SEM TUTORIAL</button></div></div>
 <div id="tutorialShade" class="hidden"></div><aside id="tutorialCard" class="hidden" aria-live="polite"><strong id="tutorialProgress"></strong><p id="tutorialText"></p><div class="tutorial-controls"><button class="mini-btn" id="tutorialPrevious">Voltar</button><button class="mini-btn" id="tutorialNext">Próxima etapa</button><button class="mini-btn" id="tutorialClose">Fechar tutorial</button></div></aside>
 <script type="module" src="app.js"></script>

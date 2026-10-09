@@ -473,7 +473,7 @@ function showScreen(name) {
     }
   );
 
-  if (name !== "player") setPlayerPanMode(false);
+  if (name !== "player") playerViewer.drag = null;
   activeScreen =
     name;
 
@@ -1587,15 +1587,11 @@ function mapBox(
   zoom = 1,
   panX = 0,
   panY = 0,
-  map = draft.map
+  map = draft.map,
+  rotation = 0
 ) {
-  const iw =
-    map.naturalWidth ||
-    width;
-
-  const ih =
-    map.naturalHeight ||
-    height;
+  const iw = (rotation === 90 ? map.naturalHeight : map.naturalWidth) || width;
+  const ih = (rotation === 90 ? map.naturalWidth : map.naturalHeight) || height;
 
   const scale =
     Math.min(
@@ -1610,6 +1606,7 @@ function mapBox(
     ih * scale * zoom;
 
   return {
+    rotation,
     left:
       width / 2 -
       boxWidth / 2 +
@@ -1628,6 +1625,12 @@ function mapBox(
   };
 }
 
+function playerMapRotation() {
+  return innerHeight > innerWidth && state.match.map.naturalWidth > state.match.map.naturalHeight ? 90 : 0;
+}
+function mapPoint(box, x, y) {
+  return box.rotation === 90 ? {x:box.left + (1-y)*box.width, y:box.top + x*box.height} : {x:box.left + x*box.width, y:box.top + y*box.height};
+}
 function resizeCanvas(canvas) {
   if (!canvas) {
     return null;
@@ -1709,15 +1712,7 @@ function drawMapMarks(
         return;
       }
 
-      const x =
-        box.left +
-        mark.x *
-        box.width;
-
-      const y =
-        box.top +
-        mark.y *
-        box.height;
+      const {x,y} = mapPoint(box,mark.x,mark.y);
 
       const size =
         Math.max(
@@ -1879,15 +1874,7 @@ function drawMapMarks(
     state.match.bomb;
 
   if (bomb.planted) {
-    const bx =
-      box.left +
-      bomb.x *
-      box.width;
-
-    const by =
-      box.top +
-      bomb.y *
-      box.height;
+    const {x:bx,y:by} = mapPoint(box,bomb.x,bomb.y);
 
     ctx.save();
 
@@ -1951,15 +1938,7 @@ function drawPlayerMark(
   box
 ) {
   if (!player.joined || !Number.isFinite(player.x) || !Number.isFinite(player.y)) return;
-  const x =
-    box.left +
-    player.x *
-    box.width;
-
-  const y =
-    box.top +
-    player.y *
-    box.height;
+  const {x,y} = mapPoint(box,player.x,player.y);
 
   const radius =
     Math.max(
@@ -2076,7 +2055,8 @@ function drawCanvas(
       zoom,
       panX,
       panY,
-      options.live ? state.match.map : draft.map
+      options.live ? state.match.map : draft.map,
+      options.rotation || 0
     );
 
   const paint =
@@ -2114,17 +2094,18 @@ function drawCanvas(
           zoom,
           panX,
           panY,
-          options.live ? state.match.map : draft.map
+          options.live ? state.match.map : draft.map,
+      options.rotation || 0
         );
 
       if (image) {
-        context.drawImage(
-          image,
-          currentBox.left,
-          currentBox.top,
-          currentBox.width,
-          currentBox.height
-        );
+        if (currentBox.rotation === 90) {
+          context.save();
+          context.translate(currentBox.left + currentBox.width,currentBox.top);
+          context.rotate(Math.PI / 2);
+          context.drawImage(image,0,0,currentBox.height,currentBox.width);
+          context.restore();
+        } else context.drawImage(image,currentBox.left,currentBox.top,currentBox.width,currentBox.height);
       }
 
       if (image) {
@@ -2237,26 +2218,25 @@ function constrainPlayerPan() {
   if (!canvas) return;
   const r = canvas.getBoundingClientRect();
   if (!r.width || !r.height) return;
-  const box = mapBox(r.width,r.height,playerViewer.zoom,0,0,state.match.map);
+  const box = mapBox(r.width,r.height,playerViewer.zoom,0,0,state.match.map,playerMapRotation());
   const limitX = Math.max(0,(box.width-r.width)/2);
   const limitY = Math.max(0,(box.height-r.height)/2);
   playerViewer.panX = Math.max(-limitX,Math.min(limitX,playerViewer.panX));
   playerViewer.panY = Math.max(-limitY,Math.min(limitY,playerViewer.panY));
 }
-function setPlayerPanMode(enabled) {
-  playerViewer.panEnabled = Boolean(enabled);
-  playerViewer.drag = null;
-  $('playerMapSurface')?.classList.toggle('map-pan-enabled',playerViewer.panEnabled);
-  $('playerMapDragToggle')?.setAttribute('aria-pressed',String(playerViewer.panEnabled));
-  setText('playerMapDragToggle',playerViewer.panEnabled ? 'Rolar tela' : 'Mover mapa');
-  setText('playerMapGestureHint',playerViewer.panEnabled ? 'Arraste dentro da delimitação para mover o mapa. Toque em “Rolar tela” para voltar à rolagem.' : 'Arraste para rolar a tela. Para navegar no mapa ampliado, ative “Mover mapa”.');
+function setPlayerPanMode() {
+  const enabled = playerViewer.zoom > 1.01;
+  playerViewer.panEnabled = enabled;
+  $('playerMapSurface')?.classList.toggle('map-pan-enabled',enabled);
 }
-
 function drawPlayerMap() {
+  if ($('playerZoomOut')) $('playerZoomOut').disabled = playerViewer.zoom <= 1;
+  if ($('playerZoomIn')) $('playerZoomIn').disabled = playerViewer.zoom >= 4;
   const surface = $("playerMapSurface");
   const map = state.match.map;
   if (surface) {
-    surface.style.aspectRatio = `${map.naturalWidth || 16} / ${map.naturalHeight || 10}`;
+    surface.dataset.orientation = playerMapRotation() === 90 ? "portrait" : "original";
+    setPlayerPanMode();
     constrainPlayerPan();
   }
   drawCanvas(
@@ -2272,6 +2252,7 @@ function drawPlayerMap() {
       panY:
         playerViewer.panY,
 
+      rotation:playerMapRotation(),
       playerView:
         true,
 
@@ -3478,7 +3459,7 @@ function renderPlayerLive() {
 
   setText(
     'pGps',
-    state.gps.updatedAt
+    !window.isSecureContext ? 'GPS requer conexão segura' : state.gps.updatedAt
       ? `GPS ±${Math.round(
           state.gps.accuracy || 0
         )}m`
@@ -6182,7 +6163,7 @@ function bindEvents() {
     () => {
       playerViewer.zoom =
         Math.max(
-          .75,
+          1,
           playerViewer.zoom - .25
         );
 
@@ -6194,7 +6175,7 @@ function bindEvents() {
     'playerMapCenter',
     'click',
     () => {
-      setPlayerPanMode(false);
+      playerViewer.drag = null;
       playerViewer.zoom =
         1;
 
@@ -6209,13 +6190,12 @@ function bindEvents() {
   );
 
   /* Player gestures: scrolling is the default; map panning is explicit. */
-  on('playerMapDragToggle', 'click', () => setPlayerPanMode(!playerViewer.panEnabled));
   const playerCanvas = $('playerMapCanvas');
   if (playerCanvas) {
     playerCanvas.addEventListener('pointerdown', event => {
       if (!playerViewer.panEnabled || event.button !== 0 || !event.isPrimary) return;
       const r = playerCanvas.getBoundingClientRect();
-      const box = mapBox(r.width, r.height, playerViewer.zoom, playerViewer.panX, playerViewer.panY, state.match.map);
+      const box = mapBox(r.width, r.height, playerViewer.zoom, playerViewer.panX, playerViewer.panY, state.match.map,playerMapRotation());
       const x = event.clientX - r.left, y = event.clientY - r.top;
       if (x < box.left || x > box.left + box.width || y < box.top || y > box.top + box.height) return;
       playerViewer.drag = {pointerId:event.pointerId,x:event.clientX,y:event.clientY,panX:playerViewer.panX,panY:playerViewer.panY};
@@ -6231,6 +6211,20 @@ function bindEvents() {
     for (const name of ['pointerup','pointercancel','lostpointercapture']) playerCanvas.addEventListener(name, event => {
       if (playerViewer.drag?.pointerId === event.pointerId) playerViewer.drag = null;
     });
+    let pinch = null;
+    const touchDistance = touches => Math.hypot(touches[0].clientX-touches[1].clientX,touches[0].clientY-touches[1].clientY);
+    playerCanvas.addEventListener('touchstart',event=>{
+      if(event.touches.length!==2)return;
+      event.preventDefault();playerViewer.drag=null;
+      pinch={distance:touchDistance(event.touches),zoom:playerViewer.zoom};
+    },{passive:false});
+    playerCanvas.addEventListener('touchmove',event=>{
+      if(!pinch||event.touches.length!==2)return;
+      event.preventDefault();playerViewer.drag=null;
+      playerViewer.zoom=Math.max(1,Math.min(4,pinch.zoom*touchDistance(event.touches)/Math.max(1,pinch.distance)));
+      drawPlayerMap();
+    },{passive:false});
+    for(const eventName of ['touchend','touchcancel'])playerCanvas.addEventListener(eventName,()=>{pinch=null;playerViewer.drag=null;});
     const surface = $('playerMapSurface');
     if (surface && window.ResizeObserver) new ResizeObserver(() => {
       if (activeScreen === 'player' && state.match.status === 'live') drawPlayerMap();
@@ -6751,6 +6745,7 @@ window.addEventListener(
 
 /* Persistent multiplayer integration. Visual role is separate from authorization. */
 let identity = null;
+let hostInfo = null;
 let authoritative = null;
 let stream = null;
 let saving = false;
@@ -6775,14 +6770,22 @@ function mergeConfiguration(current, next) {
   for (const key of bombConfigurationKeys) result.bomb[key] = deepClone(next.bomb[key]);
   return result;
 }
-function connectionStatus(text) { setText('connectionStatus', text); }
+function connectionStatus(text) {
+  const connected=text.startsWith('Conectado');
+  setText('connectionStatus', connected ? 'Conectado' : text);
+  if ($('connectionStatus')) $('connectionStatus').title=text;
+  $('reconnectButton')?.classList.toggle('hidden',connected);
+}
 async function request(path, body) {
   const response = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)} : {});
+  if (!(response.headers.get("content-type") || "").includes("application/json")) throw new Error("Este endereço não está conectado à partida. Abra o link compartilhado pelo operador.");
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
   return data;
 }
 function receive(data) {
+  hostInfo=data.host || hostInfo;
+  toggleHidden('shareMatch', !hostInfo?.joinUrls?.length || data.identity?.role !== 'organizer');
   const clean = !draftDirty();
   const gps = state.gps;
   authoritative = deepClone(data.match); identity = data.identity;
@@ -6849,7 +6852,8 @@ async function persistChanges() {
 }
 function openLogin(selectedRole) {
   $('loginRole').value = selectedRole;
-  toggleHidden('operatorKeyField', selectedRole !== 'organizer');
+  toggleHidden('localOperatorNotice',selectedRole!=='organizer'||!hostInfo?.localOperator);
+  toggleHidden('operatorKeyField', selectedRole !== 'organizer' || hostInfo?.localOperator);
   setText('loginTitle', selectedRole === 'organizer' ? 'Acesso do operador' : 'Entrar como jogador');
   $('loginName').value = identity?.name || localStorage.getItem('df_display_name') || '';
   $('loginKey').value = '';
@@ -6937,6 +6941,11 @@ function renderPlayerExtras() {
   }
 }
 function bindEnhancements() {
+  on('shareMatch','click',()=>{$('inviteUrl').innerHTML=(hostInfo?.joinUrls||[]).map(url=>`<option value="${esc(url)}">${esc(url)}</option>`).join('');setText('inviteStatus','');openOverlay('inviteModal');});
+  on('inviteClose','click',()=>closeOverlay('inviteModal'));
+  on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida pela rede do operador',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
+  on('sessionMenu','click',()=>{const expanded=$('sessionMenu').getAttribute('aria-expanded')==='true';$('sessionMenu').setAttribute('aria-expanded',String(!expanded));$('sessionActions').classList.toggle('expanded',!expanded);});
+  for(const button of $$('#sessionActions button'))button.addEventListener('click',()=>{$('sessionMenu').setAttribute('aria-expanded','false');$('sessionActions').classList.remove('expanded');});
   on('loginForm','submit',async event=>{
     event.preventDefault(); const button=$('loginSubmit');button.disabled=true;setText('loginError','');
     try {

@@ -1,12 +1,16 @@
 import test from 'node:test';
+import http from 'node:http';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, statSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from '../server.js';
 const key='test-operator-secret';
-async function harness(path=':memory:') {
-  const app=createApp({dbPath:path,operatorKey:key});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
+async function harness(path=':memory:',options={}) {
+  const app=createApp({dbPath:path,operatorKey:key,...options});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));
   const url=`http://127.0.0.1:${app.server.address().port}`;
   function client(cookie='') {return {cookie,async call(path,body){const res=await fetch(url+path,{method:body?'POST':'GET',headers:{Cookie:this.cookie,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(res.headers.get('set-cookie'))this.cookie=res.headers.get('set-cookie').split(';')[0];return {status:res.status,data:await res.json()};}};}
   return {app,url,client};
@@ -98,4 +102,37 @@ test('overdue explosion and match end resume from persisted timestamps after ser
     await h.app.close();h=await harness(path);await new Promise(r=>setTimeout(r,650));assert.equal((await h.client(opCookie).call('/api/state')).data.match.status,'ended');
     const events=(await h.client(opCookie).call('/api/events')).data.events;assert.equal(events.filter(e=>e.type==='bomb_explosion').length,1);assert.equal(events.filter(e=>e.type==='end').length,1);
   }finally{await h.app.close();rmSync(dir,{recursive:true,force:true});}
+});
+test('temporary host recognizes only loopback device and never trusts forwarded headers or LAN Host',async()=>{
+  const h=await harness(':memory:',{phoneHost:true});try {
+    const local=h.client();const info=(await local.call('/api/state')).data.host;assert.equal(info.phoneHost,true);assert.equal(info.localOperator,true);
+    const result=await local.call('/api/login',{role:'organizer',name:'Operador local',team:'A'});assert.equal(result.status,200);assert.equal(result.data.identity.role,'organizer');
+    async function remoteRequest(path,body) {
+      return new Promise((resolve,reject)=>{const req=http.request(h.url+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Host:'192.168.1.10:3000','X-Forwarded-For':'127.0.0.1'}},res=>{let data='';res.on('data',chunk=>data+=chunk);res.on('end',()=>resolve({status:res.statusCode,data:JSON.parse(data)}));});req.on('error',reject);req.end(body?JSON.stringify(body):undefined);});
+    }
+    const remote=await remoteRequest('/api/login',{role:'organizer',name:'Participante remoto'});assert.equal(remote.status,403);
+    const remoteState=await remoteRequest('/api/state');assert.equal(remoteState.data.host.localOperator,false);
+  }finally{await h.app.close();}
+});
+test('phone-mode launcher creates a private key automatically and preserves it and match state across restarts',async()=>{
+  const dir=mkdtempSync(join(tmpdir(),'df-phone-'));const allocation=await harness();const port=allocation.app.server.address().port;await allocation.app.close();let child;
+  const env={...process.env,DATABASE_PATH:join(dir,'airsoft.sqlite'),PORT:String(port),HOST:'127.0.0.1'};delete env.OPERATOR_KEY;delete env.TERMUX_VERSION;
+  async function start(){child=spawn(process.execPath,[fileURLToPath(new URL('../server.js',import.meta.url)),'--phone'],{env,stdio:['ignore','pipe','pipe']});await new Promise((resolve,reject)=>{child.stdout.on('data',chunk=>{if(chunk.toString().includes('disponível'))resolve();});child.once('error',reject);child.once('exit',code=>{if(code)reject(new Error('Host failed to start'));});});}
+  async function stop(){const ended=once(child,'exit');child.kill('SIGTERM');await ended;child=null;}
+  try {
+    await start();const keyStat=statSync(join(dir,'operator-key'));assert.equal(keyStat.mode&0o777,0o600);
+    const url=`http://127.0.0.1:${port}`;let result=await fetch(url+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'organizer',name:'Operador'})});assert.equal(result.status,200);const original=await result.json();const cookie=result.headers.get('set-cookie').split(';')[0];await stop();
+    await start();assert.equal(statSync(join(dir,'operator-key')).mtimeMs,keyStat.mtimeMs);result=await fetch(url+'/api/state',{headers:{Cookie:cookie}});const recovered=await result.json();assert.equal(recovered.match.id,original.match.id);assert.equal(recovered.identity.role,'organizer');await stop();
+  }finally{if(child){const ended=once(child,'exit');child.kill('SIGTERM');await ended;}rmSync(dir,{recursive:true,force:true});}
+});
+test('temporary LAN host shares an actual reachable address and remote players cannot become operators automatically',async()=>{
+  const app=createApp({dbPath:':memory:',operatorKey:key,phoneHost:true});await new Promise(r=>app.server.listen(0,'0.0.0.0',r));
+  try {
+    const local=`http://127.0.0.1:${app.server.address().port}`;
+    const login=await fetch(local+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'organizer',name:'Operador local'})});assert.equal(login.status,200);
+    const data=await login.json();assert.ok(data.host.joinUrls.length>0,'A local network interface should produce an invitation link');
+    const invitation=data.host.joinUrls[0];const remoteState=await fetch(invitation+'/api/state');assert.equal(remoteState.status,200);assert.equal((await remoteState.json()).host.localOperator,false);
+    const remoteOperator=await fetch(invitation+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'organizer',name:'Jogador remoto'})});assert.equal(remoteOperator.status,403);
+    const player=await fetch(invitation+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'player',name:'Jogador remoto',team:'B'})});assert.equal(player.status,200);assert.equal((await player.json()).identity.role,'player');
+  }finally{await app.close();}
 });

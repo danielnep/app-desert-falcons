@@ -2,3 +2,4 @@ data/
 .env
 __pycache__/
 tests/artifacts/
+operator-key

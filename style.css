@@ -1624,3 +1624,26 @@ body:has(#tutorialCard:not(.hidden)) .editor-stage { height:auto; }
 .player-map-surface.map-pan-enabled canvas:active { cursor:grabbing; }
 .map-gesture-hint { margin:10px 0; font-size:12px; color:var(--muted); line-height:1.5; }
 .map-preview { height:auto; min-height:0; aspect-ratio:16 / 10; max-height:65dvh; border:1px solid var(--border); }
+
+/* Player view: the field is the main screen, not a thumbnail below menus. */
+.session-actions { display:contents; }
+.session-menu-toggle { display:none; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-toolbar { gap:6px; padding:6px 10px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) #connectionStatus { flex-basis:auto; font-size:10px; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) #participantName { flex:1; flex-basis:auto; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-menu-toggle { display:block; min-height:34px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-actions { display:none; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-actions.expanded { display:flex; flex-wrap:wrap; gap:6px; flex-basis:100%; }
+[data-screen="player"] { padding:8px; }
+.tactical-map { display:block; position:relative; padding:0; border:0; }
+.player-map-surface { height:58dvh; min-height:280px; max-height:620px; aspect-ratio:auto!important; border:2px solid var(--brown); }
+.tactical-map .map-corner-tools { position:absolute; top:8px; right:8px; flex-wrap:nowrap; max-width:none; gap:2px; border-radius:999px; }
+.tactical-map .hud-chip { position:absolute; background:rgba(255,255,255,.92); padding:6px 8px; }
+.tactical-map .hud-objective { top:8px; left:8px; max-width:48%; }
+.tactical-map .hud-score { top:48px; right:8px; gap:8px; }
+.tactical-map .hud-you { bottom:8px; left:8px; }
+.tactical-map .hud-time { bottom:8px; right:8px; }
+.tactical-map canvas { touch-action:pan-y; }
+.player-map-surface.map-pan-enabled canvas { touch-action:none; }
+.map-gesture-hint { font-size:11px; margin:8px 2px; }
+@media(orientation:landscape) { .player-map-surface { height:64dvh; min-height:180px; } }

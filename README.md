@@ -16,6 +16,18 @@ Abra `http://localhost:3000`. Distribua a chave somente aos operadores autorizad
 
 Variáveis: `PORT` (3000), `HOST` (0.0.0.0), `DATABASE_PATH` (`data/airsoft.sqlite`), `OPERATOR_KEY` (obrigatória), `SECURE_COOKIES` (`true` em HTTPS). O servidor recusa iniciar sem chave válida. Nenhuma chave deve ser adicionada ao Git.
 
+## Host temporário no dispositivo do operador
+
+Foi acrescentado `npm run phone` para um dispositivo que **já tenha um runtime Node.js 24+**. Esse modo cria e conserva uma chave segura automaticamente, reconhece o operador somente em `127.0.0.1`/`localhost`, disponibiliza o servidor na rede local e apresenta **Convidar jogadores** com o endereço real da rede. Em Termux, também solicita a abertura do navegador local automaticamente. Jogadores na mesma rede usam o link compartilhado, nunca o seu próprio `localhost`.
+
+**Não é possível iniciar esse servidor apenas abrindo HTML no Chrome/Safari.** O runtime precisa ser instalado/executado no sistema. O modo foi testado em Node/Linux; inicialização em Android/Termux e iPhone não foi executada. É necessário confirmar o sistema do celular para integrar uma forma adequada de iniciar o host. Em iPhone, Node/Termux não oferece esse caminho; é necessária uma aplicação nativa compatível ou outro modelo de conexão.
+
+O link HTTP de rede local permite sincronização da partida, mas navegadores podem bloquear GPS fora de contexto seguro. GPS de jogadores nesse arranjo depende de integração nativa ou HTTPS confiável; isso ainda não foi validado no telefone.
+
+## Mapa na área do jogador
+
+O mapa é a área principal, com HUD sobreposto e menu compacto. Em celular vertical, uma imagem horizontal é apresentada verticalmente; ao girar o celular, volta à orientação original. Objetivos e participantes acompanham a mesma transformação, com textos legíveis. A visão inicial mostra todo o campo delimitado. Dois dedos ampliam; depois de ampliar, arrastar move o mapa automaticamente. Centralizar volta à visão completa, na qual arrastar rola a tela. Não há botão para alternar modos de gesto.
+
 ## Implantação
 
 1. Use um serviço que execute Node.js 24 continuamente e tenha disco persistente. GitHub Pages sozinho não executa o servidor.

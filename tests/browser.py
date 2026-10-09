@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright, expect
 root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as temp:
  env=dict(os.environ,OPERATOR_KEY='test-operator-secret',DATABASE_PATH=temp+'/game.sqlite',PORT='3107',HOST='127.0.0.1')
- server=subprocess.Popen(['node','server.js'],cwd=root,env=env,stdout=subprocess.PIPE,text=True)
+ server=subprocess.Popen(['node','server.js','--phone'],cwd=root,env=env,stdout=subprocess.PIPE,text=True)
  assert 'disponível' in server.stdout.readline()
  try:
   with sync_playwright() as p:
@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory() as temp:
     page.goto('http://127.0.0.1:3107')
    player.locator('[data-role="player"]').click();player.locator('#loginName').fill('Jogador móvel');player.locator('#loginTeam').select_option('B');player.locator('#loginSubmit').click()
    expect(player.locator('#playerWait')).to_be_visible()
-   op.locator('[data-role="organizer"]').click();op.locator('#loginName').fill('Operador');op.locator('#loginKey').fill('test-operator-secret');op.locator('#loginSubmit').click()
+   op.locator('[data-role="organizer"]').click();op.locator('#loginName').fill('Operador');expect(op.locator('#localOperatorNotice')).to_be_visible();op.locator('#loginSubmit').click()
    expect(op.locator('#operatorIntro')).to_be_visible();op.locator('#tutorialBegin').click()
    expect(op.locator('#tutorialProgress')).to_have_text('Etapa 1 de 6')
    op.locator('[data-apply-modal="modesModal"]').click();expect(op.locator('#tutorialProgress')).to_have_text('Etapa 2 de 6')
@@ -32,11 +32,12 @@ with tempfile.TemporaryDirectory() as temp:
    op.locator('#confirmStart').check();expect(op.locator('#tutorialProgress')).to_have_text('Etapa 6 de 6')
    player.locator('#btnConfirm').click();expect(player.locator('#btnConfirm')).to_contain_text('CONFIRMADA')
    op.locator('#btnStartMatch').click();expect(op.locator('#playerLive')).to_be_visible();expect(player.locator('#playerLive')).to_be_visible()
-   # Real touch gestures must scroll the page by default and pan only on request.
+   # Touch gestures scroll at fit size, then pinch and pan automatically after zoom.
    surface=player.locator('#playerMapSurface');canvas=player.locator('#playerMapCanvas')
    bounds=canvas.bounding_box()
-   assert abs(bounds['width']/bounds['height'] - 1.6) < .04, 'map should fit image aspect ratio without tall empty area'
-   expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','false')
+   assert bounds['height'] >= 844*.5, 'map must be the main player area on a phone'
+   expect(surface).to_have_attribute('data-orientation','portrait')
+   assert player.locator('#playerMapDragToggle').count()==0, 'gestures must not require a mode button'
    cdp=player_context.new_cdp_session(player)
    def swipe(dx,dy):
     box=canvas.bounding_box();x=box['x']+box['width']/2;y=box['y']+box['height']/2
@@ -50,29 +51,38 @@ with tempfile.TemporaryDirectory() as temp:
    swipe(0,-90)
    assert player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop') > 25, 'touching map should not trap page scrolling'
    player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop=0');player.wait_for_timeout(300)
-   for _ in range(4):player.locator('#playerZoomIn').click()
-   player.locator('#playerMapDragToggle').click();expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','true')
+   # Pinch with two fingers automatically zooms; dragging then pans without a mode selector.
+   box=canvas.bounding_box();cx=box['x']+box['width']/2;cy=box['y']+box['height']/2
+   cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':cx-30,'y':cy},{'x':cx+30,'y':cy}]})
+   for i in range(1,9):
+    spread=30+30*i/8;cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':cx-spread,'y':cy},{'x':cx+spread,'y':cy}]});player.wait_for_timeout(35)
+   cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]});player.wait_for_timeout(250)
+   expect(player.locator('#playerZoomValue')).to_have_text('200%')
    before_image=canvas.screenshot();before_scroll=player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop')
    swipe(-60,-35)
    assert canvas.screenshot()!=before_image, 'drag must move the zoomed map'
    assert abs(player.locator('[data-screen="player"]').evaluate('(el)=>el.scrollTop')-before_scroll)<5, 'map drag must not scroll page in map mode'
-   player.locator('#playerMapCenter').click();expect(player.locator('#playerMapDragToggle')).to_have_attribute('aria-pressed','false');expect(player.locator('#playerZoomValue')).to_have_text('100%')
+   player.locator('#playerMapCenter').click();expect(player.locator('#playerZoomValue')).to_have_text('100%')
+   player.set_viewport_size({'width':844,'height':390});expect(surface).to_have_attribute('data-orientation','original');player.set_viewport_size({'width':390,'height':844});expect(surface).to_have_attribute('data-orientation','portrait')
    before=op.evaluate('fetch("/api/state").then(r=>r.json())')
    op.locator('#modeOperator').click();expect(op.locator('[data-screen="organizer"]')).to_be_visible();op.locator('#modePlayer').click();expect(op.locator('#playerLive')).to_be_visible()
    after=op.evaluate('fetch("/api/state").then(r=>r.json())')
    assert before['match']['startAt']==after['match']['startAt'] and before['match']['id']==after['match']['id']
-   expect(player.locator('#modeSwitch')).to_be_hidden();player.locator('#definitionsButton').click();expect(player.locator('#editDefinitions')).to_be_hidden();expect(player.locator('#definitionsList')).to_contain_text('Partida integrada');player.locator('#definitionsBack').click()
+   def action(name):
+    if not player.locator('#'+name).is_visible():player.locator('#sessionMenu').click()
+    player.locator('#'+name).click()
+   expect(player.locator('#modeSwitch')).to_be_hidden();action('definitionsButton');expect(player.locator('#editDefinitions')).to_be_hidden();expect(player.locator('#definitionsList')).to_contain_text('Partida integrada');player.locator('#definitionsBack').click()
    op.locator('#modeOperator').click();op.locator('#openControlFromMenu').click();op.locator('#liveRespawnDelay').fill('0');op.locator('#btnApplyLiveRules').click()
-   player.locator('#definitionsButton').click();expect(player.locator('#definitionsList')).to_contain_text('Respawn (s)');player.locator('#definitionsBack').click()
+   action('definitionsButton');expect(player.locator('#definitionsList')).to_contain_text('Respawn (s)');player.locator('#definitionsBack').click()
    player.locator('#btnHit').click();player.locator('#confirmOk').click();expect(player.locator('#pAlive')).to_contain_text('2 vida')
    player.reload();expect(player.locator('#playerLive')).to_be_visible();expect(player.locator('#pAlive')).to_contain_text('2 vida')
-   player.locator('#historyButton').click();expect(player.locator('#historyList')).to_contain_text('Partida iniciada');expect(player.locator('#historyList')).to_contain_text('HIT registrado');player.locator('#historySearch').fill('HIT');expect(player.locator('#historyList')).to_contain_text('HIT');player.locator('#historyBack').click()
+   action('historyButton');expect(player.locator('#historyList')).to_contain_text('Partida iniciada');expect(player.locator('#historyList')).to_contain_text('HIT registrado');player.locator('#historySearch').fill('HIT');expect(player.locator('#historyList')).to_contain_text('HIT');player.locator('#historyBack').click()
    assert player.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'mobile horizontal overflow'
    # Repeat the tutorial against a mobile operator viewport, test real highlight positioning.
    op.set_viewport_size({'width':390,'height':844});op.locator('#tutorialAgain').click();op.locator('#tutorialBegin').click();expect(op.locator('#tutorialShade')).to_be_visible();expect(op.locator('.tutorial-highlight')).to_be_visible();Path(root/'tests/artifacts').mkdir(exist_ok=True);op.screenshot(path=str(root/'tests/artifacts/operator-mobile-tutorial.png'),full_page=True);op.locator('#tutorialClose').click()
    Path(temp+'/mobile.png').parent.mkdir(exist_ok=True);player.screenshot(path=str(root/'tests/artifacts/player-mobile.png'),full_page=True)
    assert not errors, errors
-   print(json.dumps({'result':'PASS','scenarios':['waiting before match','operator authentication','six-step interactive tutorial','configuration and map editor','player waiting','SSE automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial','touch scrolling over map','explicit map pan and recenter'],'page_errors':errors},ensure_ascii=False))
+   print(json.dumps({'result':'PASS','scenarios':['waiting before match','local operator automatic authentication','six-step interactive tutorial','configuration and map editor','player waiting','SSE automatic start','operator/player switching preserves match','read-only definitions','live respawn update','HIT','reload','persistent history and search','mobile layout and tutorial','touch scrolling over map','automatic pinch and pan','automatic portrait and landscape orientation'],'page_errors':errors},ensure_ascii=False))
    browser.close()
  finally:
   server.terminate();server.wait(timeout=10)
