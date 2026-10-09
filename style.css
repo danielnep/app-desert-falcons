@@ -1655,3 +1655,67 @@ body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-action
 /* Simple role entry and readable first-use guides. */
 .role-guide{margin-top:24px;padding:20px;border:1px solid var(--line, #343b40);border-radius:16px;background:rgba(255,255,255,.035)}
 .role-guide h2{font-size:1.1rem;margin:0 0 12px}.role-guide ol,.intro-steps{padding-left:22px;line-height:1.65}.role-guide li,.intro-steps li{margin:0 0 12px}.role-guide p{opacity:.75;font-size:.88rem;line-height:1.5}.role-card:disabled{opacity:.45;cursor:not-allowed}.intro-steps strong{display:block}
+
+/* Consistent mobile navigation across waiting, setup and live screens. */
+#app { max-width:560px; }
+.header { min-height:66px; }
+.brand-logo { width:44px; height:44px; }
+.brand-text strong { letter-spacing:.08em; }
+.session-toolbar { width:100%; flex-shrink:0; margin:0; padding:12px 16px; gap:10px; border-bottom:1px solid var(--border); background:var(--surface); }
+.session-identity { flex:1; min-width:0; }
+#participantName { display:block; font-size:12px; font-weight:650; }
+.session-toolbar #connectionStatus { display:block; max-width:none; font-size:10px; color:var(--muted); margin-top:3px; white-space:normal; }
+.session-toolbar .session-menu-toggle { display:block; min-height:42px; padding:10px 14px; background:var(--surface2); border-radius:10px; font-size:12px; text-transform:none; letter-spacing:0; }
+#modeSwitch { display:grid; grid-template-columns:1fr 1fr; width:100%; padding:4px; gap:4px; background:var(--soft); border-radius:12px; }
+#modeSwitch .mini-btn { min-height:38px; border:0; border-radius:8px; background:transparent; font-size:12px; letter-spacing:0; text-transform:none; }
+#modeSwitch .mini-btn.active { background:var(--surface2); color:var(--brownDark); box-shadow:0 1px 4px #0001; }
+.session-actions.overlay { position:fixed; display:flex; z-index:1500; padding:16px; }
+.session-menu-panel { width:min(460px,100%); max-height:calc(100dvh - 32px); overflow:auto; padding:20px; border-radius:20px; }
+.menu-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; }
+.menu-heading h2 { margin:0; font-size:20px; letter-spacing:0; }
+.menu-heading .mini-btn { width:42px; height:42px; border-radius:10px; }
+.menu-section-label { color:var(--muted); font-size:11px; font-weight:700; margin:16px 0 8px; }
+.menu-items { display:grid; gap:0; border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.menu-items .mini-btn { width:100%; display:grid; grid-template-columns:1fr auto; padding:13px 14px; min-height:54px; border:0; border-radius:0; background:var(--surface2); text-align:left; letter-spacing:0; text-transform:none; }
+.menu-items .mini-btn+.mini-btn { border-top:1px solid var(--border); }
+.menu-items strong { font-size:13px; grid-column:1; }
+.menu-items small { font-size:11px; color:var(--muted); font-weight:400; margin-top:3px; grid-column:1; }
+.menu-items span { grid-column:2; grid-row:1 / 3; align-self:center; font-size:24px; color:var(--brown); }
+.menu-items .mini-btn:hover { background:var(--surface); }
+.screen { padding:22px 18px; }
+.screen h1 { font-size:28px; letter-spacing:-.02em; margin-top:8px; }
+.screen-copy { font-size:13px; line-height:1.65; }
+.role-card { border-radius:14px; padding:20px 16px; }
+.role-copy strong { font-size:18px; }
+.role-copy small { font-size:12px; line-height:1.6; margin-top:6px; }
+.role-guide { border-color:var(--border); background:var(--surface); padding:18px; }
+#roleError { color:var(--danger); font-size:13px; line-height:1.5; }
+#roleError:empty { display:none; }
+.operator-top { margin-bottom:20px; }
+.operator-top h2 { font-size:23px; letter-spacing:-.02em; }
+.operator-top .state-badge { display:none; }
+.op-menu { gap:10px; }
+.op-menu-card { padding:17px 14px; border-radius:14px; grid-template-columns:32px 1fr 14px; }
+.op-menu-card strong { font-size:14px; }
+.op-menu-card small { font-size:12px; line-height:1.5; margin-top:4px; }
+.menu-icon { width:30px; height:30px; border-radius:50%; background:var(--brownSoft); font-size:12px; font-weight:750; display:grid; place-items:center; }
+.menu-summary { margin-top:20px; border-radius:14px; }
+#operatorEnded { padding:20px; border-radius:14px; }
+#operatorEnded h3 { font-size:17px; margin-bottom:10px; }
+#operatorEnded p { font-size:13px; line-height:1.65; color:var(--muted); }
+.empty-state { margin:20px 8px; padding:28px 20px; border:1px solid var(--border); border-radius:18px; background:var(--surface); text-align:center; }
+.empty-icon { font-size:32px; color:var(--brown); margin-bottom:16px; }
+.empty-state h2 { font-size:23px; margin:10px 0; }
+.empty-state p:not(.eyebrow) { color:var(--muted); font-size:13px; line-height:1.7; margin-bottom:22px; }
+.dialog { max-height:calc(100dvh - 32px); overflow:auto; }
+.operator-intro { border-radius:20px; padding:26px; }
+.operator-intro h2 { font-size:22px; line-height:1.3; }
+.intro-steps { font-size:13px; }
+.btn { min-height:46px; border-radius:10px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-toolbar { padding:10px 14px; gap:8px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) #connectionStatus { max-width:none; font-size:10px; white-space:normal; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) #participantName { font-size:12px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-menu-toggle { min-height:42px; }
+body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-actions { display:flex; }
+.hidden, #modeSwitch.hidden, .session-toolbar.hidden, .session-actions.hidden { display:none!important; }
+@media(max-width:380px) { .brand-text strong { font-size:11px; } .screen { padding:18px 14px; } .session-toolbar { padding:10px 14px; } .session-menu-panel { padding:16px; } }

@@ -1,5 +1,5 @@
 let localTransportPromise;
-function localTransport(){return localTransportPromise ||= import('./local-client.js?v=guided-entry-2').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-3').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -480,6 +480,7 @@ function showScreen(name) {
     name;
 
   updateHeader();
+  renderSessionNavigation();
 
   if (name === 'player') {
     renderPlayerExtras();
@@ -1198,7 +1199,7 @@ function renderOperatorMenu() {
     badge.textContent =
       live
         ? 'EM JOGO'
-        : 'CONFIGURANDO';
+        : state.match.status === 'ended' ? 'ENCERRADA' : 'CONFIGURANDO';
 
     badge.classList.toggle(
       'live',
@@ -1215,6 +1216,15 @@ function renderOperatorMenu() {
     'btnEnd',
     (!['open', 'live'].includes(state.match.status)||state.match.status==='open'&&!isOperator())
   );
+
+  const ended = state.match.status === 'ended';
+  setText('operatorTitle', live ? 'Gerenciar partida' : ended ? 'Partida encerrada' : 'Preparar partida');
+  setText('operatorCopy', live ? 'Acompanhe os jogadores e os eventos pelo controle da operação.' : ended ? 'Consulte o histórico ou prepare a próxima operação.' : 'Siga as quatro etapas abaixo. Revise tudo antes de iniciar.');
+  toggleHidden('operatorEnded', !ended);
+  toggleHidden('btnSaveDraft', ended);
+  for (const card of $$('.op-menu [data-open-modal]')) {
+    card.classList.toggle('hidden', ended || (live && card.dataset.openModal !== 'rulesModal'));
+  }
 
   const rows = [
     [
@@ -6794,7 +6804,7 @@ function receive(data) {
   toggleHidden('logoutAccount', !identity);
   toggleHidden('modeSwitch', !isOperator());
   toggleHidden('tutorialAgain', !isOperator());
-  toggleHidden('devBtn', !isOperator());
+  toggleHidden('devBtn', true);
   toggleHidden('joinAgain', !identity || Boolean(identity.playerId && !currentPlayer()?.left));
   toggleHidden('newMatch', !isOperator() || state.match.status !== 'ended');
   if (activeScreen === 'player') renderPlayer();
@@ -6812,6 +6822,7 @@ function receive(data) {
   document.querySelectorAll('[data-open-modal="modesModal"], [data-open-modal="mapModal"]').forEach(el => el.disabled = state.match.status === 'live');
   if (clean && isOperator() && !$('rulesModal').classList.contains('hidden')) syncDraftFields();
   renderPlayerExtras();
+  renderSessionNavigation();
 }
 async function connect() { (await localTransport()).connect(receive,connectionStatus); }
 
@@ -6851,7 +6862,7 @@ async function chooseRole(selectedRole) {
     const data=await request('/api/login',{role:selectedRole,team:'A'});
     receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);connect();
     showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
-    if(isOperator()){openOverlay('operatorIntro');setText('operatorIntroText',state.match.status==='live'?'A partida já começou. Você participa pelo painel do jogador e usa os botões Jogador e Operador no topo para acessar os controles.':'Você configura e inicia a partida. O guia vai destacar cada campo, explicar o que ele faz e acompanhar você até o botão Concluir configuração e iniciar partida.');$('tutorialBegin').textContent=state.match.status==='live'?'ABRIR PAINEL DA PARTIDA':'COMEÇAR PASSO A PASSO';}
+    if(isOperator() && state.match.status !== 'ended') showOperatorIntro();
     else openOverlay('playerIntro');
   }catch(error){setText('roleError',error.message);toast(error.message,5000);}
 }
@@ -6937,12 +6948,47 @@ function renderPlayerExtras() {
     const btn=document.createElement('button');btn.className='quick-action';btn.textContent=`Capturar ${flag.label}`;btn.disabled=Boolean(m.flagCarriers?.[flag.id]);btn.onclick=()=>command('flag',{flagId:flag.id},'BANDEIRA CAPTURADA.');actions.append(btn);
   }
 }
+function closeSessionMenu() {
+  closeOverlay('sessionActions');
+  $('sessionMenu').setAttribute('aria-expanded','false');
+  $('sessionMenu').focus();
+}
+function renderSessionNavigation() {
+  const entry = activeScreen === 'role';
+  document.querySelector('.session-toolbar').classList.toggle('hidden', entry);
+  if(entry)closeOverlay('sessionActions');
+  const operatorView = ['organizer','control'].includes(activeScreen);
+  for(const [id,selected] of [['modePlayer',!operatorView],['modeOperator',operatorView]]) {
+    $(id).classList.toggle('active',selected);
+    $(id).setAttribute('aria-pressed',String(selected));
+  }
+  toggleHidden('tutorialAgain', !isOperator() || state.match.status !== 'open');
+}
+function showOperatorIntro() {
+  const live=state.match.status==='live';
+  setText('operatorIntroText',live?'A partida já começou. Use Jogador para participar e Operador para abrir o controle da operação.':'Você configura e inicia a partida. O guia destaca cada etapa, explica os campos e acompanha você até Concluir configuração e iniciar partida.');
+  setText('tutorialBegin',live?'ABRIR PAINEL DA PARTIDA':'COMEÇAR PASSO A PASSO');
+  setText('tutorialSkip',live?'FECHAR INSTRUÇÕES':'CONFIGURAR SEM GUIA');
+  openOverlay('operatorIntro');
+}
 function bindEnhancements() {
   on('shareMatch','click',()=>{$('inviteUrl').innerHTML=(hostInfo?.joinUrls||[]).map(url=>`<option value="${esc(url)}">${esc(url)}</option>`).join('');setText('inviteStatus','');openOverlay('inviteModal');});
   on('inviteClose','click',()=>closeOverlay('inviteModal'));
   on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida Desert Falcons',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
-  on('sessionMenu','click',()=>{const expanded=$('sessionMenu').getAttribute('aria-expanded')==='true';$('sessionMenu').setAttribute('aria-expanded',String(!expanded));$('sessionActions').classList.toggle('expanded',!expanded);});
-  for(const button of $$('#sessionActions button'))button.addEventListener('click',()=>{$('sessionMenu').setAttribute('aria-expanded','false');$('sessionActions').classList.remove('expanded');});
+  on('sessionMenu','click',()=>{openOverlay('sessionActions');$('sessionMenu').setAttribute('aria-expanded','true');$('sessionMenuClose').focus();});
+  on('sessionMenuClose','click',closeSessionMenu);
+  on('sessionActions','click',event=>{if(event.target===$('sessionActions'))closeSessionMenu();});
+  document.addEventListener('keydown',event=>{
+    if($('sessionActions').classList.contains('hidden'))return;
+    if(event.key==='Escape'){event.preventDefault();closeSessionMenu();}
+    if(event.key==='Tab'){
+      const buttons=$$('#sessionActions button').filter(button=>!button.disabled&&button.getClientRects().length);
+      const first=buttons[0],last=buttons.at(-1);
+      if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+    }
+  });
+  for(const button of $$('#sessionActions button:not(#sessionMenuClose)'))button.addEventListener('click',closeSessionMenu);
   on('playerIntroClose','click',()=>closeOverlay('playerIntro'));
   on('playerHelp','click',()=>openOverlay('playerIntro'));
   on('logoutAccount','click',async()=>{
@@ -6959,7 +7005,7 @@ function bindEnhancements() {
   on('editDefinitions','click',()=>{showScreen('organizer');restoreDraft();openConfig('rulesModal');});
   on('historyMatch','change',loadHistory);on('historySearch','input',loadHistory);
   on('reconnectButton','click',async()=>{try{receive(await request('/api/state'));if(identity)connect();}catch(error){toast(error.message);}});
-  on('tutorialAgain','click',()=>{if(isOperator()){showScreen('organizer');openOverlay('operatorIntro');}});
+  on('tutorialAgain','click',()=>{if(isOperator()){showScreen('organizer');showOperatorIntro();}});
   on('tutorialBegin','click',()=>{closeOverlay('operatorIntro');if(state.match.status==='live')showScreen('player');else tutorialGo(0);});
   on('tutorialSkip','click',()=>closeOverlay('operatorIntro'));
   on('tutorialPrevious','click',()=>tutorialGo(tutorialStep-1));
@@ -6974,7 +7020,7 @@ function bindEnhancements() {
   on('mapEditorApply','click',()=>tutorialCompleted('mapEditorModal'));
   on('confirmStart','change',()=>{if(tutorialStep===4&&$('confirmStart').checked)tutorialGo(5);});
   on('positionSubmit','click',()=>command('position',{x:Number($('positionX').value)/100,y:Number($('positionY').value)/100},'POSIÇÃO NO MAPA ATUALIZADA.'));
-  on('newMatch','click',async()=>{if(await command('new',{},'NOVA CONFIGURAÇÃO CRIADA.')){restoreDraft();showScreen('organizer');openOverlay('operatorIntro');}});
+  for(const id of ['newMatch','newMatchFromOperator'])on(id,'click',async()=>{if(await command('new',{},'NOVA CONFIGURAÇÃO CRIADA.')){restoreDraft();showScreen('organizer');showOperatorIntro();}});
   on('gpsButton','click',requestGps);
   on('joinAgain','click',()=>chooseRole(identity?.role||'player'));
   on('grantBenefit','click',()=>command('benefit',{team:$('benefitTeam').value,kind:$('benefitKind').value},'BENEFÍCIO CONCEDIDO.'));
