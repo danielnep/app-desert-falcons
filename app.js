@@ -1,5 +1,5 @@
 let localTransportPromise;
-function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-4').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-5').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -6806,6 +6806,7 @@ function receive(data) {
   if (activeScreen === 'definitions') renderDefinitions();
   if (activeScreen === 'history') loadHistory();
   const ended = state.match.status === 'ended';
+  if (ended && activeScreen === 'control') showScreen('organizer');
   if ($('playerWait')) {
     $('playerWait').querySelector('h2').textContent = ended ? 'Partida encerrada' : 'Aguardando o operador';
     $('playerWait').querySelector('p:not(.eyebrow)').textContent = ended ? 'Os registros estão disponíveis no Histórico. Aguarde uma nova partida.' : 'O operador configura modos, regras e mapa, depois inicia a partida. Por enquanto, cada celular funciona de forma independente.';
