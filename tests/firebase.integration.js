@@ -6,7 +6,7 @@ import {initializeApp} from 'firebase/app';
 import {getAuth,connectAuthEmulator,signInWithEmailAndPassword,signInAnonymously} from 'firebase/auth';
 import {getFunctions,connectFunctionsEmulator,httpsCallable} from 'firebase/functions';
 import {getDatabase,connectDatabaseEmulator,ref,get,set,onValue} from 'firebase/database';
-const projectId='deseart-falcons-airsof';initializeAdmin({projectId,databaseURL:`http://127.0.0.1:9000?ns=${projectId}-default-rtdb`});
+const projectId='deseart-falcons-githib';initializeAdmin({projectId,databaseURL:`http://127.0.0.1:9000?ns=${projectId}-default-rtdb`});
 const user=await adminAuth().createUser({email:'operator@example.test',password:'test-password-123'});await adminAuth().setCustomUserClaims(user.uid,{operator:true});
 function client(name){const app=initializeApp({apiKey:'fake-key',projectId,databaseURL:`https://${projectId}-default-rtdb.firebaseio.com`},name);const auth=getAuth(app),fn=getFunctions(app),db=getDatabase(app);connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectFunctionsEmulator(fn,'127.0.0.1',5001);connectDatabaseEmulator(db,'127.0.0.1',9000);return {auth,db,call:async data=>(await httpsCallable(fn,'airsoft')(data)).data};}
 const op=client('operator'),p=client('player');await signInAnonymously(p.auth);

@@ -4,7 +4,7 @@ import {onCall,HttpsError} from 'firebase-functions/v2/https';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {onValueWritten} from 'firebase-functions/v2/database';
 import {fresh,execute,advance,validate,roster,normalize} from './engine.js';
-initializeApp({databaseURL:'https://deseart-falcons-airsof-default-rtdb.firebaseio.com'});
+initializeApp({databaseURL:'https://deseart-falcons-githib-default-rtdb.firebaseio.com'});
 const db=getDatabase(), root=db.ref('airsoftV2');
 function publish(room) {
   const m=normalize(room.match); room.match=m; room.views={};

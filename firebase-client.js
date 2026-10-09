@@ -2,7 +2,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/10.10.0/firebase
 import {getAuth,signInAnonymously,signInWithEmailAndPassword,onAuthStateChanged,connectAuthEmulator} from 'https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js';
 import {getDatabase,ref,get,onValue,onDisconnect,set,connectDatabaseEmulator} from 'https://www.gstatic.com/firebasejs/10.10.0/firebase-database.js';
 import {getFunctions,httpsCallable,connectFunctionsEmulator} from 'https://www.gstatic.com/firebasejs/10.10.0/firebase-functions.js';
-const app=initializeApp({apiKey:'AIzaSyAQK1aQR9Et8uWofokz3xTGRfwdb2XK37Q',authDomain:'deseart-falcons-airsof.firebaseapp.com',databaseURL:'https://deseart-falcons-airsof-default-rtdb.firebaseio.com',projectId:'deseart-falcons-airsof',storageBucket:'deseart-falcons-airsof.firebasestorage.app',messagingSenderId:'530347333591',appId:'1:530347333591:web:c48b152765ba7297e51d92'});
+const app=initializeApp({apiKey:'AIzaSyBF7Qe4HV3m7QmhtWbIMv-Nxzm10Ms-InI',authDomain:'deseart-falcons-githib.firebaseapp.com',databaseURL:'https://deseart-falcons-githib-default-rtdb.firebaseio.com',projectId:'deseart-falcons-githib',storageBucket:'deseart-falcons-githib.firebasestorage.app',messagingSenderId:'816488814155',appId:'1:816488814155:web:0824afebbbc651dd541fce'});
 const auth=getAuth(app),db=getDatabase(app),functions=getFunctions(app,'us-central1');
 if(['localhost','127.0.0.1'].includes(location.hostname)&&new URLSearchParams(location.search).has('emulator')){connectAuthEmulator(auth,'http://127.0.0.1:9099',{disableWarnings:true});connectDatabaseEmulator(db,'127.0.0.1',9000);connectFunctionsEmulator(functions,'127.0.0.1',5001);}
 await new Promise(resolve=>{const stop=onAuthStateChanged(auth,()=>{stop();resolve();});});
