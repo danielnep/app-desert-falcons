@@ -1651,3 +1651,7 @@ body:has([data-screen="player"].active #playerLive:not(.hidden)) .session-action
 /* Account forms reuse the existing mobile dialogs. */
 #registerError, #joinError { color:var(--danger); min-height:20px; }
 #loginStatus { color:var(--success, #66d29b); }
+
+/* Simple role entry and readable first-use guides. */
+.role-guide{margin-top:24px;padding:20px;border:1px solid var(--line, #343b40);border-radius:16px;background:rgba(255,255,255,.035)}
+.role-guide h2{font-size:1.1rem;margin:0 0 12px}.role-guide ol,.intro-steps{padding-left:22px;line-height:1.65}.role-guide li,.intro-steps li{margin:0 0 12px}.role-guide p{opacity:.75;font-size:.88rem;line-height:1.5}.role-card:disabled{opacity:.45;cursor:not-allowed}.intro-steps strong{display:block}

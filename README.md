@@ -1,3 +1,13 @@
+# Desert Falcons — versão simples sem login
+
+A interface publicada usa `local-client.js` e `local-engine.js`. Ao abrir, escolha Jogador ou Operador. Não há cadastro, senha, Firebase ou Cloud Functions no fluxo ativo. O operador recebe um tutorial em seis etapas; o jogador recebe um guia e aguarda o início. Ao iniciar, o operador passa ao painel do jogador, mantendo os dois botões de alternância no topo.
+
+A partida, as configurações e o histórico são salvos no navegador. Abas do mesmo navegador e endereço compartilham o estado e reservam um único operador, com Web Locks para serializar alterações. O operador pode retornar após recarregar; Trocar perfil libera a reserva. Celulares ou navegadores diferentes são independentes: não existe sincronização entre dispositivos nesta versão. Os avisos da interface deixam esse limite claro e o compartilhamento de convite fica oculto.
+
+Os arquivos do Firebase e do servidor anterior estão preservados, mas não são carregados pela interface. `local-engine.js` é a cópia do motor existente, adaptada para IDs com Web Crypto; alterações futuras de regras devem manter os motores consistentes.
+
+Validação: `npm run check`; `node --test tests/local-client.test.js tests/firebase-engine.test.js`. A suíte completa inclui um teste antigo de servidor LAN que já falha neste ambiente na versão anterior.
+
 # Desert Falcons — Firebase e celulares
 
 Branch de trabalho: `feat/airsoft-functional-match`. A interface existente e seus componentes foram preservados.

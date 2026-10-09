@@ -1,5 +1,5 @@
-let firebaseTransportPromise;
-function firebaseTransport(){ return firebaseTransportPromise ||= import('./firebase-client.js?v=account-recovery-2').catch(error=>{firebaseTransportPromise=null;throw new Error('Não foi possível conectar ao Firebase. Verifique a internet e tente novamente.');}); }
+let localTransportPromise;
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=simple-roles-1');}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -1213,9 +1213,7 @@ function renderOperatorMenu() {
 
   toggleHidden(
     'btnEnd',
-    !['open', 'live'].includes(
-      state.match.status
-    )
+    (!['open', 'live'].includes(state.match.status)||state.match.status==='open'&&!isOperator())
   );
 
   const rows = [
@@ -3281,9 +3279,7 @@ function renderPlayer() {
   }
 
   if (
-    !['open', 'live'].includes(
-      state.match.status
-    )
+    (!['open', 'live'].includes(state.match.status)||state.match.status==='open'&&!isOperator())
   ) {
     wait.classList.remove(
       'hidden'
@@ -5532,7 +5528,7 @@ function bindEvents() {
         return;
       }
 
-      openLogin(selectedRole);
+      chooseRole(selectedRole);
     }
   );
 
@@ -6683,7 +6679,7 @@ window.addEventListener(
 
 setInterval(
   () => {
-    // Game timers and positions are authoritative on the server.
+    // The local match engine advances timers and stores positions in this browser.
     updateHeader();
 
     if (
@@ -6773,16 +6769,18 @@ function mergeConfiguration(current, next) {
   return result;
 }
 function connectionStatus(text) {
-  const connected=text.startsWith('Conectado');
-  setText('connectionStatus', connected ? 'Conectado' : text);
+  const connected=text.startsWith('Modo local');
+  setText('connectionStatus',text);
   if ($('connectionStatus')) $('connectionStatus').title=text;
   $('reconnectButton')?.classList.toggle('hidden',connected);
 }
-async function request(path, body) { return (await firebaseTransport()).request(path,body); }
+async function request(path, body) { return (await localTransport()).request(path,body); }
 
 function receive(data) {
   if(!data.match) data.match=deepClone(DEFAULT_STATE.match);
-  data.host={joinUrls:[location.origin+location.pathname+'?join']};
+  data.host={joinUrls:[]};
+  const operatorButton=document.querySelector('[data-role="organizer"]');
+  if(operatorButton){operatorButton.disabled=Boolean(data.operatorTaken);operatorButton.querySelector('small').textContent=data.operatorTaken?'Operador já escolhido neste navegador. Entre como jogador.':'Configura modos, regras e mapa. Inicia e controla a partida.';}
   hostInfo=data.host || hostInfo;
   toggleHidden('shareMatch', !hostInfo?.joinUrls?.length || data.identity?.role !== 'organizer');
   data.match={...DEFAULT_STATE.match,...data.match,bomb:{...DEFAULT_STATE.match.bomb,...data.match.bomb},map:{...DEFAULT_STATE.match.map,...data.match.map,marks:data.match.map?.marks||[]},players:data.match.players||[],logs:data.match.logs||[],zones:data.match.zones||{}};
@@ -6800,6 +6798,7 @@ function receive(data) {
   toggleHidden('joinAgain', !identity || Boolean(identity.playerId && !currentPlayer()?.left));
   toggleHidden('newMatch', !isOperator() || state.match.status !== 'ended');
   if (activeScreen === 'player') renderPlayer();
+  toggleHidden('playerHelp',!identity);
   if (activeScreen === 'organizer') renderOperatorMenu();
   if (activeScreen === 'control') renderControl();
   if (activeScreen === 'definitions') renderDefinitions();
@@ -6807,20 +6806,20 @@ function receive(data) {
   const ended = state.match.status === 'ended';
   if ($('playerWait')) {
     $('playerWait').querySelector('h2').textContent = ended ? 'Partida encerrada' : 'Aguardando o operador';
-    $('playerWait').querySelector('p:not(.eyebrow)').textContent = ended ? 'Os registros estão disponíveis no Histórico. Aguarde uma nova partida.' : 'Aguarde a configuração e a confirmação de início. Esta tela será atualizada automaticamente.';
+    $('playerWait').querySelector('p:not(.eyebrow)').textContent = ended ? 'Os registros estão disponíveis no Histórico. Aguarde uma nova partida.' : 'O operador configura modos, regras e mapa, depois inicia a partida. Por enquanto, cada celular funciona de forma independente.';
   }
   toggleHidden('btnStartMatch', state.match.status !== 'open');
   document.querySelectorAll('[data-open-modal="modesModal"], [data-open-modal="mapModal"]').forEach(el => el.disabled = state.match.status === 'live');
   if (clean && isOperator() && !$('rulesModal').classList.contains('hidden')) syncDraftFields();
   renderPlayerExtras();
 }
-async function connect() { (await firebaseTransport()).connect(receive,connectionStatus); }
+async function connect() { (await localTransport()).connect(receive,connectionStatus); }
 
 async function command(action, values = {}, success) {
   try {
     connectionStatus('Salvando…');
     const data = await request('/api/command', {action, ...values});
-    receive(data); connectionStatus('Conectado · dados salvos');
+    receive(data); connectionStatus('Modo local · alterações salvas');
     if (success) toast(success);
     return true;
   } catch(error) {
@@ -6837,7 +6836,7 @@ async function configure(next) {
   return ok;
 }
 async function persistChanges() {
-  // Legacy GPS callbacks persist only the authenticated participant's coordinates.
+  // GPS updates only this local participant.
   if (saving) { pendingPosition = true; return; }
   const me = currentPlayer();
   if (!identity || !me || !state.gps.updatedAt) return;
@@ -6846,11 +6845,14 @@ async function persistChanges() {
   saving = false;
   if (pendingPosition) { pendingPosition = false; persistChanges(); }
 }
-function openLogin(selectedRole) {
-  $('loginRole').value = selectedRole;
-  setText('loginTitle', selectedRole === 'organizer' ? 'Login do operador' : 'Entrar na sua conta');
-  $('loginKey').value = '';
-  setText('loginError', '');setText('loginStatus',''); openOverlay('loginModal'); $('loginEmail').focus();
+async function chooseRole(selectedRole) {
+  try {
+    const data=await request('/api/login',{role:selectedRole,team:'A'});
+    receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);connect();
+    showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');
+    if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
+    else openOverlay('playerIntro');
+  }catch(error){toast(error.message,5000);}
 }
 
 function renderDefinitions() {
@@ -6884,7 +6886,7 @@ const tutorialSteps = [
   {modal:'mapModal',selector:'.file-btn',text:'Envie a imagem do campo. Você também pode gerar um mapa de referência e ajustar seus elementos.'},
   {modal:'mapEditorModal',selector:'#mapEditorCanvas',text:'Use as ferramentas para posicionar os objetivos e bases necessários. Clique em aplicar quando terminar.'},
   {modal:'reviewModal',selector:'#reviewSummary',text:'Confira todas as definições da partida e confirme que revisou o briefing e o mapa.'},
-  {modal:'reviewModal',selector:'#btnStartMatch',text:'Confira as definições da partida. Quando tudo estiver correto, clique neste botão para concluir a configuração e iniciar o jogo. Os participantes que estiverem aguardando serão direcionados para a partida.'}
+  {modal:'reviewModal',selector:'#btnStartMatch',text:'Confira as definições da partida. Quando tudo estiver correto, clique neste botão para concluir a configuração e iniciar o jogo. Você irá para a tela de jogador e poderá voltar aos controles pelos botões no topo.'}
 ];
 function endTutorial() { tutorialStep = -1; document.querySelectorAll('.tutorial-highlight').forEach(el=>el.classList.remove('tutorial-highlight')); toggleHidden('tutorialShade',true); toggleHidden('tutorialCard',true); }
 function tutorialGo(step) {
@@ -6940,34 +6942,13 @@ function bindEnhancements() {
   on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida Desert Falcons',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
   on('sessionMenu','click',()=>{const expanded=$('sessionMenu').getAttribute('aria-expanded')==='true';$('sessionMenu').setAttribute('aria-expanded',String(!expanded));$('sessionActions').classList.toggle('expanded',!expanded);});
   for(const button of $$('#sessionActions button'))button.addEventListener('click',()=>{$('sessionMenu').setAttribute('aria-expanded','false');$('sessionActions').classList.remove('expanded');});
-  on('loginForm','submit',async event=>{
-    event.preventDefault();const button=$('loginSubmit');button.disabled=true;setText('loginError','');setText('loginStatus','');
-    try{const profile=await request('/api/authenticate',{email:$('loginEmail').value.trim(),key:$('loginKey').value,role:$('loginRole').value});
-      $('loginKey').value='';setText('accountName',`Olá, ${profile.name}. Escolha sua equipe.`);$('loginTeam').value=profile.team||'A';setText('joinError','');toggleHidden('importLegacyField',$('loginRole').value!=='organizer');closeOverlay('loginModal');openOverlay('joinModal');
-    }catch(error){setText('loginError',error.message);}finally{button.disabled=false;}
+  on('playerIntroClose','click',()=>closeOverlay('playerIntro'));
+  on('playerHelp','click',()=>openOverlay('playerIntro'));
+  on('logoutAccount','click',async()=>{
+    const button=$('logoutAccount');button.disabled=true;
+    try{const data=await request('/api/logout');endTutorial();receive(data);showScreen('role');}
+    catch(error){toast(error.message);}finally{button.disabled=false;}
   });
-  on('joinForm','submit',async event=>{
-    event.preventDefault();const button=$('joinSubmit');button.disabled=true;setText('joinError','');
-    try{const legacy=localStorage.getItem(STORAGE_KEY);const payload={role:$('loginRole').value,team:$('loginTeam').value};
-      if(payload.role==='organizer'&&!state.match.id&&legacy&&$('importLegacy').checked)payload.legacy=JSON.parse(legacy).match;
-      const data=await request('/api/login',payload);receive(data);draft=deepClone(state.match);appliedSnapshot=deepClone(draft);localStorage.setItem('df_display_name',identity.name);closeOverlay('joinModal');connect();
-      showScreen(isOperator()&&state.match.status!=='live'?'organizer':'player');if(isOperator()&&state.match.status==='open')openOverlay('operatorIntro');
-    }catch(error){setText('joinError',error.message);}finally{button.disabled=false;}
-  });
-  on('openRegister','click',()=>{closeOverlay('loginModal');$('registerForm').reset();$('registerEmail').value=$('loginEmail').value;setText('registerError','');openOverlay('registerModal');$('registerName').focus();});
-  on('registerBack','click',()=>{closeOverlay('registerModal');openLogin($('loginRole').value);});
-  on('registerForm','submit',async event=>{
-    event.preventDefault();setText('registerError','');if($('registerPassword').value!==$('registerConfirm').value){setText('registerError','As senhas não coincidem.');$('registerConfirm').focus();return;}
-    const button=$('registerSubmit');button.disabled=true;
-    try{const email=$('registerEmail').value.trim();const registration=await request('/api/register',{name:$('registerName').value.trim(),email,key:$('registerPassword').value});$('registerForm').reset();closeOverlay('registerModal');openLogin($('loginRole').value);$('loginEmail').value=email;setText('loginStatus',registration.recovered?'Conta existente reconhecida. Entre com seu e-mail e senha.':'Cadastro concluído. Entre com seu e-mail e senha.');}
-    catch(error){setText('registerError',error.message);}finally{button.disabled=false;}
-  });
-  on('forgotPassword','click',async()=>{if(!$('loginEmail').value.trim()||!$('loginEmail').checkValidity()){$('loginEmail').reportValidity();return;}
-    const button=$('forgotPassword');button.disabled=true;try{await request('/api/reset-password',{email:$('loginEmail').value.trim()});setText('loginError','');setText('loginStatus','Se houver uma conta para esse e-mail, você receberá as instruções de recuperação.');}catch(error){setText('loginError',error.message);}finally{button.disabled=false;}
-  });
-  on('loginCancel','click',()=>closeOverlay('loginModal'));
-  on('joinCancel','click',()=>{closeOverlay('joinModal');openLogin($('loginRole').value);});
-  on('logoutAccount','click',async()=>{const button=$('logoutAccount');button.disabled=true;try{await request('/api/logout');endTutorial();receive({identity:null,match:deepClone(DEFAULT_STATE.match)});showScreen('role');toast('VOCÊ SAIU DA CONTA.');}catch(error){toast(error.message);}finally{button.disabled=false;}});
   on('modePlayer','click',()=>{endTutorial();showScreen('player');});
   on('modeOperator','click',()=>{if(isOperator())showScreen('organizer');});
   on('definitionsButton','click',()=>{lastScreen=activeScreen;showScreen('definitions');renderDefinitions();});
@@ -6994,7 +6975,7 @@ function bindEnhancements() {
   on('positionSubmit','click',()=>command('position',{x:Number($('positionX').value)/100,y:Number($('positionY').value)/100},'POSIÇÃO NO MAPA ATUALIZADA.'));
   on('newMatch','click',async()=>{if(await command('new',{},'NOVA CONFIGURAÇÃO CRIADA.')){restoreDraft();showScreen('organizer');openOverlay('operatorIntro');}});
   on('gpsButton','click',requestGps);
-  on('joinAgain','click',()=>openLogin(identity?.role || 'player'));
+  on('joinAgain','click',()=>chooseRole(identity?.role||'player'));
   on('grantBenefit','click',()=>command('benefit',{team:$('benefitTeam').value,kind:$('benefitKind').value},'BENEFÍCIO CONCEDIDO.'));
   // Leaving is recorded without terminating the match; operator visual switching does not use this action.
   for(const id of ['btnLeave','btnPlayerBackReady']) on(id,'click',()=>command('leave',{},'SAÍDA REGISTRADA.'));
@@ -7025,7 +7006,7 @@ startDisarm = async function() {
     if(remaining<=0){clearInterval(disarmTimer);disarmTimer=null;await command('disarm',{},'BOMBA DESARMADA.');}
   },500);
 };
-explodeBomb = function() {}; // The persistent server timer performs detonation exactly once.
+explodeBomb = function() {}; // The local match engine performs detonation exactly once.
 transferBomb = function() {
   const players=state.match.players.filter(p=>p.joined&&p.team===state.match.bomb.armedByTeam&&p.status==='ATIVO');
   const value=prompt('Novo portador:\n'+players.map((p,i)=>`${i+1}. ${p.name}`).join('\n'),'1');if(value===null)return;
@@ -7041,8 +7022,8 @@ resetAll = function() {openConfirm('Reiniciar configuração?','A partida atual 
 
 async function init() {
   localStorage.setItem('df_empty_match',JSON.stringify(deepClone(DEFAULT_STATE.match))); bindEvents(); bindEnhancements(); renderModeModal(); syncDraftFields(); showScreen('role');
-  try { const data = await request('/api/state'); receive(data); connectionStatus('Conectado · dados atualizados'); if (identity) { showScreen(identity.role === 'organizer' && state.match.status !== 'live' ? 'organizer' : 'player'); connect(); } }
-  catch(error) { connectionStatus('Firebase indisponível · tente reconectar.'); toast(error.message, 5000); }
+  try { const data = await request('/api/state'); receive(data); connectionStatus('Modo local · salvo neste navegador'); if (identity) { showScreen(identity.role === 'organizer' && state.match.status !== 'live' ? 'organizer' : 'player'); connect(); if(identity.role==='organizer'&&state.match.status==='open')openOverlay('operatorIntro'); }else connect(); }
+  catch(error) { connectionStatus('Não foi possível carregar os dados locais.'); toast(error.message, 5000); }
 }
 
 if (
