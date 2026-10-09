@@ -1,5 +1,5 @@
 let localTransportPromise;
-function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-5').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
+function localTransport(){return localTransportPromise ||= import('./local-client.js?v=menu-review-6').catch(error=>{localTransportPromise=null;throw new Error('Não foi possível carregar a partida. Recarregue a página para buscar a versão atual. '+error.message);});}
 const STORAGE_KEY = 'df_airsoft_state_v7';
 const ROLE_KEY = 'df_airsoft_role_v7';
 
@@ -5665,7 +5665,8 @@ function bindEvents() {
       button => {
         button.addEventListener(
           'click',
-          () => {
+          async () => {
+            if(button.disabled)return;
             const modalId =
               button.dataset.applyModal;
 
@@ -5676,7 +5677,11 @@ function bindEvents() {
               readRulesForm();
             }
 
-            applyDraft().then(ok => { if (ok) { closeOverlay(modalId); tutorialCompleted(modalId); } });
+            const label=button.textContent;
+            button.disabled=true;button.textContent='SALVANDO…';
+            try {
+              if(await applyDraft()) { closeOverlay(modalId); tutorialCompleted(modalId); }
+            } finally {button.disabled=false;button.textContent=label;}
           }
         );
       }
@@ -6968,6 +6973,12 @@ function showOperatorIntro() {
   openOverlay('operatorIntro');
 }
 function bindEnhancements() {
+  // Keep edits in the draft before background state refreshes arrive.
+  for(const field of $$('#rulesModal input, #rulesModal select')) {
+    for(const event of ['input','change']) field.addEventListener(event,()=>{
+      if(isOperator() && !$('rulesModal').classList.contains('hidden'))readRulesForm();
+    });
+  }
   on('shareMatch','click',()=>{$('inviteUrl').innerHTML=(hostInfo?.joinUrls||[]).map(url=>`<option value="${esc(url)}">${esc(url)}</option>`).join('');setText('inviteStatus','');openOverlay('inviteModal');});
   on('inviteClose','click',()=>closeOverlay('inviteModal'));
   on('inviteShare','click',async()=>{const url=$('inviteUrl').value;if(!url)return;try{if(navigator.share)await navigator.share({title:'Partida Desert Falcons',text:'Entre na partida Desert Falcons',url});else if(navigator.clipboard){await navigator.clipboard.writeText(url);setText('inviteStatus','Link copiado.');}else{setText('inviteStatus','Compartilhe o link exibido acima.');}}catch(error){if(error.name!=='AbortError')setText('inviteStatus','Não foi possível compartilhar automaticamente. Use o link exibido.');}});
